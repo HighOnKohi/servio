@@ -1,6 +1,7 @@
 import React from "react";
 import "./kitchen.css";
 
+// Vincent
 const Kitchen = () => {
   return (
     <div className="kitchen-page">

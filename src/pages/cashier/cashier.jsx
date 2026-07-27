@@ -1,6 +1,7 @@
 import React from "react";
 import "./cashier.css";
 
+// Golpo
 const Cashier = () => {
   return (
     <div className="cashier-page">

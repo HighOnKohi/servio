@@ -1,6 +1,7 @@
 import React from "react";
 import "./inventory.css";
 
+// Dowell
 const Inventory = () => {
   return (
     <div className="inventory-page">

@@ -1,6 +1,7 @@
 import React from "react";
 import "./restaurant-management.css";
 
+// RX
 const RestaurantManagement = () => {
   return (
     <div className="restaurant-management-page">
