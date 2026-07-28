@@ -54,7 +54,7 @@ export default function Waiter() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>🍽️ Waiter</h1>
+        <h1>Waiter</h1>
         <Link to="/" className="btn btn-sm">
           ← Back
         </Link>
