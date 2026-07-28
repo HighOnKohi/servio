@@ -1,4 +1,6 @@
 import { Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { POSProvider } from "./context/POSContext.jsx";
 
 import "./App.css";
 import Admin from "./pages/admin/admin";
@@ -12,21 +14,23 @@ import Waiter from "./pages/waiter/waiter";
 
 function App() {
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<InterfaceSelector />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/cashier" element={<Cashier />} />
-        <Route path="/kitchen" element={<Kitchen />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route
-          path="/restaurant-management"
-          element={<RestaurantManagement />}
-        />
-        <Route path="/waiter" element={<Waiter />} />
-      </Routes>
-    </>
+    <AuthProvider>
+      <POSProvider>
+        <Routes>
+          <Route path="/" element={<InterfaceSelector />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/cashier" element={<Cashier />} />
+          <Route path="/kitchen" element={<Kitchen />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route
+            path="/restaurant-management"
+            element={<RestaurantManagement />}
+          />
+          <Route path="/waiter" element={<Waiter />} />
+        </Routes>
+      </POSProvider>
+    </AuthProvider>
   );
 }
 
