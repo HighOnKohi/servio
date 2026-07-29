@@ -1,5 +1,3 @@
-/* Plain CSS replacement for restaurant-management (converted from Tailwind utilities) */
-
 .restaurant-management-root { font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; background: #ffffff; display: flex; flex-direction: column; }
 
 /* Modal */
