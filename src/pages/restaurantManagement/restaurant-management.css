@@ -1,4 +1,157 @@
-/* Styles for Restaurant Management page */
-.restaurant-management-page {
-  padding: 20px;
+/* Plain CSS replacement for restaurant-management (converted from Tailwind utilities) */
+
+.restaurant-management-root { font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; background: #ffffff; display: flex; flex-direction: column; }
+
+/* Modal */
+.rmc2 { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.3); }
+.rmc3 { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px 16px 0 0; box-shadow: 0 10px 30px rgba(0,0,0,0.12); width: 100%; max-width: 420px; padding: 24px; max-height: 90vh; overflow-y: auto; }
+.rmc4 { display:flex; align-items:center; justify-content:space-between; margin-bottom: 16px; }
+.rmc5 { font-weight: 600; color: #111827; font-size: 1.125rem; }
+.rmc6 { color: #9ca3af; border: none; background: transparent; padding: 4px; cursor: pointer; }
+.rmc7 { display:block; gap: 20px; }
+.rmc8 { display:block; font-size: 0.9rem; color: #475569; margin-bottom: 6px; }
+.rmc9 { display:flex; gap:12px; padding-top:4px; }
+.rmc10 { color:#6b7280; }
+.rmc11 { border:1px solid #e5e7eb; border-radius:12px; padding:12px; display:flex; gap:12px; align-items:center; }
+.rmc12 { width:56px; height:56px; background:#f3f4f6; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#9ca3af; }
+.rmc13 { font-weight:600; color:#111827; }
+.rmc14 { color:#9ca3af; font-size:0.9rem; }
+.rmc15 { display:flex; gap:12px; }
+.rmc16 { border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
+.rmc17 { color:#9ca3af; margin-top:6px; }
+.rmc18 { display:flex; flex-direction:column; height:100%; }
+.rmc19 { padding:20px 16px 12px 16px; overflow-y:auto; flex:1; }
+.rmc20 { font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#9ca3af; margin-bottom:12px; }
+.rmc21 { display:block; gap:6px; }
+.rmc22 { display:flex; flex:1; min-height:0; position:relative; }
+.rmc23 { position:fixed; inset:0; z-index:40; display:flex; }
+.rmc24 { position:absolute; inset:0; background: rgba(0,0,0,0.3); }
+.rmc25 { width: 16rem; background:#fff; height:100%; box-shadow: 0 6px 18px rgba(0,0,0,0.08); display:flex; flex-direction:column; }
+.rmc26 { display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid #f3f4f6; }
+.rmc27 { font-weight:600; color:#111827; }
+.rmc28 { padding:4px; color:#9ca3af; border:none; background:transparent; }
+.rmc29 { display:none; }
+.rmc30 { flex:1; display:flex; flex-direction:column; min-width:0; background:#f8fafc; }
+.rmc31 { display:flex; align-items:center; gap:14px; padding:18px; background:#fff; border-bottom:1px solid #e5e7eb; }
+.rmc32 { display:none; }
+.rmc33 { flex:1; }
+.rmc34 { display:none; }
+.rmc35 { width:100%; padding:14px 18px; border:1px solid #d1d5db; border-radius:14px; background:#f8fafb; font-size:1rem; }
+.rmc36 { display:inline-flex; align-items:center; justify-content:center; gap:10px; background:#111827; color:#fff; padding:14px 18px; border-radius:14px; border:none; cursor:pointer; font-weight:600; }
+.rmc37 { display:none; }
+.rmc38 { padding:20px 16px; display:flex; align-items:center; justify-content:space-between; }
+.rmc39 { font-size:1.125rem; font-weight:600; color:#111827; }
+.rmc40 { color:#9ca3af; font-size:0.9rem; margin-top:4px; }
+.rmc41 { padding:0 16px 20px 16px; flex:1; }
+.rmc42 { padding:48px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#9ca3af; }
+.rmc43 { margin-top:12px; font-size:1rem; }
+.rmc44 { display:grid; grid-template-columns: repeat(1,1fr); gap:12px; }
+
+@media (min-width: 768px) {
+ /* On desktop show the table view and hide the small card grid to avoid duplicated content */
+ .rmc44 { display: none; }
 }
+
+.rmc45 { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; display:flex; gap:12px; align-items:flex-start; }
+.rmc46 { width:56px; height:56px; background:#f3f4f6; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+.rmc47 { flex:1; min-width:0; }
+.rmc48 { color:#9ca3af; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; }
+.rmc49 { font-weight:600; color:#111827; margin-top:6px; }
+.rmc50 { display:flex; flex-direction:column; gap:8px; }
+.rmc51, .rmc52 { width:40px; height:40px; padding:0; border-radius:10px; background:transparent; border:1px solid transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:1rem; }
+.rmc51:hover { background:#f3f4f6; border-color:#e5e7eb; color:#111827; }
+.rmc52:hover { background:#fff0f0; border-color:#f8d7da; color:#dc2626; }
+.rmc53 { display:block; background:#fff; border:1px solid #111827; border-radius:18px; overflow:hidden; box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08); }
+.rmc54 { width:100%; border-collapse: collapse; border-spacing:0; }
+.rmc54 th, .rmc54 td { padding:16px 18px; text-align:left; }
+.rmc54 th { background:#f3f4f6; color:#111827; font-weight:700; letter-spacing:0.02em; border-bottom:1px solid #e5e7eb; }
+.rmc54 tbody tr { border-bottom:1px solid #e5e7eb; }
+.rmc54 tbody tr:last-child { border-bottom:0; }
+.rmc55 { border-bottom:1px solid #f3f4f6; }
+.rmc56, .rmc57, .rmc58, .rmc59, .rmc60, .rmc61, .rmc64 { padding:12px; }
+.rmc60 { text-align:right; }
+.rmc62 { width:48px; height:48px; background:#f3f4f6; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+.rmc63 { font-weight:600; }
+.rmc64 { font-weight:600; }
+.rmc65 { display:inline-block; padding:6px 10px; border-radius:9999px; background:#ecfdf5; color:#16a34a; border:1px solid #bbf7d0; font-size:0.85rem; }
+.rmc66 { text-align:right; }
+.rmc67 { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+.rmc68 { padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #f3f4f6; background:#fff; }
+.rmc69 { display:flex; align-items:center; gap:8px; }
+.rmc70 { padding:8px; border:1px solid #e5e7eb; border-radius:8px; background:transparent; cursor:pointer; }
+.rmc71 { display:none; }
+.rmc71 > div + div { margin-top:24px; }
+.rmc72 { display:grid; grid-template-columns: repeat(2,1fr); gap:12px; }
+.rmc73 { border:1px solid #e5e7eb; border-radius:12px; padding:14px 12px; text-align:center; }
+.rmc74 { font-size:1.75rem; font-weight:600; }
+.rmc75 { font-size:0.85rem; color:#9ca3af; margin-top:6px; }
+.rmc76 { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
+.rmc77 { font-size:1rem; color:#374151; overflow:hidden; text-overflow:ellipsis; }
+.rmc78 { display:flex; gap:6px; opacity:0; transition: opacity .15s ease; }
+.rmc76:hover .rmc78 { opacity:1; }
+.rmc79, .rmc80 { padding:6px; border-radius:6px; background:transparent; border:none; cursor:pointer; }
+.rmc81 { display:flex; align-items:center; gap:8px; padding:8px; border-radius:8px; cursor:pointer; }
+.rmc82 { display:flex; flex-direction:column; gap:12px; }
+.rmc83 { width:40px; height:40px; border:1px solid #e5e7eb; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.rmc84 { flex:1; border:1px solid #e5e7eb; border-radius:8px; text-align:center; padding:8px; font-weight:600; }
+.rmc85 { font-size:0.9rem; color:#9ca3af; margin-top:8px; }
+.rmc86 { border-top:1px solid #f3f4f6; padding-top:12px; }
+.rmc87 { display:grid; gap:10px; }
+.rmc88 { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.rmc89 { font-size:0.95rem; color:#6b7280; margin-left:8px; }
+.rmc90 { display:flex; flex:1; min-height:0; }
+.rmc91 { width:288px; background:#fff; box-shadow: 0 8px 24px rgba(0,0,0,0.08); padding:20px; }
+.rmc92 { display:none; }
+
+.rmc93 { padding:20px 16px 12px 16px; display:flex; align-items:center; justify-content:space-between; }
+.rmc94 { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; }
+.rmc95 { display:none; }
+.rmc96 { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center; }
+
+@media (min-width: 768px) {
+  .rmc29 { display:block; width:220px; flex-shrink:0; border-right:1px solid #e5e7eb; background:#fff; padding-top:8px; }
+  .rmc92 { display:block; width:220px; flex-shrink:0; border-right:1px solid #e5e7eb; background:#fff; padding:12px 16px; }
+  .rmc71 { display:block; width:260px; flex-shrink:0; border-left:1px solid #e5e7eb; background:#fff; padding:12px 16px; }
+}
+.rmc97 { color:#9ca3af; font-size:0.9rem; }
+.rmc98 { border-bottom:1px solid #f3f4f6; background:#f8fafc; }
+.rmc99, .rmc100, .rmc101, .rmc102, .rmc103, .rmc104 { padding:12px; }
+.rmc105 { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-top:1px solid #f3f4f6; background:#fff; }
+.rmc106 { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; }
+.rmc107 { font-size:0.9rem; color:#9ca3af; padding:0 6px; }
+.rmc108 { min-height: 100vh; }
+.rmc109 { border-bottom:1px solid #e5e7eb; background:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
+.rmc110 { display:flex; align-items:center; gap:10px; }
+.rmc111 { width:32px; height:32px; background:#111827; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; }
+.rmc112 { font-weight:600; color:#111827; font-size:0.95rem; }
+.rmc113 { display:flex; align-items:center; gap:8px; }
+.rmc114 { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; }
+.rmc115 { width:32px; height:32px; border-radius:9999px; border:1px solid #e5e7eb; background:#f3f4f6; display:flex; align-items:center; justify-content:center; }
+.rmc116 { text-align:right; display:none; }
+.rmc117 { font-size:0.95rem; font-weight:600; }
+.rmc118 { font-size:0.85rem; color:#9ca3af; }
+.rmc119 { border-bottom:1px solid #e5e7eb; background:#fff; padding:8px 16px; }
+.rmc120 { display:flex; }
+.rmc121 { display:flex; flex:1; min-height:0; overflow:hidden; }
+
+/* form / input */
+.restaurant-management-input { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:1rem; }
+.restaurant-management-textarea { resize: none; }
+.restaurant-management-button-primary { background:#111827; color:#fff; padding:10px 14px; border-radius:8px; border:none; cursor:pointer; }
+.restaurant-management-button-secondary { background:#fff; border:1px solid #e5e7eb; padding:10px 14px; border-radius:8px; cursor:pointer; }
+.restaurant-management-image-placeholder { width:100%; background:#f3f4f6; border:1px dashed #e5e7eb; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#9ca3af; }
+.restaurant-management-image-placeholder--sm { height:64px; }
+.restaurant-management-image-placeholder--md { height:128px; }
+.restaurant-management-image-placeholder--lg { height:176px; }
+.restaurant-management-status-badge { display:inline-flex; align-items:center; justify-content:center; min-width:90px; padding:8px 10px; border-radius:9999px; font-size:0.9rem; line-height:1; }
+.restaurant-management-status-badge--available { border:1px solid #e5e7eb; color:#374151; background:#fff; }
+.restaurant-management-status-badge--occupied { background:#111827; color:#fff; border:1px solid #111827; }
+.restaurant-management-status-badge--reserved { border:1px solid #d1d5db; color:#6b7280; background:#fff; }
+.restaurant-management-category-button { width:100%; text-align:left; padding:12px; border-radius:8px; background:transparent; border:none; font-size:1rem; }
+.restaurant-management-category-button-active { background:#111827; color:#fff; font-weight:600; }
+.restaurant-management-category-button-inactive { color:#374151; }
+.restaurant-management-table-row { border-bottom:1px solid #f8fafc; }
+.restaurant-management-table-row-last { border-bottom:0; }
+.restaurant-management-tab { padding:12px 16px; font-size:0.95rem; border-bottom:2px solid transparent; cursor:pointer; }
+.restaurant-management-tab-active { border-color:#111827; color:#111827; }
+.restaurant-management-tab-inactive { color:#6b7280; }
