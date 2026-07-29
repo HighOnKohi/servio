@@ -27,6 +27,18 @@ const INTERFACES = [
     desc: "View live orders and start cooking.",
     route: "/kitchen",
   },
+  {
+    id: "admin",
+    label: "Admin Interface",
+    desc: "Gain administrative access to the system.",
+    route: "/admin",
+  },
+  {
+    id: "inventory",
+    label: "Inventory Interface",
+    desc: "Manage and track inventory levels.",
+    route: "/inventory",
+  },
 ];
 
 function GridIcon() {
