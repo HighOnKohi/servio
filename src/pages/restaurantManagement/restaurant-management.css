@@ -70,7 +70,7 @@
 .rmc55 { border-bottom:1px solid #f3f4f6; }
 .rmc56, .rmc57, .rmc58, .rmc59, .rmc60, .rmc61, .rmc64 { padding:12px; }
 .rmc60 { text-align:right; }
-.rmc62 { width:48px; height:48px; background:#f3f4f6; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+.rmc62 { width:52px; aspect-ratio:1; height:auto; background:#f3f4f6; border-radius:8px; display:flex; align-items:center; justify-content:center; }
 .rmc63 { font-weight:600; }
 .rmc64 { font-weight:600; }
 .rmc65 { display:inline-block; padding:6px 10px; border-radius:9999px; background:#ecfdf5; color:#16a34a; border:1px solid #bbf7d0; font-size:0.85rem; }
@@ -169,17 +169,24 @@
 .restaurant-management-keyword-details strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.95rem; }
 .restaurant-management-keyword-details small { color:#64748b; font-size:.82rem; }
 
-/* Menu table: retain the same grid and action placement on every page. */
-.rmc22 .rmc54 { table-layout:fixed; }
-.rmc22 .rmc54 th:nth-child(1), .rmc22 .rmc54 td:nth-child(1) { width:12%; }
-.rmc22 .rmc54 th:nth-child(2), .rmc22 .rmc54 td:nth-child(2) { width:46%; }
-.rmc22 .rmc54 th:nth-child(3), .rmc22 .rmc54 td:nth-child(3) { width:14%; }
-.rmc22 .rmc54 th:nth-child(4), .rmc22 .rmc54 td:nth-child(4) { width:14%; }
-.rmc22 .rmc54 th:nth-child(5), .rmc22 .rmc54 td:nth-child(5) { width:14%; }
+/* Menu table: clean columns, square thumbnails, and compact right-aligned actions. */
+.rmc22 .rmc54 { table-layout:auto; }
+.rmc22 .rmc54 th, .rmc22 .rmc54 td { border-inline:0; }
+.rmc22 .rmc54 th:nth-child(1), .rmc22 .rmc54 td:nth-child(1) { width:84px; }
+.rmc22 .rmc54 th:nth-child(2), .rmc22 .rmc54 td:nth-child(2) { width:auto; }
+.rmc22 .rmc54 th:nth-child(3), .rmc22 .rmc54 td:nth-child(3), .rmc22 .rmc54 th:nth-child(4), .rmc22 .rmc54 td:nth-child(4) { width:1%; }
+.rmc22 .rmc54 th:nth-child(5), .rmc22 .rmc54 td:nth-child(5) { width:1%; padding-inline:12px; white-space:nowrap; }
 .rmc22 .rmc54 td:nth-child(2) { overflow:hidden; }
 .rmc22 .rmc54 td:nth-child(3), .rmc22 .rmc54 td:nth-child(4) { white-space:nowrap; }
-.rmc22 .rmc66 { text-align:left; }
-.rmc22 .rmc67 { width:100%; justify-content:flex-start; gap:12px; }
+.rmc22 .rmc60, .rmc22 .rmc66 { text-align:right; }
+.rmc22 .rmc67 { justify-content:flex-end; gap:8px; }
+
+/* Table list: clean columns with a square number cell and compact right-side status. */
+.rmc90 .rmc54 th, .rmc90 .rmc54 td { border-inline:0; }
+.rmc90 .rmc54 th:nth-child(1), .rmc90 .rmc54 td:nth-child(1) { width:56px; height:56px; padding:0; text-align:center; }
+.rmc90 .rmc54 th:nth-child(2), .rmc90 .rmc54 td:nth-child(2) { width:auto; }
+.rmc90 .rmc54 th:nth-child(3), .rmc90 .rmc54 td:nth-child(3) { width:1%; padding-inline:12px; text-align:right; white-space:nowrap; }
+.rmc90 .rmc104 { text-align:right; }
 
 /* Desktop reference layout */
 @media (min-width: 0px) {
