@@ -24,7 +24,7 @@ function App() {
           <Route path="/kitchen" element={<Kitchen />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route
-            path="/restaurant-management"
+            path="/restaurant-management/*"
             element={<RestaurantManagement />}
           />
           <Route path="/waiter" element={<Waiter />} />
