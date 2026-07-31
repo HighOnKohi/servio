@@ -119,6 +119,10 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
         setFormError('Description must contain at least 20 characters.');
         return;
       }
+      if (itemDesc.trim().length > 120) {
+        setFormError('Description cannot exceed 120 characters.');
+        return;
+      }
       if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
         setFormError('Price must be between ₱0.01 and ₱10,000.00.');
         return;
@@ -135,6 +139,10 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
       }
       if (itemDesc.trim().length < 20) {
         setFormError('Description must contain at least 20 characters.');
+        return;
+      }
+      if (itemDesc.trim().length > 120) {
+        setFormError('Description cannot exceed 120 characters.');
         return;
       }
       if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
@@ -188,7 +196,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
             </div>
             <div>
               <label className="rmc8">Description</label>
-              <textarea required className="restaurant-management-input restaurant-management-textarea" rows={3} value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} />
+              <textarea required maxLength={120} className="restaurant-management-input restaurant-management-textarea" rows={3} value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} />
             </div>
             {mode.type === 'addItem' && (
               <div>
