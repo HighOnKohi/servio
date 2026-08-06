@@ -1,555 +1,348 @@
-/* Global theme variables */
-:root {
-  --bg: #f7f8fb;
-  --panel: #ffffff;
-  --card: #ffffff;
-  --table-bg: #f5f7fb;
-  --card-alt: #f3f5fb;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --accent: #0f172a;
-  --accent-soft: #dbeafe;
-  --border: rgba(15, 23, 42, 0.08);
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  margin: 0;
-  min-height: 100vh;
-  height: 100vh;
-  width: 100vw;
-  font-family: Inter, system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-}
-
-body {
-  padding: 0;
-  overflow-x: hidden;
-}
-
-#root {
+.cashier-app {
+  --cashier-ink: #111827;
+  --cashier-muted: #64748b;
+  --cashier-line: #e2e8f0;
+  --cashier-soft: #f8fafc;
+  --cashier-panel: #ffffff;
+  min-height: 0;
+  position: relative;
   display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: cashier-interface;
+  overflow: hidden;
+  zoom: var(--cashier-scale, 1);
+  background: var(--cashier-soft);
+  color: var(--cashier-ink);
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* Main App */
-.app {
-  width: 100vw;
-  min-height: 100vh;
-  max-width: none;
-  margin: 0;
-  background: var(--panel);
-  border-radius: 0;
-  padding: 24px;
-  box-shadow: none;
-}
+.cashier-app *, .cashier-app *::before, .cashier-app *::after { box-sizing: border-box; }
+.cashier-app button, .cashier-app input { font: inherit; }
 
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.tab-group {
-  display: flex;
-  gap: 10px;
-}
-
-.brand {
+.cashier-app .topbar {
+  height: 67px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-right: 12px;
+  gap: 24px;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--cashier-line);
+  flex-shrink: 0;
 }
 
-.brand-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--text);
-  color: var(--panel);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
+.cashier-app .brand, .cashier-app .topbar-right { display: flex; align-items: center; }
+.cashier-app .brand { gap: 10px; margin-right: auto; }
+.cashier-app .brand-logo {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 8px; background: var(--cashier-ink); color: #fff;
 }
+.cashier-app .brand-logo svg { width: 18px; height: 18px; }
+.cashier-app .brand-text { font-size: .95rem; font-weight: 600; color: #111827; }
 
-.brand-text {
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.cashier-app .tab-group {
+  height: 66px; display: flex; align-items: stretch; gap: 0; padding: 7px 16px;
+  background: #fff; border-bottom: 1px solid var(--cashier-line);
+  flex-shrink: 0;
 }
+.cashier-app .tab {
+  border: 0; border-bottom: 2px solid transparent; padding: 0 16px;
+  background: transparent; color: var(--cashier-muted); cursor: pointer;
+  font-size: .95rem; letter-spacing: 0; transition: color .18s, border-color .18s;
+}
+.cashier-app .tab:hover, .cashier-app .tab.active { color: var(--cashier-ink); }
+.cashier-app .tab.active { border-bottom-color: var(--cashier-ink); font-weight: 400; }
 
-.tab {
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: var(--panel);
-  color: var(--text);
-  padding: 10px 18px;
-  border-radius: 999px;
+.cashier-app .topbar-right { gap: 16px; color: #64748b; }
+.cashier-app .date-time { font-size: .875rem; white-space: nowrap; }
+.cashier-app .return-button {
+  width: 38px; height: 38px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 8px; background: var(--cashier-ink); color: #fff; cursor: pointer;
+  transition: background .18s, transform .18s;
+}
+.cashier-app .return-button:hover { background: #000; transform: translateY(-1px); }
+.cashier-app .return-button svg { width: 20px; height: 20px; }
+
+.cashier-app .action-row {
+  display: flex; justify-content: space-between; align-items: end; gap: 24px;
+  padding: 38px 376px 30px 16px; background: var(--cashier-soft);
+  flex-shrink: 0;
+}
+.cashier-app .eyebrow { margin: 0 0 7px; color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: .09em; }
+.cashier-app .action-row h1 { margin: 0; color: #111827; font-size: 1.125rem; font-weight: 600; }
+.cashier-app .action-row p:not(.eyebrow) { margin: 4px 0 0; color: #9ca3af; font-size: .9rem; }
+.cashier-app .table-summary { display: flex; overflow: hidden; border: 1px solid var(--cashier-line); border-radius: 10px; background: #fff; }
+.cashier-app .table-summary span { padding: 10px 13px; color: var(--cashier-muted); font-size: 12px; white-space: nowrap; }
+.cashier-app .table-summary span + span { border-left: 1px solid var(--cashier-line); }
+.cashier-app .table-summary strong { color: var(--cashier-ink); font-size: 14px; }
+
+.cashier-app .main {
+  display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch;
+  gap: 0; padding: 0;
+}
+.cashier-app .cashier-table-area { grid-column: 1; min-height: 0; display: flex; flex-direction: column; }
+.cashier-app .table-grid {
+  display: grid; flex: 1; min-height: 0; grid-template-columns: repeat(4, minmax(130px, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 14px;
+  padding: 0 16px; background: transparent;
+}
+.cashier-app .table-card {
+  min-height: 0; display: flex; flex-direction: column; padding: 15px;
+  border: 1px solid var(--cashier-line); border-radius: 11px; background: #fff; cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.cashier-app .table-card:hover { transform: translateY(-2px); border-color: #94a3b8; box-shadow: 0 7px 16px rgba(15, 23, 42, .08); }
+.cashier-app .table-card.selected { border-color: var(--cashier-ink); box-shadow: 0 0 0 1px var(--cashier-ink); }
+.cashier-app .table-card.empty { background: #fcfdff; }
+.cashier-app .table-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cashier-app .table-number {
+  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px;
+  background: #f1f5f9; color: var(--cashier-ink); font-size: 14px; font-weight: 700;
+}
+.cashier-app .selected .table-number { background: var(--cashier-ink); color: #fff; }
+.cashier-app .table-status { color: var(--cashier-muted); font-size: 10px; font-weight: 700; letter-spacing: .07em; }
+.cashier-app .table-card-body { display: flex; flex-direction: column; gap: 4px; margin: auto 0 12px; padding-top: 18px; }
+.cashier-app .table-label { color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.cashier-app .table-total { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.cashier-app .table-card-footer { min-height: 14px; color: var(--cashier-muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.cashier-app .table-pagination {
+  height: 67px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12px; padding: 12px 16px; border-top: 1px solid #f3f4f6; background: #fff; color: #94a3b8; font-size: .9rem;
+}
+.cashier-app .pagination-actions { display: flex; align-items: center; gap: 14px; }
+.cashier-app .pagination-actions button {
+  padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+  color: #111827; cursor: pointer;
+}
+.cashier-app .pagination-actions button:disabled { color: #cbd5e1; opacity: .55; cursor: default; }
+.cashier-app .pagination-actions > span { padding: 0 6px; }
+
+.cashier-app .menu-ordering-workspace {
+  grid-column: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  background: var(--cashier-soft);
+}
+.cashier-app .menu-ordering-main { gap: 0; }
+.cashier-app .menu-category-sidebar {
+  width: 220px;
+  flex: 0 0 220px;
+  margin-left: 0;
+  padding: 40px 16px 20px;
+  border-right: 1px solid var(--cashier-line);
+  background: #fff;
+}
+.cashier-app .menu-category-label {
+  margin: 0 0 12px;
+  color: #9ca3af;
+  font-size: .75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.cashier-app .menu-category-button {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-radius: 8px;
+  padding: 12px;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
   cursor: pointer;
-  font-size: 13px;
-  letter-spacing: 0.02em;
 }
-
-.tab.active {
-  background: var(--text);
-  border-color: rgba(15, 23, 42, 0.16);
-  color: #ffffff;
-}
-
-.topbar-right {
+.cashier-app .menu-category-button:hover { background: #f8fafc; }
+.cashier-app .menu-category-button.active { background: var(--cashier-ink); color: #fff; font-weight: 600; }
+.cashier-app .menu-catalog { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.cashier-app .menu-search-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--muted);
+  padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
-
-.return-button {
-  width: 38px;
-  height: 38px;
+.cashier-app .menu-search-field { position: relative; flex: 1; min-width: 0; }
+.cashier-app .menu-search-input {
+  width: 100%;
+  height: 55px;
+  padding: 14px 18px;
+  border: 1px solid #d1d5db;
   border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: var(--card-alt);
-  color: var(--text);
-  cursor: pointer;
+  background: #f8fafb;
+  color: var(--cashier-ink);
+  font: inherit;
+  font-size: 1rem;
 }
-
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: flex-start;
-  margin-bottom: 22px;
-}
-
-.action-row h1 {
-  margin: 0 0 6px;
-  font-size: 26px;
-  color: var(--text);
-}
-
-.action-row p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.table-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.table-actions button {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 16px;
-  font-weight: 600;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-}
-
-.table-actions button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* Main content layout */
-.main {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 20px;
-}
-
-.main {
-  align-items: start;
-}
-
-/* Table card grid */
-.table-grid {
+.cashier-app .menu-search-input::placeholder { color: #64748b; opacity: 1; }
+.cashier-app .menu-search-input:focus { outline: none; border-color: #94a3b8; }
+.cashier-app .menu-keyword-dropdown { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; left: 0; max-height: 320px; overflow-y: auto; padding: 6px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; box-shadow: 0 12px 28px rgba(15, 23, 42, .16); }
+.cashier-app .menu-keyword-option { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; border: 0; border-radius: 8px; background: #fff; color: #111827; text-align: left; cursor: pointer; }
+.cashier-app .menu-keyword-option:hover { background: #f8fafc; }
+.cashier-app .menu-keyword-image { width: 42px; height: 42px; flex: 0 0 42px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #f3f4f6; color: #94a3b8; }
+.cashier-app .menu-keyword-image svg { width: 25px; height: 25px; }
+.cashier-app .menu-keyword-details { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.cashier-app .menu-keyword-details strong { overflow: hidden; font-size: .95rem; text-overflow: ellipsis; white-space: nowrap; }
+.cashier-app .menu-keyword-details small { color: #64748b; font-size: .82rem; }
+.cashier-app .menu-catalog-heading { padding: 22px 16px 20px; }
+.cashier-app .menu-catalog-heading h1 { margin: 0; color: #111827; font-size: 1.125rem; font-weight: 600; }
+.cashier-app .menu-catalog-heading p { margin: 4px 0 0; color: #9ca3af; font-size: .9rem; }
+.cashier-app .menu-item-grid {
+  min-height: 0;
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  background: var(--table-bg);
-  padding: 20px;
-  border-radius: 12px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 18px 16px;
+  padding: 0 16px 12px;
 }
-
-.table-grid {
-  position: relative;
-  z-index: 1;
-}
-
-.table-card {
-  background: var(--card);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 18px;
-  cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
-}
-
-.table-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(15, 23, 42, 0.16);
-}
-
-.table-card.selected {
-  border-color: rgba(96, 165, 250, 0.8);
-  background: #ffffff;
-}
-
-.table-card.empty {
-  opacity: 0.7;
-}
-
-.table-card-top {
+.cashier-app .menu-item-card {
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
+  flex-direction: column;
+  border: 1px solid var(--cashier-line);
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 0;
+  background: #fff;
+  color: var(--cashier-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
-
-.table-number {
-  width: 42px;
-  height: 42px;
+.cashier-app .menu-item-card:hover { transform: translateY(-2px); border-color: #94a3b8; box-shadow: 0 7px 16px rgba(15, 23, 42, .08); }
+.cashier-app .menu-item-image {
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: var(--accent-soft);
-  font-weight: 700;
-  color: var(--text);
-}
-
-.table-status {
-  font-size: 12px;
-  color: #000000;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.table-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.table-label {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.table-total {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.table-card-footer {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* Sidebar / bill panel */
-.sidebar {
-  background: var(--card);
-  border-radius: 22px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.sidebar {
-  position: relative;
-  top: -52px;
-  z-index: 20;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 14px;
-}
-
-.bill-title {
-  font-size: 20px;
-  margin: 0 0 4px;
-}
-
-.bill-subtitle {
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.status-pill {
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
-.status-pill.occupied {
-  background: rgba(76, 184, 255, 0.16);
-  color: #8ad6ff;
-}
-
-.status-pill.empty {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--muted);
-}
-
-.order-code {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-size: 12px;
-  color: var(--muted);
-  width: fit-content;
-}
-
-.items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 180px;
-}
-
-.empty-items {
-  color: var(--muted);
-  font-size: 14px;
-  padding: 22px 0;
-  text-align: center;
-}
-
-.item-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.item-name {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.item-note {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.item-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.item-remove {
-  border: none;
-  border-radius: 12px;
-  width: 30px;
-  height: 30px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.summary {
-  display: grid;
-  gap: 10px;
-  padding: 14px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.summary-total {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 700;
-  font-size: 22px;
-  color: var(--text);
-}
-
-.sidebar-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.sidebar-actions button {
-  flex: 1;
-  border: none;
-  border-radius: 14px;
-  padding: 12px 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--card-alt);    
-  color: var(--text);
-  cursor: pointer;
-}
-
-.sidebar-actions .discount-button {
-  background: var(--card-alt);
-  color: var(--text);
-}
-
-.bill-button {
-  background: var(--text);
-  color: #ffffff;
-}
-
-.button-icon {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Modal and dialog styles */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.35);
-  display: grid;
-  place-items: center;
-  z-index: 20;
-}
-
-.modal {
-  width: min(420px, calc(100% - 32px));
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
-  color: var(--text);
-}
-
-.modal h2 {
-  margin: 0 0 18px;
-  font-size: 20px;
-  color: var(--text);
-}
-
-.discount-buttons,
-.payment-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.discount-buttons button,
-.custom-discount button,
-.modal-actions button,
-.modal-close {
-  border: none;
-  border-radius: 14px;
-  padding: 12px 14px;
-  cursor: pointer;
-  background: var(--card-alt);
-  color: var(--text);
-}
-
-.discount-buttons button:hover,
-.custom-discount button:hover,
-.modal-actions button:hover,
-.modal-close:hover {
-  background: rgba(15, 23, 42, 0.08);
-}
-
-.custom-discount {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.custom-discount label {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.custom-discount input {
   width: 100%;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: var(--card-alt);
-  color: var(--text);
+  min-height: 0;
+  flex: 1 1 auto;
+  border-radius: 0;
+  background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+  color: #94a3b8;
 }
+.cashier-app .menu-item-image svg { width: 45px; height: 45px; }
+.cashier-app .menu-item-name { flex: 0 0 auto; margin: 14px 14px 0; overflow: hidden; color: #0f172a; font-size: 17px; font-weight: 400; letter-spacing: -.015em; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.cashier-app .menu-item-bottom { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 14px 14px; }
+.cashier-app .menu-item-price { color: #334155; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+.cashier-app .menu-item-add { position: relative; width: 28px; height: 28px; display: block; flex: 0 0 auto; border: 0; border-radius: 50%; background: #111827; color: transparent; font-size: 0; box-shadow: 0 1px 2px rgba(15, 23, 42, .2); }
+.cashier-app .menu-item-add::before, .cashier-app .menu-item-add::after { position: absolute; top: 50%; left: 50%; width: 12px; height: 2px; border-radius: 1px; background: #fff; content: ''; transform: translate(-50%, -50%); }
+.cashier-app .menu-item-add::after { transform: translate(-50%, -50%) rotate(90deg); }
+.cashier-app .menu-item-card:hover .menu-item-add { background: #000; }
+.cashier-app .menu-pagination { margin-top: 0; }
 
-.payment-options label {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--card-alt);
-  cursor: pointer;
-  color: var(--text);
+.cashier-app .sidebar {
+  position: absolute; top: 133px; right: 0; bottom: 0; width: 360px;
+  display: flex; flex-direction: column; overflow: hidden; border: 0; border-left: 1px solid #e5e7eb;
+  border-radius: 0; background: #fff; box-shadow: none; padding: 13px 16px;
 }
-
-.payment-options input {
-  accent-color: var(--accent);
+.cashier-app .sidebar-section-label { margin: 0 0 12px; color: #9ca3af; font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; }
+.cashier-app .sidebar-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 8px; border-bottom: 1px solid #f3f4f6; }
+.cashier-app .bill-title { font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+.cashier-app .bill-subtitle { margin-top: 4px; color: var(--cashier-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.cashier-app .bill-selection-controls { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.cashier-app .status-pill { padding: 6px 9px; border: 1px solid var(--cashier-line); border-radius: 999px; color: var(--cashier-muted); background: #fff; font-size: 10px; font-weight: 700; letter-spacing: .05em; }
+.cashier-app .status-pill.occupied { border-color: #bbf7d0; color: #15803d; background: #f0fdf4; }
+.cashier-app .table-switcher { position: relative; }
+.cashier-app .table-switcher-button { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--cashier-line); border-radius: 7px; background: #fff; color: #475569; cursor: pointer; }
+.cashier-app .table-switcher-button:hover, .cashier-app .table-switcher-button[aria-expanded="true"] { border-color: #94a3b8; background: #f8fafc; color: #111827; }
+.cashier-app .table-switcher-button svg { width: 15px; height: 15px; }
+.cashier-app .table-switcher-dropdown { position: absolute; z-index: 25; top: calc(100% + 6px); right: 0; width: 190px; overflow: hidden; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; box-shadow: 0 12px 28px rgba(15, 23, 42, .16); }
+.cashier-app .table-switcher-dropdown > p { margin: 0; padding: 10px 12px 7px; color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.cashier-app .table-switcher-options { max-height: 235px; overflow-y: auto; padding: 0 5px 5px; }
+.cashier-app .table-switcher-options button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: 6px; padding: 9px 8px; background: #fff; color: #111827; font-size: 12px; text-align: left; cursor: pointer; }
+.cashier-app .table-switcher-options button:hover { background: #f8fafc; }
+.cashier-app .table-switcher-options button.selected { background: #eef2ff; color: #1e3a8a; }
+.cashier-app .table-switcher-options small { color: #64748b; font-size: 10px; }
+.cashier-app .order-code { width: fit-content; margin: 14px 8px 0; padding: 6px 9px; border-radius: 6px; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 600; }
+.cashier-app .items-list { flex: 1; min-height: 180px; overflow: auto; padding: 10px 8px; }
+.cashier-app .empty-items { display: grid; min-height: 145px; place-items: center; color: #94a3b8; font-size: 13px; text-align: center; }
+.cashier-app .item-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+.cashier-app .item-row:last-child { border-bottom: 0; }
+.cashier-app .item-name { font-size: 13px; font-weight: 650; }
+.cashier-app .item-note { margin-top: 3px; color: #94a3b8; font-size: 11px; }
+.cashier-app .item-right { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; white-space: nowrap; }
+.cashier-app .item-remove { width: 24px; height: 24px; border: 1px solid var(--cashier-line); border-radius: 6px; background: #fff; color: #64748b; cursor: pointer; }
+.cashier-app .item-remove:hover { border-color: #fecaca; background: #fff1f2; color: #dc2626; }
+.cashier-app .summary { margin: 0 8px; padding: 14px 0; border-top: 1px solid #f3f4f6; border-bottom: 1px solid #f3f4f6; }
+.cashier-app .summary-row, .cashier-app .summary-total { display: flex; justify-content: space-between; align-items: center; }
+.cashier-app .summary-row { margin-bottom: 9px; color: var(--cashier-muted); font-size: 13px; }
+.cashier-app .summary-total { font-size: 16px; font-weight: 750; }
+.cashier-app .sidebar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 8px 8px; }
+.cashier-app .sidebar-actions button {
+  min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 650; cursor: pointer;
 }
+.cashier-app .discount-button { border: 1px solid var(--cashier-line); background: #fff; color: var(--cashier-ink); }
+.cashier-app .bill-button { border: 1px solid var(--cashier-ink); background: var(--cashier-ink); color: #fff; }
+.cashier-app .clear-button { border: 1px solid var(--cashier-line); background: #fff; color: var(--cashier-ink); }
+.cashier-app .punch-order-button { border: 1px solid var(--cashier-ink); background: var(--cashier-ink); color: #fff; }
+.cashier-app .sidebar-actions button:hover { filter: brightness(.96); }
+.cashier-app .sidebar-actions button:disabled { cursor: not-allowed; opacity: .45; filter: none; }
+.cashier-app .button-icon { display: inline-flex; }
+.cashier-app .button-icon svg { width: 16px; height: 16px; }
+.cashier-app .discount-button .button-icon svg { fill: currentColor; }
+.cashier-app .bill-button .button-icon svg { fill: currentColor; }
+.cashier-app .clear-button .button-icon svg { fill: currentColor; }
+.cashier-app .punch-order-button .button-icon svg { fill: currentColor; }
 
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 14px;
+.cashier-app .modal-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .42); }
+.cashier-app .modal { width: min(440px, 100%); padding: 24px; border: 1px solid var(--cashier-line); border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .22); }
+.cashier-app .modal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.cashier-app .modal-kicker { margin: 0 0 6px; color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: .09em; }
+.cashier-app .modal h2 { margin: 0; color: #111827; font-size: 20px; letter-spacing: -.02em; }
+.cashier-app .modal-description { margin: 10px 0 20px; color: #64748b; font-size: 13px; line-height: 1.5; }
+.cashier-app .modal-description strong { color: #111827; }
+.cashier-app .modal-icon-close { width: 30px; height: 30px; border: 0; border-radius: 7px; background: #f8fafc; color: #64748b; cursor: pointer; font-size: 21px; line-height: 1; }
+.cashier-app .modal-icon-close:hover { background: #e2e8f0; color: #111827; }
+.cashier-app .discount-buttons, .cashier-app .payment-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.cashier-app .discount-buttons button, .cashier-app .custom-discount button, .cashier-app .modal-actions button, .cashier-app .modal-close { border: 1px solid var(--cashier-line); border-radius: 8px; background: #fff; color: var(--cashier-ink); padding: 11px 13px; cursor: pointer; }
+.cashier-app .discount-buttons button:hover, .cashier-app .custom-discount button:hover, .cashier-app .modal-close:hover { background: #f8fafc; }
+.cashier-app .discount-buttons button { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+.cashier-app .discount-buttons strong { color: #111827; }
+.cashier-app .custom-discount { display: flex; gap: 10px; align-items: flex-end; }
+.cashier-app .custom-discount label { flex: 1; display: flex; flex-direction: column; gap: 6px; color: var(--cashier-muted); font-size: 12px; }
+.cashier-app .custom-discount input { width: 100%; border: 1px solid var(--cashier-line); border-radius: 8px; padding: 10px; color: var(--cashier-ink); }
+.cashier-app .payment-options label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--cashier-line); border-radius: 8px; padding: 12px 13px; cursor: pointer; }
+.cashier-app .payment-options label:has(input:checked) { border-color: #111827; background: #f8fafc; }
+.cashier-app .payment-options input { accent-color: var(--cashier-ink); }
+.cashier-app .modal-actions { display: flex; gap: 10px; }
+.cashier-app .modal-actions button { flex: 1; }
+.cashier-app .modal-print { background: var(--cashier-ink) !important; border-color: var(--cashier-ink) !important; color: #fff !important; }
+.cashier-app .modal-text-button { width: 100%; margin-top: 12px; border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; text-decoration: underline; }
+.cashier-app .modal-text-button:hover { color: #111827; }
+.cashier-app .receipt-modal { text-align: center; }
+.cashier-app .receipt-check { width: 48px; height: 48px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; color: #15803d; font-size: 25px; font-weight: 700; }
+.cashier-app .receipt-details { margin: 22px 0; padding: 4px 14px; border: 1px solid #e5e7eb; border-radius: 10px; text-align: left; }
+.cashier-app .receipt-details > div { display: flex; justify-content: space-between; gap: 18px; padding: 11px 0; color: #64748b; font-size: 12px; }
+.cashier-app .receipt-details > div + div { border-top: 1px solid #f1f5f9; }
+.cashier-app .receipt-details strong { color: #111827; font-weight: 600; text-align: right; }
+.cashier-app .receipt-details .receipt-total { color: #111827; font-size: 14px; font-weight: 700; }
+.cashier-app .receipt-details .receipt-total strong { font-size: 16px; }
+.cashier-app .receipt-done { width: 100%; min-height: 43px; }
+
+@container cashier-interface (max-width: 1050px) {
+  .cashier-app .main { grid-template-columns: 1fr; }
+  .cashier-app .sidebar { position: static; width: auto; min-height: 0; }
+  .cashier-app .action-row { padding-right: 32px; }
+  .cashier-app .menu-ordering-workspace { grid-column: 1; }
 }
-
-.modal-remove {
-  flex: 1;
-  background: var(--card-alt);
-}
-
-.modal-print {
-  flex: 1;
-  background: var(--text);
-  color: #ffffff;
-}
-
-.modal-close {
-  width: 100%;
-  margin-top: 18px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 780px) {
-  .table-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+@container cashier-interface (max-width: 760px) {
+  .cashier-app .topbar { flex-wrap: wrap; gap: 12px; }
+  .cashier-app .brand { margin-right: 0; }
+  .cashier-app .tab-group { height: 52px; padding: 0 8px; }
+  .cashier-app .tab { flex: 1; }
+  .cashier-app .topbar-right { margin-left: auto; }
+  .cashier-app .date-time { display: none; }
+  .cashier-app .action-row, .cashier-app .main { padding-left: 16px; padding-right: 16px; }
+  .cashier-app .action-row { align-items: flex-start; flex-direction: column; padding-top: 22px; }
+  .cashier-app .table-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(0, 1fr)); padding: 12px; gap: 10px; }
+  .cashier-app .table-card { min-height: 135px; padding: 12px; }
+  .cashier-app .menu-category-sidebar { width: 150px; flex-basis: 150px; margin-left: 0; padding: 24px 10px; }
+  .cashier-app .menu-category-button { padding: 11px 10px; font-size: 14px; }
+  .cashier-app .menu-catalog-heading { padding: 22px 16px 14px; }
+  .cashier-app .menu-item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; padding: 0 16px 12px; gap: 10px; overflow: auto; }
 }

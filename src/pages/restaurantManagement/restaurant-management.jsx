@@ -25,11 +25,12 @@ function makeInitTables(n) {
   return Array.from({ length: n }, (_, i) => ({ id: i + 1, status: STATUSES[i % STATUSES.length] }));
 }
 
-const TABLES_PER_PAGE = 10;
+const TABLES_PER_PAGE = 12;
 const categorySlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-const menuPath = (category) => `/restaurant-management/edit-menu/${categorySlug(category.name)}`;
-const withPage = (path, page) => (page > 1 ? `${path}?page=${page}` : path);
-const itemTag = (item, category) => `${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '')}_(${categorySlug(category.name).replace(/-/g, '_')})`;
+const menuItemSlug = (item) => item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+const menuPath = (category, item = null) => `/restaurant-management/edit-menu?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;
+const withPage = (path, page) => (page > 1 ? `${path}${path.includes('?') ? '&' : '?'}page=${page}` : path);
+const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
 const normalizeName = (name) => categorySlug(name);
 const toTitleCase = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 const toSentenceCase = (text) => text.trim().replace(/\s+/g, ' ').toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
@@ -284,16 +285,13 @@ function MenuInterface() {
   const [panel, setPanel] = useState(null);
   const PER_PAGE = 5;
 
-  const categorySlugFromRoute = location.pathname.split('/').filter(Boolean).at(-1);
+  const categorySlugFromRoute = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
   const activeCategory = categories.find((cat) => categorySlug(cat.name) === categorySlugFromRoute) ?? categories[0];
   const activeCat = activeCategory?.id ?? 0;
 
   const searchTerm = search.trim().toLowerCase();
-  const selectedTag = (new URLSearchParams(location.search).get('tag') ?? '').replace(/^"|"$/g, '');
-  const selectedItem = selectedTag ? items.find((item) => {
-    const category = categories.find((cat) => cat.id === item.categoryId);
-    return category && itemTag(item, category) === selectedTag;
-  }) : null;
+  const selectedItemSlug = unquoteQueryValue(new URLSearchParams(location.search).get('item'));
+  const selectedItem = selectedItemSlug ? items.find((item) => item.categoryId === activeCat && menuItemSlug(item) === selectedItemSlug) : null;
   const keywordMatches = searchTerm ? items.filter((item) => item.name.toLowerCase().includes(searchTerm)).slice(0, 6) : [];
   const filtered = selectedItem ? [selectedItem] : items.filter((it) => it.categoryId === activeCat);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -340,7 +338,7 @@ function MenuInterface() {
     if (!category) return;
     setSearch(item.name);
     setIsSearchOpen(false);
-    navigate(`${menuPath(category)}?tag="${itemTag(item, category)}"`);
+    navigate(menuPath(category, item));
   };
   const goToMenuPage = (nextPage) => {
     const category = categories.find((cat) => cat.id === activeCat);
@@ -454,7 +452,7 @@ function MenuInterface() {
         </div>
 
         <div>
-          <p className="rmc20">Categories</p>
+          <p className="rmc20">Edit Categories</p>
           <div className="rmc21">
             {categories.map((cat) => (
               <div key={cat.id} className="rmc76"><span className="rmc77">{cat.name}</span><div className="rmc78"><button className="rmc79" onClick={() => setPanel({ type: 'editCategory', category: cat })}>✎</button><button className="rmc80" onClick={() => setPanel({ type: 'deleteCategory', category: cat })}>✕</button></div></div>
@@ -477,6 +475,8 @@ function TableInterface() {
   const location = useLocation();
   const [tableCount, setTableCount] = useState(20);
   const [tables, setTables] = useState(() => makeInitTables(20));
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const updateCount = (n) => {
     const clamped = Math.max(0, Math.min(100, n));
@@ -489,18 +489,24 @@ function TableInterface() {
   };
 
   const cycleStatus = (id) => setTables((prev) => prev.map((t) => (t.id === id ? { ...t, status: STATUSES[(STATUSES.indexOf(t.status) + 1) % STATUSES.length] } : t)));
-  const totalPages = Math.max(1, Math.ceil(tableCount / TABLES_PER_PAGE));
+  const filteredTables = statusFilter === 'All' ? tables : tables.filter((table) => table.status === statusFilter);
+  const totalPages = Math.max(1, Math.ceil(filteredTables.length / TABLES_PER_PAGE));
   const requestedPage = Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
   const currentPage = Math.min(Math.max(requestedPage || 1, 1), totalPages);
-  const visible = tables.slice((currentPage - 1) * TABLES_PER_PAGE, currentPage * TABLES_PER_PAGE);
+  const visible = filteredTables.slice((currentPage - 1) * TABLES_PER_PAGE, currentPage * TABLES_PER_PAGE);
   const countByStatus = (s) => tables.filter((t) => t.status === s).length;
   const goToTablePage = (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
     navigate(withPage('/restaurant-management/table-list', safePage));
   };
+  const selectStatusFilter = (status) => {
+    setStatusFilter(status);
+    setIsFilterOpen(false);
+    navigate('/restaurant-management/table-list');
+  };
 
   return (
-    <div className="rmc90">
+    <div className="rmc90 table-management-layout">
 
       <aside className="rmc92">
         <div className="rmc82">
@@ -519,12 +525,28 @@ function TableInterface() {
         </div>
       </aside>
 
-      <main className="rmc30">
+      <main className="rmc30 table-management-area">
         <div className="rmc93">
           <div>
             <h2 className="rmc39">Restaurant Tables</h2>
-            <p className="rmc40">{tableCount} table{tableCount !== 1 ? 's' : ''} configured</p>
+            <p className="rmc40">Click a table to update its availability and status.</p>
           </div>
+          <div className="table-management-summary" aria-label="Table status summary">
+            {STATUSES.map((status) => <span key={status}><strong>{countByStatus(status)}</strong> {status.toLowerCase()}</span>)}
+          </div>
+        </div>
+
+        <div className="table-management-grid">
+          {visible.length === 0 ? (
+            <div className="table-management-empty"><GridIcon /><p>No tables found</p></div>
+          ) : visible.map((table) => (
+            <button key={table.id} className={`table-management-card ${table.status.toLowerCase()}`} onClick={() => cycleStatus(table.id)} title="Click to change status">
+              <span className="table-management-card-top">
+                <span className="table-management-number">{String(table.id).padStart(2, '0')}</span>
+                <span className="table-management-status">{table.status}</span>
+              </span>
+            </button>
+          ))}
         </div>
 
         <div className="rmc41">
@@ -547,7 +569,7 @@ function TableInterface() {
         </div>
 
         <div className="rmc105">
-          <span className="rmc14">{Math.min((currentPage - 1) * TABLES_PER_PAGE + 1, tableCount)}–{Math.min(currentPage * TABLES_PER_PAGE, tableCount)} of {tableCount}</span>
+          <span className="rmc14">{filteredTables.length ? Math.min((currentPage - 1) * TABLES_PER_PAGE + 1, filteredTables.length) : 0}–{Math.min(currentPage * TABLES_PER_PAGE, filteredTables.length)} of {filteredTables.length}</span>
           <div className="rmc69">
             <button className="rmc106" disabled={currentPage <= 1} onClick={() => goToTablePage(currentPage - 1)}>◀ Previous</button>
             <span className="rmc107">{currentPage} / {totalPages}</span>
@@ -555,6 +577,31 @@ function TableInterface() {
           </div>
         </div>
       </main>
+
+      <aside className="table-counter-panel">
+        <p className="table-counter-label">TABLE COUNTER</p>
+        <div className="table-counter-heading">
+          <h2>Table settings</h2>
+          <p>Configure the total number of restaurant tables.</p>
+        </div>
+        <div className="table-counter-control">
+          <button onClick={() => updateCount(tableCount - 1)} aria-label="Remove table">−</button>
+          <input type="number" value={tableCount} onChange={(e) => { const count = parseInt(e.target.value, 10); updateCount(Number.isNaN(count) ? 0 : count); }} min={0} max={100} aria-label="Table count" />
+          <button onClick={() => updateCount(tableCount + 1)} aria-label="Add table">+</button>
+        </div>
+        <div className="table-filter-control">
+          <button className="table-filter-toggle" onClick={() => setIsFilterOpen((open) => !open)} aria-expanded={isFilterOpen}>
+            <span aria-hidden="true">⌕</span> Filter <small>{statusFilter}</small>
+          </button>
+          {isFilterOpen && (
+            <div className="table-filter-options" role="menu" aria-label="Filter tables by status">
+              {['All', ...STATUSES].map((status) => (
+                <button key={status} className={statusFilter === status ? 'active' : ''} onClick={() => selectStatusFilter(status)} role="menuitem">{status}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -565,7 +612,9 @@ export default function RestaurantManagement() {
   const interfaceCanvas = useFixedInterfaceCanvas();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const tab = location.pathname.includes('/table-list') ? 'tables' : 'menu';
-  const menuRoute = location.pathname.includes('/edit-menu/') ? location.pathname : '/restaurant-management/edit-menu/meals';
+  const menuRoute = location.pathname.includes('/edit-menu')
+    ? `/restaurant-management/edit-menu${location.search || '?category="meals"'}`
+    : '/restaurant-management/edit-menu?category="meals"';
 
   useEffect(() => {
     const intervalId = setInterval(() => setCurrentDateTime(new Date()), 1000);
