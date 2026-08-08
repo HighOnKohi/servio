@@ -1,47 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { usePOS } from '../../context/POSContext';
 import './cashier.css';
 
-const initialTables = Array.from({ length: 16 }, (_, index) => {
-  const id = index + 1;
-  const label = String(id).padStart(2, '0');
-  const activeData = {
-  };
-  return {
-    id,
-    label,
-    occupied: activeData[id]?.occupied || false,
-    startedAt: activeData[id]?.startedAt || null,
-    minutes: activeData[id]?.minutes || '',
-    guests: activeData[id]?.guests || 0,
-    items: activeData[id]?.items || [],
-    discount: activeData[id]?.discount || 0,
-  };
-});
-
-const menuCategories = [
-  { id: 'meals', name: 'Meals' },
-  { id: 'drinks', name: 'Drinks' },
-  { id: 'desserts', name: 'Desserts' },
-  { id: 'snacks', name: 'Snacks' },
-];
-
-const menuItems = [
-  { id: 1, name: 'Chicken Burger', price: 120, category: 'meals' },
-  { id: 2, name: 'Beef Burger', price: 145, category: 'meals' },
-  { id: 3, name: 'Grilled Chicken', price: 180, category: 'meals' },
-  { id: 4, name: 'Pork Sisig', price: 160, category: 'meals' },
-  { id: 5, name: 'Strawberry Shake', price: 75, category: 'drinks' },
-  { id: 6, name: 'Coke', price: 40, category: 'drinks' },
-  { id: 7, name: 'Iced Tea', price: 50, category: 'drinks' },
-  { id: 8, name: 'Lemonade', price: 55, category: 'drinks' },
-  { id: 9, name: 'Cheesecake Slice', price: 95, category: 'desserts' },
-  { id: 10, name: 'Chocolate Cake', price: 90, category: 'desserts' },
-  { id: 11, name: 'Fries', price: 60, category: 'snacks' },
-  { id: 12, name: 'Nachos', price: 110, category: 'snacks' },
-];
-
-const menuItemSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
 
 function MenuImagePlaceholder() {
@@ -55,7 +16,7 @@ function MenuImagePlaceholder() {
 }
 
 function formatMoney(value) {
-  return `₱${value.toFixed(2)}`;
+  return `₱${Number(value).toFixed(2)}`;
 }
 
 function useFixedInterfaceCanvas() {
@@ -84,7 +45,73 @@ function useFixedInterfaceCanvas() {
 function Cashier() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [tables, setTables] = useState(initialTables);
+  const {
+    tables: dbTables,
+    menuItems: dbMenuItems,
+    categories: dbCategories,
+    orders,
+    orderItems,
+    getOrdersForTable,
+    getItemsForOrder,
+    createOrder,
+    billOutTable,
+    loading,
+  } = usePOS();
+
+  // Map DB data to component-friendly shapes
+  const menuCategories = useMemo(() =>
+    dbCategories.map((c) => ({ id: c.id, name: c.name })),
+    [dbCategories]
+  );
+
+  const menuItems = useMemo(() =>
+    dbMenuItems.map((m) => ({
+      id: m.id,
+      name: m.name,
+      price: Number(m.price),
+      category: m.category_id,
+    })),
+    [dbMenuItems]
+  );
+
+  // Derive table display data from DB
+  const derivedTables = useMemo(() => {
+    return dbTables.map((t) => {
+      const tableOrders = orders.filter(
+        (o) => o.table_number === t.table_number &&
+        o.status !== 'COMPLETED' && o.status !== 'CANCELLED'
+      );
+      const tableItems = tableOrders.flatMap((o) =>
+        (orderItems || []).filter((oi) => oi.order_id === o.id)
+      );
+      const billValue = tableItems.reduce(
+        (sum, oi) => sum + Number(oi.price) * oi.quantity, 0
+      );
+
+      return {
+        id: t.table_number,
+        label: String(t.table_number).padStart(2, '0'),
+        occupied: t.status === 'OCCUPIED',
+        startedAt: t.occupied_since ? new Date(t.occupied_since).getTime() : null,
+        minutes: '',
+        guests: t.guests_count || 0,
+        items: tableItems.map((oi) => ({
+          id: oi.menu_item_id || oi.id,
+          name: oi.item_name,
+          price: Number(oi.price),
+          qty: oi.quantity,
+        })),
+        discount: 0,
+        billValue,
+        table_number: t.table_number,
+        dbOrders: tableOrders,
+      };
+    });
+  }, [dbTables, orders, orderItems]);
+
+  // Local state for cart (menu ordering tab, before punching)
+  const [localCarts, setLocalCarts] = useState({});
+  const [localDiscounts, setLocalDiscounts] = useState({});
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPunchOrderModal, setShowPunchOrderModal] = useState(false);
@@ -96,37 +123,49 @@ function Cashier() {
   const [customDiscount, setCustomDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [punchingOrder, setPunchingOrder] = useState(false);
+  const [billingOut, setBillingOut] = useState(false);
+
   const routeCategory = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
-  const routeItem = unquoteQueryValue(new URLSearchParams(location.search).get('item'));
-  const routeMenuItem = menuItems.find((item) => menuItemSlug(item.name) === routeItem);
-  const [selectedCategory, setSelectedCategory] = useState(() =>
-    menuCategories.some((category) => category.id === routeCategory) ? routeCategory : menuCategories[0].id
-  );
-  const [menuSearch, setMenuSearch] = useState(() => routeMenuItem?.name ?? '');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [menuSearch, setMenuSearch] = useState('');
   const [isMenuSearchOpen, setIsMenuSearchOpen] = useState(false);
   const interfaceCanvas = useFixedInterfaceCanvas();
 
-  const isMenuOrdering = location.pathname.startsWith('/cashier/menu-ordering');
-  const activeMenuCategory = isMenuOrdering && menuCategories.some((category) => category.id === routeCategory)
-    ? routeCategory
-    : selectedCategory;
-  const requestedTableId = Number(location.pathname.match(/\/table-(\d+)$/)?.[1]);
-  const selectedId = tables.some((table) => table.id === requestedTableId)
-    ? requestedTableId
-    : initialTables[0].id;
-  const selected = tables.find((table) => table.id === selectedId);
+  // Set initial category once loaded
+  useEffect(() => {
+    if (menuCategories.length > 0 && !selectedCategory) {
+      setSelectedCategory(menuCategories[0].id);
+    }
+  }, [menuCategories, selectedCategory]);
 
-  const subtotal = selected
-    ? selected.items.reduce((sum, item) => sum + item.price * item.qty, 0)
-    : 0;
-  const discount = selected?.discount || 0;
+  const isMenuOrdering = location.pathname.startsWith('/cashier/menu-ordering');
+  const activeMenuCategory = isMenuOrdering && menuCategories.some((c) => c.id === routeCategory)
+    ? routeCategory
+    : (selectedCategory || (menuCategories[0]?.id ?? ''));
+
+  const requestedTableId = Number(location.pathname.match(/\/table-(\d+)$/)?.[1]);
+  const selectedId = derivedTables.some((t) => t.id === requestedTableId)
+    ? requestedTableId
+    : (derivedTables[0]?.id ?? 1);
+  const selected = derivedTables.find((t) => t.id === selectedId) || derivedTables[0];
+
+  const localCart = localCarts[selectedId] || [];
+  const localDiscount = localDiscounts[selectedId] || 0;
+
+  // In overview, show DB items; in menu ordering, show local cart
+  const displayItems = isMenuOrdering ? localCart : (selected?.items || []);
+  const subtotal = displayItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discount = isMenuOrdering ? 0 : localDiscount;
   const total = +(subtotal - discount).toFixed(2);
+
   const tablesPerPage = 12;
-  const totalTablePages = Math.ceil(tables.length / tablesPerPage);
+  const totalTablePages = Math.max(1, Math.ceil(derivedTables.length / tablesPerPage));
   const requestedPage = Number(new URLSearchParams(location.search).get('page')) || 1;
   const currentTablePage = Math.min(Math.max(requestedPage, 1), totalTablePages);
   const pageStart = (currentTablePage - 1) * tablesPerPage;
-  const visibleTables = tables.slice(pageStart, pageStart + tablesPerPage);
+  const visibleTables = derivedTables.slice(pageStart, pageStart + tablesPerPage);
+
   const menuSearchTerm = menuSearch.trim().toLowerCase();
   const menuKeywordMatches = menuSearchTerm
     ? menuItems.filter((item) => item.name.toLowerCase().includes(menuSearchTerm)).slice(0, 6)
@@ -141,6 +180,8 @@ function Cashier() {
   const currentMenuPage = Math.min(Math.max(requestedMenuPage, 1), totalMenuPages);
   const menuPageStart = (currentMenuPage - 1) * menuItemsPerPage;
   const pagedMenuItems = visibleMenuItems.slice(menuPageStart, menuPageStart + menuItemsPerPage);
+
+  const menuItemSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
   function cashierPath(section, tableId = selectedId, page = 1) {
     const path = `/cashier/${section}/table-${tableId}`;
@@ -165,8 +206,7 @@ function Cashier() {
   }
 
   function goToMenuPage(page) {
-    const exactItem = menuItems.find((item) => item.name.toLowerCase() === menuSearch.trim().toLowerCase());
-    navigate(menuOrderingPath(activeMenuCategory, exactItem, page));
+    navigate(menuOrderingPath(activeMenuCategory, null, page));
   }
 
   function selectCategory(categoryId) {
@@ -184,31 +224,21 @@ function Cashier() {
   }
 
   function addMenuItem(item) {
-    setTables((prev) => prev.map((table) => {
-      if (table.id !== selectedId) return table;
-      const existing = table.items.find((orderItem) => orderItem.id === item.id);
-      const items = existing
-        ? table.items.map((orderItem) => orderItem.id === item.id ? { ...orderItem, qty: orderItem.qty + 1 } : orderItem)
-        : [...table.items, { ...item, qty: 1 }];
-      return { ...table, items, occupied: true, startedAt: table.startedAt || Date.now(), guests: table.guests || 1, punchedAt: null };
-    }));
+    setLocalCarts((prev) => {
+      const currentCart = prev[selectedId] || [];
+      const existing = currentCart.find((ci) => ci.id === item.id);
+      const updatedCart = existing
+        ? currentCart.map((ci) => ci.id === item.id ? { ...ci, qty: ci.qty + 1 } : ci)
+        : [...currentCart, { ...item, qty: 1 }];
+      return { ...prev, [selectedId]: updatedCart };
+    });
   }
 
-  function removeItem(itemName) {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id !== selectedId) return table;
-        const items = table.items.filter((item) => item.name !== itemName);
-        return {
-          ...table,
-          items,
-          occupied: items.length > 0,
-          minutes: items.length > 0 ? table.minutes : '',
-          guests: items.length > 0 ? table.guests : 0,
-          punchedAt: null,
-        };
-      })
-    );
+  function removeItem(itemId) {
+    setLocalCarts((prev) => ({
+      ...prev,
+      [selectedId]: (prev[selectedId] || []).filter((item) => item.id !== itemId),
+    }));
   }
 
   function openDiscountModal() {
@@ -216,28 +246,35 @@ function Cashier() {
     setShowDiscountModal(true);
   }
 
-  function clearSelectedOrder() {
-    if (!selectedId) return;
-    setTables((prev) => prev.map((table) =>
-      table.id === selectedId
-        ? { ...table, occupied: false, startedAt: null, minutes: '', guests: 0, items: [], discount: 0, punchedAt: null }
-        : table
-    ));
+  function clearLocalCart() {
+    setLocalCarts((prev) => ({ ...prev, [selectedId]: [] }));
   }
 
   function requestClearOrder() {
-    if (selected?.items.length) setShowClearOrderModal(true);
+    if (localCart.length > 0) setShowClearOrderModal(true);
   }
 
-  function punchOrder() {
-    if (!selectedId || !selected?.items.length) return;
-    setTables((prev) => prev.map((table) =>
-      table.id === selectedId ? { ...table, punchedAt: Date.now() } : table
-    ));
+  async function punchOrder() {
+    if (!selected || localCart.length === 0 || punchingOrder) return;
+    setPunchingOrder(true);
+    try {
+      await createOrder(selected.table_number, 'Cashier', localCart.map((item) => ({
+        id: item.id,
+        menu_item_id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.qty,
+      })), 'DINE-IN');
+      clearLocalCart();
+    } catch (err) {
+      console.error('Error punching order:', err);
+    } finally {
+      setPunchingOrder(false);
+    }
   }
 
   function requestPunchOrder() {
-    if (selected?.items.length) setShowPunchOrderModal(true);
+    if (localCart.length > 0) setShowPunchOrderModal(true);
   }
 
   function goToOverview() {
@@ -245,7 +282,7 @@ function Cashier() {
   }
 
   function requestOverview() {
-    if (isMenuOrdering && selected?.items.length && !selected.punchedAt) {
+    if (isMenuOrdering && localCart.length > 0) {
       setShowDiscardOrderModal(true);
       return;
     }
@@ -253,7 +290,7 @@ function Cashier() {
   }
 
   function discardOrderAndGoToOverview() {
-    clearSelectedOrder();
+    clearLocalCart();
     setShowDiscardOrderModal(false);
     setPendingTableId(null);
     goToOverview();
@@ -268,31 +305,28 @@ function Cashier() {
     setShowTableSwitcher(false);
     if (tableId === selectedId) return;
 
-    if (selected?.items.length && !selected.punchedAt) {
+    if (localCart.length > 0) {
       setPendingTableId(tableId);
       setShowDiscardOrderModal(true);
       return;
     }
 
-    navigate(menuOrderingPath(activeMenuCategory, routeMenuItem, currentMenuPage, tableId));
+    navigate(menuOrderingPath(activeMenuCategory, null, currentMenuPage, tableId));
   }
 
   function discardOrderAndSwitchTable() {
     const nextTableId = pendingTableId;
-    clearSelectedOrder();
+    clearLocalCart();
     setShowDiscardOrderModal(false);
     setPendingTableId(null);
-    if (nextTableId) navigate(menuOrderingPath(activeMenuCategory, routeMenuItem, currentMenuPage, nextTableId));
+    if (nextTableId) navigate(menuOrderingPath(activeMenuCategory, null, currentMenuPage, nextTableId));
   }
 
   function applyDiscount(amount) {
     if (!selectedId) return;
-    const safeAmount = Math.min(Math.max(Number(amount) || 0, 0), subtotal);
-    setTables((prev) =>
-      prev.map((table) =>
-        table.id === selectedId ? { ...table, discount: safeAmount } : table
-      )
-    );
+    const billSubtotal = (selected?.items || []).reduce((s, i) => s + i.price * i.qty, 0);
+    const safeAmount = Math.min(Math.max(Number(amount) || 0, 0), billSubtotal);
+    setLocalDiscounts((prev) => ({ ...prev, [selectedId]: safeAmount }));
     setShowDiscountModal(false);
   }
 
@@ -306,46 +340,38 @@ function Cashier() {
     navigate('/');
   }
 
-  function completeBill() {
-    if (!selectedId) return;
-    setTables((prev) =>
-      prev.map((table) =>
-        table.id === selectedId
-          ? { ...table, occupied: false, startedAt: null, minutes: '', guests: 0, items: [], discount: 0 }
-          : table
-      )
-    );
-    setShowPaymentModal(false);
+  async function completeBill() {
+    if (!selected || billingOut) return;
+    setBillingOut(true);
+    try {
+      await billOutTable(selected.table_number);
+      setLocalDiscounts((prev) => ({ ...prev, [selectedId]: 0 }));
+    } catch (err) {
+      console.error('Error billing out:', err);
+    } finally {
+      setBillingOut(false);
+      setShowPaymentModal(false);
+    }
   }
 
-  function printReceipt() {
+  async function printReceipt() {
     const printedAt = new Date();
+    const billSubtotal = (selected?.items || []).reduce((s, i) => s + i.price * i.qty, 0);
+    const billTotal = +(billSubtotal - localDiscount).toFixed(2);
     setReceipt({
       table: selected?.label,
       paymentMethod,
-      subtotal,
-      discount,
-      total,
+      subtotal: billSubtotal,
+      discount: localDiscount,
+      total: billTotal,
       date: `${printedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, ${printedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`,
     });
-    completeBill();
+    await completeBill();
   }
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
-      setTables((prev) =>
-        prev.map((table) => {
-          if (!table.occupied || !table.startedAt) return table;
-          const elapsedMs = Date.now() - table.startedAt;
-          const minutes = Math.floor(elapsedMs / 60000);
-          const seconds = Math.floor((elapsedMs % 60000) / 1000);
-          return {
-            ...table,
-            minutes: `${minutes}m ${String(seconds).padStart(2, '0')}s`,
-          };
-        })
-      );
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -362,6 +388,19 @@ function Cashier() {
     second: '2-digit',
     hour12: true,
   });
+
+  if (loading) {
+    return <div className="cashier-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.2rem' }}>Loading…</div>;
+  }
+
+  // Calculate elapsed time for tables
+  const getTableMinutes = (table) => {
+    if (!table.occupied || !table.startedAt) return '';
+    const elapsedMs = currentTime - table.startedAt;
+    const minutes = Math.floor(elapsedMs / 60000);
+    const seconds = Math.floor((elapsedMs % 60000) / 1000);
+    return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  };
 
   return (
     <div
@@ -412,8 +451,8 @@ function Cashier() {
           <p>Choose a table to review its order and bill.</p>
         </div>
         <div className="table-summary">
-          <span><strong>{tables.filter((table) => !table.occupied).length}</strong> available</span>
-          <span><strong>{tables.filter((table) => table.occupied).length}</strong> occupied</span>
+          <span><strong>{derivedTables.filter((t) => !t.occupied).length}</strong> available</span>
+          <span><strong>{derivedTables.filter((t) => t.occupied).length}</strong> occupied</span>
           <span><strong>0</strong> reserved</span>
         </div>
       </div>}
@@ -439,13 +478,8 @@ function Cashier() {
                     onFocus={() => setIsMenuSearchOpen(true)}
                     onChange={(event) => {
                       const nextSearch = event.target.value;
-                      const exactItem = menuItems.find((item) => item.name.toLowerCase() === nextSearch.trim().toLowerCase());
                       setMenuSearch(nextSearch);
                       setIsMenuSearchOpen(true);
-                      if (exactItem) {
-                        setSelectedCategory(exactItem.category);
-                        navigate(menuOrderingPath(exactItem.category, exactItem));
-                      }
                     }}
                   />
                   {isMenuSearchOpen && menuKeywordMatches.length > 0 && (
@@ -453,7 +487,7 @@ function Cashier() {
                       {menuKeywordMatches.map((item) => (
                         <button key={item.id} type="button" className="menu-keyword-option" onClick={() => selectMenuKeyword(item)}>
                           <span className="menu-keyword-image"><MenuImagePlaceholder /></span>
-                          <span className="menu-keyword-details"><strong>{item.name}</strong><small>{menuCategories.find((category) => category.id === item.category)?.name ?? 'Uncategorized'}</small></span>
+                          <span className="menu-keyword-details"><strong>{item.name}</strong><small>{menuCategories.find((c) => c.id === item.category)?.name ?? 'Uncategorized'}</small></span>
                         </button>
                       ))}
                     </div>
@@ -462,8 +496,8 @@ function Cashier() {
               </div>
               <div className="menu-catalog-heading">
                 <div>
-                  <h1>{menuCategories.find((category) => category.id === activeMenuCategory)?.name}</h1>
-                  <p>Tap an item to add it to Table #{selected.label}.</p>
+                  <h1>{menuCategories.find((c) => c.id === activeMenuCategory)?.name}</h1>
+                  <p>Tap an item to add it to Table #{selected?.label}.</p>
                 </div>
               </div>
               <div className="menu-item-grid">
@@ -491,10 +525,6 @@ function Cashier() {
         ) : <section className="cashier-table-area">
           <div className="table-grid">
           {visibleTables.map((table) => {
-            const billValue = table.items.reduce(
-              (sum, item) => sum + item.price * item.qty,
-              0
-            );
             return (
               <div
                 key={table.id}
@@ -506,12 +536,12 @@ function Cashier() {
                 <div className="table-card-top">
                   <div className="table-number">{table.label}</div>
                   <div className="table-status">
-                    {table.occupied ? table.minutes || 'ACTIVE' : 'EMPTY'}
+                    {table.occupied ? getTableMinutes(table) || 'ACTIVE' : 'EMPTY'}
                   </div>
                 </div>
                 <div className="table-card-body">
                   <span className="table-label">CURRENT BILL</span>
-                  <span className="table-total">{formatMoney(billValue)}</span>
+                  <span className="table-total">{formatMoney(table.billValue)}</span>
                 </div>
                 <div className="table-card-footer">
                   {table.occupied ? `${table.guests} GUESTS` : ''}
@@ -521,7 +551,7 @@ function Cashier() {
           })}
           </div>
           <footer className="table-pagination">
-            <span>{pageStart + 1}–{Math.min(pageStart + tablesPerPage, tables.length)} of {tables.length}</span>
+            <span>{pageStart + 1}–{Math.min(pageStart + tablesPerPage, derivedTables.length)} of {derivedTables.length}</span>
             <div className="pagination-actions">
               <button disabled={currentTablePage <= 1} onClick={() => goToTablePage(currentTablePage - 1)}>◀ Previous</button>
               <span>{currentTablePage} / {totalTablePages}</span>
@@ -540,8 +570,8 @@ function Cashier() {
                   <div className="bill-subtitle">Table #{selected.label} · Dine-in</div>
                 </div>
                 <div className="bill-selection-controls">
-                  <div className={`status-pill ${selected.occupied ? 'occupied' : 'empty'}`}>
-                    {selected.occupied ? 'OCCUPIED' : 'EMPTY'}
+                  <div className={`status-pill ${selected.occupied || localCart.length > 0 ? 'occupied' : 'empty'}`}>
+                    {selected.occupied || localCart.length > 0 ? 'OCCUPIED' : 'EMPTY'}
                   </div>
                   {isMenuOrdering && (
                     <div className="table-switcher">
@@ -560,7 +590,7 @@ function Cashier() {
                         <div className="table-switcher-dropdown" role="listbox" aria-label="Switch to another table">
                           <p>Switch table</p>
                           <div className="table-switcher-options">
-                            {tables.map((table) => (
+                            {derivedTables.map((table) => (
                               <button
                                 key={table.id}
                                 type="button"
@@ -581,26 +611,28 @@ function Cashier() {
                 </div>
               </div>
 
-              <div className="order-code">#ORD-2849</div>
+              <div className="order-code">{selected.dbOrders?.length > 0 ? `#ORD-${selected.dbOrders[0].id.slice(0, 4).toUpperCase()}` : '#ORD-NEW'}</div>
 
               <div className="items-list">
-                {selected.items.length === 0 ? (
+                {displayItems.length === 0 ? (
                   <div className="empty-items">No items yet. Add from below.</div>
                 ) : (
-                  selected.items.map((item) => (
-                    <div key={item.name} className="item-row">
+                  displayItems.map((item, idx) => (
+                    <div key={item.id || idx} className="item-row">
                       <div>
-                        <div className="item-name">{item.name}</div>
-                        <div className="item-note">Extra ice</div>
+                        <div className="item-name">{item.name} × {item.qty}</div>
+                        <div className="item-note">Dine-in</div>
                       </div>
                       <div className="item-right">
                         <span>{formatMoney(item.price * item.qty)}</span>
-                        <button
-                          className="item-remove"
-                          onClick={() => removeItem(item.name)}
-                        >
-                          -
-                        </button>
+                        {isMenuOrdering && (
+                          <button
+                            className="item-remove"
+                            onClick={() => removeItem(item.id)}
+                          >
+                            -
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -624,20 +656,20 @@ function Cashier() {
 
               <div className="sidebar-actions">
                 {isMenuOrdering ? <>
-                  <button className="clear-button" onClick={requestClearOrder} disabled={selected.items.length === 0}>
+                  <button className="clear-button" onClick={requestClearOrder} disabled={localCart.length === 0}>
                     <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 16 9-9 3 3-9 9H7v-3Zm10.7-10.7 1.1-1.1a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4L19.7 7l-2-1.7Z"/></svg></span>
                     Clear
                   </button>
-                  <button className="punch-order-button" onClick={requestPunchOrder} disabled={selected.items.length === 0}>
+                  <button className="punch-order-button" onClick={requestPunchOrder} disabled={localCart.length === 0 || punchingOrder}>
                     <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 2v5h10V5H7Zm0 9v5h10v-5H7Z"/></svg></span>
-                    Punch Order
+                    {punchingOrder ? 'Punching...' : 'Punch Order'}
                   </button>
                 </> : <>
                   <button className="discount-button" onClick={openDiscountModal}>
                     <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M856-390 570-104q-12 12-27 18t-30 6q-15 0-30-6t-27-18L103-457q-11-11-17-25.5T80-513v-287q0-33 23.5-56.5T160-880h287q16 0 31 6.5t26 17.5l352 353q12 12 17.5 27t5.5 30q0 15-5.5 29.5T856-390ZM513-160l286-286-353-354H160v286l353 354ZM260-640q25 0 42.5-17.5T320-700q0-25-17.5-42.5T260-760q-25 0-42.5 17.5T200-700q0 25 17.5 42.5T260-640Zm220 160Z"/></svg></span>
                     Add Discount
                   </button>
-                  <button className="bill-button" onClick={openPaymentModal} disabled={selected.items.length === 0}>
+                  <button className="bill-button" onClick={openPaymentModal} disabled={!selected.items.length || billingOut}>
                     <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M560-440q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM280-320q-33 0-56.5-23.5T200-400v-320q0-33 23.5-56.5T280-800h560q33 0 56.5 23.5T920-720v320q0 33-23.5 56.5T840-320H280Zm80-80h400q0-33 23.5-56.5T840-480v-160q-33 0-56.5-23.5T760-720H360q0 33-23.5 56.5T280-640v160q33 0 56.5 23.5T360-400Zm440 240H120q-33 0-56.5-23.5T40-240v-440h80v440h680v80ZM280-400v-320 320Z"/></svg></span>
                     Bill Out
                   </button>
@@ -658,7 +690,7 @@ function Cashier() {
             <p className="modal-description">Save the current order for Table #{selected?.label}?</p>
             <div className="modal-actions">
               <button onClick={() => setShowPunchOrderModal(false)}>Cancel</button>
-              <button className="modal-print" onClick={() => { punchOrder(); setShowPunchOrderModal(false); }}>Punch Order</button>
+              <button className="modal-print" onClick={() => { punchOrder(); setShowPunchOrderModal(false); }}>{punchingOrder ? 'Punching...' : 'Punch Order'}</button>
             </div>
           </div>
         </div>
@@ -674,7 +706,7 @@ function Cashier() {
             <p className="modal-description">This removes all selected items for Table #{selected?.label}.</p>
             <div className="modal-actions">
               <button onClick={() => setShowClearOrderModal(false)}>Cancel</button>
-              <button className="modal-print" onClick={() => { clearSelectedOrder(); setShowClearOrderModal(false); }}>Clear Order</button>
+              <button className="modal-print" onClick={() => { clearLocalCart(); setShowClearOrderModal(false); }}>Clear Order</button>
             </div>
           </div>
         </div>
@@ -726,7 +758,7 @@ function Cashier() {
                 Apply amount
               </button>
             </div>
-            {discount > 0 && <button className="modal-text-button" onClick={() => applyDiscount(0)}>Remove current discount</button>}
+            {localDiscount > 0 && <button className="modal-text-button" onClick={() => applyDiscount(0)}>Remove current discount</button>}
           </div>
         </div>
       )}
@@ -775,8 +807,8 @@ function Cashier() {
               <button className="modal-remove" onClick={() => setShowPaymentModal(false)}>
                 Cancel
               </button>
-              <button className="modal-print" onClick={printReceipt}>
-                Print Receipt
+              <button className="modal-print" onClick={printReceipt} disabled={billingOut}>
+                {billingOut ? 'Processing...' : 'Print Receipt'}
               </button>
             </div>
           </div>

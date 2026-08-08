@@ -1,3 +1,11 @@
+/**
+ * POSContext.jsx
+ * 
+ * This file serves as the central state management and database communication layer for the entire POS system.
+ * It provides a React Context that wraps the application, exposing data and helper functions to all components.
+ * It relies on Supabase for real-time database syncing and CRUD operations.
+ */
+
 import {
   createContext,
   useContext,
@@ -7,12 +15,20 @@ import {
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// Create the context that will be provided to the app
 const POSContext = createContext(null);
 
+// Constants used across the application for calculations and display
 const TAX_RATE = 0.12; // 12% VAT for Philippines
 const CURRENCY = "₱";
 
+/**
+ * POSProvider Component
+ * Wraps the application and manages the global state.
+ */
 export function POSProvider({ children }) {
+  // --- Global State Definitions ---
+  // Each of these state variables corresponds to a table in the Supabase database.
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -21,9 +37,15 @@ export function POSProvider({ children }) {
   const [profiles, setProfiles] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [recipeIngredients, setRecipeIngredients] = useState([]);
+  
+  // Loading state indicates whether the initial data fetch from Supabase is complete
   const [loading, setLoading] = useState(true);
 
-  // --- Refetch helpers ---
+  // --- Refetch Helpers ---
+  // These functions query the Supabase database and update the local state.
+  // They are wrapped in useCallback to prevent unnecessary re-renders.
+
+  /** Fetches all restaurant tables, ordered by table number. */
   const refetchTables = useCallback(async () => {
     const { data } = await supabase
       .from("restaurant_tables")
@@ -32,6 +54,7 @@ export function POSProvider({ children }) {
     if (data) setTables(data);
   }, []);
 
+  /** Fetches all menu items, ordered alphabetically by name. */
   const refetchMenu = useCallback(async () => {
     const { data } = await supabase
       .from("menu_items")
@@ -40,6 +63,7 @@ export function POSProvider({ children }) {
     if (data) setMenuItems(data);
   }, []);
 
+  /** Fetches all menu categories, ordered alphabetically. */
   const refetchCategories = useCallback(async () => {
     const { data } = await supabase
       .from("categories")
@@ -48,6 +72,7 @@ export function POSProvider({ children }) {
     if (data) setCategories(data);
   }, []);
 
+  /** Fetches all orders, ordered by creation date (newest first). */
   const refetchOrders = useCallback(async () => {
     const { data } = await supabase
       .from("orders")
@@ -56,11 +81,13 @@ export function POSProvider({ children }) {
     if (data) setOrders(data);
   }, []);
 
+  /** Fetches all individual order items (the contents of the orders). */
   const refetchOrderItems = useCallback(async () => {
     const { data } = await supabase.from("order_items").select("*");
     if (data) setOrderItems(data);
   }, []);
 
+  /** Fetches all staff profiles, ordered alphabetically by full name. */
   const refetchProfiles = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
@@ -69,6 +96,7 @@ export function POSProvider({ children }) {
     if (data) setProfiles(data);
   }, []);
 
+  /** Fetches all inventory ingredients, ordered alphabetically by name. */
   const refetchIngredients = useCallback(async () => {
     const { data } = await supabase
       .from("ingredients")
@@ -77,12 +105,15 @@ export function POSProvider({ children }) {
     if (data) setIngredients(data);
   }, []);
 
+  /** Fetches the recipe mappings (which ingredients belong to which menu items). */
   const refetchRecipeIngredients = useCallback(async () => {
     const { data } = await supabase.from("recipe_ingredients").select("*");
     if (data) setRecipeIngredients(data);
   }, []);
 
-  // Fetch all on mount
+  // --- Initial Data Load ---
+  // This useEffect runs once when the application starts up.
+  // It fetches all the necessary data from Supabase simultaneously to minimize load time.
   useEffect(() => {
     async function fetchAll() {
       setLoading(true);
@@ -110,7 +141,10 @@ export function POSProvider({ children }) {
     refetchRecipeIngredients,
   ]);
 
-  // Realtime subscriptions
+  // --- Real-time Subscriptions ---
+  // This useEffect sets up WebSocket connections to Supabase.
+  // Whenever data in these tables changes (e.g., from another device), 
+  // the corresponding refetch function is called to update the local state instantly.
   useEffect(() => {
     const channel = supabase
       .channel("pos-realtime")
@@ -140,6 +174,8 @@ export function POSProvider({ children }) {
         () => refetchIngredients(),
       )
       .subscribe();
+      
+    // Cleanup function to close the connection when the component unmounts
     return () => {
       channel.unsubscribe();
     };
@@ -151,21 +187,33 @@ export function POSProvider({ children }) {
     refetchIngredients,
   ]);
 
-  // ---- Inventory: deduct stock ----
+  // ==========================================
+  // HELPER FUNCTIONS (CRUD & Business Logic)
+  // ==========================================
+
+  /**
+   * Deducts ingredients from the inventory based on the items ordered.
+   * Looks up the recipe for each ordered item and decrements the required quantity.
+   */
   const deductIngredients = useCallback(
     async (cartItems) => {
-      // For each cart item, find recipe_ingredients and deduct stock
+      // Loop through every item in the cart
       for (const item of cartItems) {
         const menuItemId = item.id || item.menu_item_id;
         if (!menuItemId) continue;
+        
+        // Find all recipe rows associated with this menu item
         const recipes = recipeIngredients.filter(
           (ri) => ri.menu_item_id === menuItemId,
         );
+        
+        // Loop through each ingredient required by the recipe
         for (const recipe of recipes) {
           const qty = recipe.quantity_needed * (item.quantity || 1);
-          // Decrement stock
           const ing = ingredients.find((i) => i.id === recipe.ingredient_id);
+          
           if (ing) {
+            // Calculate new stock, ensuring it doesn't drop below 0
             const newStock = Math.max(0, Number(ing.stock) - qty);
             await supabase
               .from("ingredients")
@@ -174,12 +222,12 @@ export function POSProvider({ children }) {
           }
         }
       }
-      await refetchIngredients();
+      await refetchIngredients(); // Sync the updated stock back to the UI
     },
     [recipeIngredients, ingredients, refetchIngredients],
   );
 
-  // ---- Table management ----
+  /** Adds a new physical table to the system. */
   const addTable = useCallback(
     async (tableNumber, capacity = 4) => {
       const { data, error } = await supabase
@@ -199,6 +247,7 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
+  /** Removes a physical table from the system. */
   const removeTable = useCallback(
     async (tableId) => {
       const { error } = await supabase
@@ -211,7 +260,7 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
-  // ---- Menu operations ----
+  /** Adds a new item to the menu. */
   const addMenuItem = useCallback(
     async (item) => {
       const { data } = await supabase
@@ -225,6 +274,7 @@ export function POSProvider({ children }) {
     [refetchMenu],
   );
 
+  /** Updates details (e.g., price, name) of an existing menu item. */
   const updateMenuItem = useCallback(
     async (itemId, updates) => {
       await supabase.from("menu_items").update(updates).eq("id", itemId);
@@ -233,6 +283,7 @@ export function POSProvider({ children }) {
     [refetchMenu],
   );
 
+  /** Deletes a menu item from the system. */
   const deleteMenuItem = useCallback(
     async (itemId) => {
       await supabase.from("menu_items").delete().eq("id", itemId);
@@ -241,6 +292,7 @@ export function POSProvider({ children }) {
     [refetchMenu],
   );
 
+  /** Adds a new menu category (e.g., 'Beverages'). */
   const addCategory = useCallback(
     async (name) => {
       const { data } = await supabase
@@ -254,7 +306,28 @@ export function POSProvider({ children }) {
     [refetchCategories],
   );
 
-  // ---- Ingredient / recipe operations ----
+  /** Updates the name of an existing menu category. */
+  const updateCategory = useCallback(
+    async (id, updates) => {
+      await supabase.from("categories").update(updates).eq("id", id);
+      await refetchCategories();
+    },
+    [refetchCategories],
+  );
+
+  /** Deletes a category and forcefully deletes all menu items belonging to it. */
+  const deleteCategory = useCallback(
+    async (id) => {
+      // First delete all items belonging to this category to prevent foreign key errors
+      await supabase.from("menu_items").delete().eq("category_id", id);
+      // Then delete the category itself
+      await supabase.from("categories").delete().eq("id", id);
+      await Promise.all([refetchCategories(), refetchMenu()]);
+    },
+    [refetchCategories, refetchMenu],
+  );
+
+  /** Adds a new raw ingredient to the inventory. */
   const addIngredient = useCallback(
     async (ingredient) => {
       const { data, error } = await supabase
@@ -268,6 +341,7 @@ export function POSProvider({ children }) {
     [refetchIngredients],
   );
 
+  /** Updates an ingredient's properties (stock level, threshold, etc.). */
   const updateIngredient = useCallback(
     async (id, updates) => {
       await supabase
@@ -279,6 +353,7 @@ export function POSProvider({ children }) {
     [refetchIngredients],
   );
 
+  /** Removes an ingredient from the inventory completely. */
   const deleteIngredient = useCallback(
     async (id) => {
       await supabase.from("ingredients").delete().eq("id", id);
@@ -287,6 +362,7 @@ export function POSProvider({ children }) {
     [refetchIngredients],
   );
 
+  /** Links an ingredient to a menu item, defining how much of it is needed to make the item. */
   const addRecipeIngredient = useCallback(
     async (menuItemId, ingredientId, quantityNeeded) => {
       const { data, error } = await supabase
@@ -304,6 +380,7 @@ export function POSProvider({ children }) {
     [refetchRecipeIngredients],
   );
 
+  /** Removes a specific ingredient mapping from a recipe. */
   const removeRecipeIngredient = useCallback(
     async (id) => {
       await supabase.from("recipe_ingredients").delete().eq("id", id);
@@ -312,9 +389,14 @@ export function POSProvider({ children }) {
     [refetchRecipeIngredients],
   );
 
-  // ---- Order operations ----
+  /**
+   * Punches a brand new order for a table.
+   * Calculates taxes, inserts the parent order, inserts all order items,
+   * deducts inventory, and marks the table as OCCUPIED.
+   */
   const createOrder = useCallback(
     async (tableNumber, serverName, items = [], orderType = "DINE-IN") => {
+      // Step 1: Calculate financial totals for the order
       const subtotal = items.reduce(
         (sum, i) => sum + Number(i.price) * (i.quantity || 1),
         0,
@@ -322,6 +404,7 @@ export function POSProvider({ children }) {
       const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
       const total = parseFloat((subtotal + tax).toFixed(2));
 
+      // Step 2: Insert the parent 'order' record
       const { data: order, error } = await supabase
         .from("orders")
         .insert({
@@ -341,6 +424,7 @@ export function POSProvider({ children }) {
         return null;
       }
 
+      // Step 3: Insert the individual items attached to this order
       if (order && items.length > 0) {
         const rows = items.map((i) => ({
           order_id: order.id,
@@ -351,16 +435,17 @@ export function POSProvider({ children }) {
           modifiers: i.modifiers || [],
           status: "PENDING",
         }));
+        
         const { error: itemErr } = await supabase
           .from("order_items")
           .insert(rows);
         if (itemErr) console.error("Error inserting order items:", itemErr);
 
-        // Deduct ingredient stock
+        // Step 4: Automatically deduct the ingredients used from the inventory
         await deductIngredients(items);
       }
 
-      // Update table status
+      // Step 5: Update the physical table's status to reflect that guests are eating
       if (tableNumber) {
         await supabase
           .from("restaurant_tables")
@@ -372,6 +457,7 @@ export function POSProvider({ children }) {
           .eq("table_number", tableNumber);
       }
 
+      // Sync all affected tables to update the UI
       await Promise.all([
         refetchOrders(),
         refetchOrderItems(),
@@ -382,8 +468,13 @@ export function POSProvider({ children }) {
     [refetchOrders, refetchOrderItems, refetchTables, deductIngredients],
   );
 
+  /**
+   * Adds new items to an existing active order (e.g., when a table orders more drinks).
+   * Recalculates the bill and deducts inventory for the new items.
+   */
   const addItemsToOrder = useCallback(
     async (orderId, items) => {
+      // Insert the new items
       const rows = items.map((i) => ({
         order_id: orderId,
         menu_item_id: i.id || null,
@@ -395,14 +486,15 @@ export function POSProvider({ children }) {
       }));
       await supabase.from("order_items").insert(rows);
 
-      // Deduct ingredient stock
+      // Deduct inventory for the newly added items
       await deductIngredients(items);
 
-      // Recalculate totals
+      // Recalculate the entire order's totals from the database
       const { data: allItems } = await supabase
         .from("order_items")
         .select("*")
         .eq("order_id", orderId);
+        
       if (allItems) {
         const subtotal = allItems.reduce(
           (sum, oi) => sum + Number(oi.price) * oi.quantity,
@@ -410,12 +502,14 @@ export function POSProvider({ children }) {
         );
         const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
         const total = parseFloat((subtotal + tax).toFixed(2));
+        
+        // Update the order totals
         await supabase
           .from("orders")
           .update({ subtotal, tax, total })
           .eq("id", orderId);
 
-        // Update table bill
+        // Update the table's active running bill
         const order = orders.find((o) => o.id === orderId);
         if (order && order.table_number) {
           await supabase
@@ -440,14 +534,17 @@ export function POSProvider({ children }) {
     ],
   );
 
+  /** Removes a single item from an active order and recalculates the bill. */
   const removeOrderItem = useCallback(
     async (orderItemId, orderId) => {
       await supabase.from("order_items").delete().eq("id", orderItemId);
 
+      // Recalculate totals for the remaining items
       const { data: remaining } = await supabase
         .from("order_items")
         .select("*")
         .eq("order_id", orderId);
+        
       if (remaining) {
         const subtotal = remaining.reduce(
           (sum, oi) => sum + Number(oi.price) * oi.quantity,
@@ -466,9 +563,10 @@ export function POSProvider({ children }) {
     [refetchOrders, refetchOrderItems],
   );
 
+  /** Updates the lifecycle status of an entire order (e.g., PENDING -> READY). */
   const updateOrderStatus = useCallback(
     async (orderId, status) => {
-      // Optimistic local update so UI responds immediately
+      // Optimistic local update so the UI responds immediately without waiting for the network
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
       );
@@ -482,9 +580,10 @@ export function POSProvider({ children }) {
     [refetchOrders],
   );
 
+  /** Updates the lifecycle status of a specific item within an order. */
   const updateOrderItemStatus = useCallback(
     async (orderItemId, status) => {
-      // Optimistic local update so UI responds immediately
+      // Optimistic local update
       setOrderItems((prev) =>
         prev.map((oi) => (oi.id === orderItemId ? { ...oi, status } : oi)),
       );
@@ -498,9 +597,13 @@ export function POSProvider({ children }) {
     [refetchOrderItems],
   );
 
+  /**
+   * Finalizes a table's session when they pay their bill.
+   * Marks all active orders on that table as COMPLETED and resets the table status to EMPTY.
+   */
   const billOutTable = useCallback(
     async (tableNumber) => {
-      // Get current orders for receipt generation before completing them
+      // Gather current orders for receipt generation before they are marked as completed
       const tableOrders = orders.filter(
         (o) =>
           o.table_number === tableNumber &&
@@ -511,11 +614,14 @@ export function POSProvider({ children }) {
         orderItems.filter((oi) => oi.order_id === o.id),
       );
 
+      // Mark the active orders as COMPLETED
       await supabase
         .from("orders")
         .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
         .eq("table_number", tableNumber)
         .neq("status", "COMPLETED");
+        
+      // Reset the physical table to make it available for the next guest
       await supabase
         .from("restaurant_tables")
         .update({
@@ -525,14 +631,16 @@ export function POSProvider({ children }) {
           occupied_since: null,
         })
         .eq("table_number", tableNumber);
+        
       await Promise.all([refetchOrders(), refetchTables()]);
 
+      // Return the completed data so the caller (Cashier) can print a receipt
       return { orders: tableOrders, items: tableItems };
     },
     [refetchOrders, refetchTables, orders, orderItems],
   );
 
-  // ---- Profile operations ----
+  /** Adds a new staff profile to the system. */
   const addProfile = useCallback(
     async (profile) => {
       const { data } = await supabase
@@ -546,7 +654,11 @@ export function POSProvider({ children }) {
     [refetchProfiles],
   );
 
-  // ---- Helpers ----
+  // ==========================================
+  // UTILITY / GETTER FUNCTIONS
+  // ==========================================
+
+  /** Returns all active orders assigned to a specific table. */
   const getOrdersForTable = useCallback(
     (tableNumber) =>
       orders.filter(
@@ -558,11 +670,13 @@ export function POSProvider({ children }) {
     [orders],
   );
 
+  /** Returns all items associated with a specific order ID. */
   const getItemsForOrder = useCallback(
     (orderId) => orderItems.filter((oi) => oi.order_id === orderId),
     [orderItems],
   );
 
+  /** Returns all orders that are currently being processed (PENDING or IN_PROGRESS). */
   const getActiveOrders = useCallback(
     () =>
       orders.filter(
@@ -571,12 +685,14 @@ export function POSProvider({ children }) {
     [orders],
   );
 
+  /** Returns the recipe ingredient requirements for a specific menu item. */
   const getRecipeForItem = useCallback(
     (menuItemId) =>
       recipeIngredients.filter((ri) => ri.menu_item_id === menuItemId),
     [recipeIngredients],
   );
 
+  /** Returns an array of ingredients that have fallen at or below their low-stock threshold. */
   const getLowStockIngredients = useCallback(
     () =>
       ingredients.filter(
@@ -585,6 +701,7 @@ export function POSProvider({ children }) {
     [ingredients],
   );
 
+  /** Utility function to calculate the subtotal, tax, and total for a given array of items. */
   const calculateBill = useCallback((items) => {
     const subtotal = items.reduce(
       (sum, oi) => sum + Number(oi.price) * oi.quantity,
@@ -595,13 +712,16 @@ export function POSProvider({ children }) {
     return { subtotal, tax, total };
   }, []);
 
+  /** Utility function to format a raw number into a currency string (e.g., ₱150.00). */
   const formatPrice = useCallback((amount) => {
     return `${CURRENCY}${Number(amount).toFixed(2)}`;
   }, []);
 
+  // Expose all data and functions via the Provider
   return (
     <POSContext.Provider
       value={{
+        // Data arrays
         tables,
         menuItems,
         categories,
@@ -611,14 +731,20 @@ export function POSProvider({ children }) {
         ingredients,
         recipeIngredients,
         loading,
+        
+        // Constants
         CURRENCY,
         TAX_RATE,
+        
+        // Operations
         addTable,
         removeTable,
         addMenuItem,
         updateMenuItem,
         deleteMenuItem,
         addCategory,
+        updateCategory,
+        deleteCategory,
         addIngredient,
         updateIngredient,
         deleteIngredient,
@@ -631,6 +757,8 @@ export function POSProvider({ children }) {
         updateOrderItemStatus,
         billOutTable,
         addProfile,
+        
+        // Utility getters
         getOrdersForTable,
         getItemsForOrder,
         getActiveOrders,
@@ -638,6 +766,8 @@ export function POSProvider({ children }) {
         getLowStockIngredients,
         calculateBill,
         formatPrice,
+        
+        // Manual refetch triggers
         refetchOrders,
         refetchOrderItems,
         refetchTables,
@@ -649,6 +779,10 @@ export function POSProvider({ children }) {
   );
 }
 
+/**
+ * Custom hook to consume the POS context safely.
+ * Throws an error if used outside of the POSProvider.
+ */
 export function usePOS() {
   const ctx = useContext(POSContext);
   if (!ctx) throw new Error("usePOS must be used within POSProvider");
