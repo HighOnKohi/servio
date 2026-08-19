@@ -37,7 +37,8 @@ function Kitchen() {
   const [currentPage, setCurrentPage] = useState(1);
   const interfaceCanvas = useFixedInterfaceCanvas();
   const viewFromPath = location.pathname.split('/').filter(Boolean).at(-1);
-  const activeView = ['active-orders', 'completed-orders', 'cancelled-orders'].includes(viewFromPath) ? viewFromPath : 'active-orders';
+  // Kitchen interface only exposes Active Orders in this build
+  const activeView = 'active-orders';
 
   // Map DB orders to kitchen tickets
   const tickets = useMemo(() => {
@@ -72,13 +73,11 @@ function Kitchen() {
     });
   }, [orders, orderItems, getItemsForOrder]);
 
-  const visibleTickets = useMemo(() => tickets.filter((ticket) => {
-    if (activeView === 'completed-orders') return ticket.status === 'COMPLETED';
-    if (activeView === 'cancelled-orders') return ticket.status === 'CANCELLED';
-    return ticket.status === 'ACTIVE';
-  }), [tickets, activeView]);
+  // Only show active tickets in the kitchen interface
+  const visibleTickets = useMemo(() => tickets.filter((ticket) => ticket.status === 'ACTIVE'), [tickets]);
 
-  const ticketsPerPage = 12;
+  // Show 4 columns x 2 rows = 8 tickets per page
+  const ticketsPerPage = 8;
   const totalPages = Math.max(1, Math.ceil(visibleTickets.length / ticketsPerPage));
   const activePage = Math.min(currentPage, totalPages);
   const ticketStart = (activePage - 1) * ticketsPerPage;
@@ -89,16 +88,15 @@ function Kitchen() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!['active-orders', 'completed-orders', 'cancelled-orders'].includes(viewFromPath)) navigate('/kitchen/active-orders', { replace: true });
+    // Ensure the URL always points to the active orders view
+    if (viewFromPath !== 'active-orders') navigate('/kitchen/active-orders', { replace: true });
   }, [viewFromPath, navigate]);
-
-  const navigateToView = (view) => { setCurrentPage(1); navigate(`/kitchen/${view}`); };
 
   const handleUpdateStatus = async (orderId, status) => {
     await updateOrderStatus(orderId, status);
   };
 
-  const labelForView = activeView === 'active-orders' ? 'Active orders' : activeView === 'completed-orders' ? 'Completed orders' : 'Cancelled orders';
+  const labelForView = 'Active orders';
 
   if (loading) {
     return <div className="kitchen-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.2rem' }}>Loading…</div>;
@@ -111,17 +109,21 @@ function Kitchen() {
         <div className="kitchen-topbar-right"><span>{new Date(currentTime).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, {new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</span><button className="kitchen-return-button" onClick={() => navigate('/')} aria-label="Return to interface selector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg></button></div>
       </header>
       <nav className="kitchen-tab-group" aria-label="Kitchen sections">
-        <button className={activeView === 'active-orders' ? 'active' : ''} onClick={() => navigateToView('active-orders')}>ACTIVE ORDERS <span>{tickets.filter((ticket) => ticket.status === 'ACTIVE').length}</span></button>
-        <button className={activeView === 'completed-orders' ? 'active' : ''} onClick={() => navigateToView('completed-orders')}>COMPLETED ORDERS <span>{tickets.filter((ticket) => ticket.status === 'COMPLETED').length}</span></button>
-        <button className={activeView === 'cancelled-orders' ? 'active' : ''} onClick={() => navigateToView('cancelled-orders')}>CANCELLED ORDERS <span>{tickets.filter((ticket) => ticket.status === 'CANCELLED').length}</span></button>
+        {/* Only show Active Orders in the kitchen interface */}
+        <button className={'active'} onClick={() => navigate('/kitchen/active-orders')}>ACTIVE ORDERS <span>{tickets.filter((ticket) => ticket.status === 'ACTIVE').length}</span></button>
       </nav>
       <main className="kitchen-workspace">
         <div className="kitchen-content">
-          <div className="kitchen-heading"><div><h1>{labelForView}</h1><p>{activeView === 'active-orders' ? 'Review new tickets and update their kitchen status.' : 'Review tickets that have already been processed.'}</p></div></div>
           {visibleTickets.length === 0 ? <div className="kitchen-empty"><div>✓</div><h2>No {labelForView.toLowerCase()}</h2><p>{activeView === 'active-orders' ? 'The kitchen is all caught up.' : 'Tickets moved here will remain available for review.'}</p></div> : <section className="ticket-grid">{pagedTickets.map((ticket) => {
-          const urgent = ticket.status === 'ACTIVE' && currentTime - new Date(ticket.createdAt).getTime() > 15 * 60000;
-          return <article className={`kitchen-ticket ${urgent ? 'urgent' : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
-            <header className="ticket-header"><div><strong>#{ticket.displayId}</strong><span>Table #{ticket.table}</span></div><time>◷ {formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}</time></header>
+          const elapsedMs = currentTime - new Date(ticket.createdAt).getTime();
+          const elapsedMinutes = Math.floor(elapsedMs / 60000);
+          let urgency = 'normal';
+          if (ticket.status === 'ACTIVE') {
+            if (elapsedMinutes >= 20) urgency = 'overtime';
+            else if (elapsedMinutes >= 10) urgency = 'warning';
+          }
+          return <article className={`kitchen-ticket ${urgency !== 'normal' ? urgency : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
+            <header className={`ticket-header ${urgency !== 'normal' ? urgency : ''}`}><div><strong>#{ticket.displayId}</strong><span>Table #{ticket.table}</span>{urgency === 'overtime' && <span className="overtime-badge">OVERTIME</span>}</div><time>◷ {formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}</time></header>
             <div className="ticket-meta"><span>{ticket.server}</span><span>{ticket.orderType}</span></div>
             <div className="ticket-items">{ticket.items.map((item, index) => <div className={`ticket-item ${item.cancelled ? 'cancelled' : ''}`} key={`${ticket.id}-${index}`}><div><strong>{item.name}</strong>{item.cancelled && <small>Item cancelled</small>}{item.notes?.map((note) => <em key={note}>{note}</em>)}</div><span>×{item.qty}</span></div>)}</div>
             <footer className="ticket-actions">{activeView === 'active-orders' ? <><button className="cancel-ticket" onClick={() => handleUpdateStatus(ticket.id, 'CANCELLED')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>Cancel</button><button className="complete-ticket" onClick={() => handleUpdateStatus(ticket.id, 'READY')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>Complete</button></> : <span className={`ticket-status ${ticket.status.toLowerCase()}`}>{ticket.status === 'COMPLETED' ? '✓ Completed' : 'Cancelled'}</span>}</footer>
