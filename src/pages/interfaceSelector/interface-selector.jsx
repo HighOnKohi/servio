@@ -13,19 +13,19 @@ const INTERFACES = [
     id: "cashier",
     label: "Cashier Interface",
     desc: "Check out customers and print receipts quickly.",
-    route: "/cashier/overview",
+    route: "/cashier",
   },
   {
     id: "waiter",
     label: "Waiter Interface",
     desc: "Send orders to the kitchen from the floor.",
-    route: "/waiter/menu-ordering",
+    route: "/waiter",
   },
   {
     id: "kitchen",
     label: "Kitchen Interface",
     desc: "View live orders and start cooking.",
-    route: "/kitchen/active-orders",
+    route: "/kitchen",
   },
   {
     id: "admin",

@@ -1,18 +1,35 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { usePOS } from '../../context/POSContext';
-import { supabase } from '../../lib/supabaseClient';
 import './restaurant-management.css';
 
+const INIT_CATEGORIES = [
+  { id: 1, name: 'Meals' },
+  { id: 2, name: 'Drinks' },
+  { id: 3, name: 'Desserts' },
+  { id: 4, name: 'Snacks' },
+];
+
+const INIT_ITEMS = [
+  { id: 1, name: 'Chicken Burger', price: 120, description: 'Juicy chicken burger with fries', categoryId: 1 },
+  { id: 2, name: 'Beef Burger', price: 145, description: 'Classic beef patty with lettuce and tomato', categoryId: 1 },
+  { id: 3, name: 'Grilled Chicken', price: 180, description: 'Oven-grilled chicken with herb seasoning', categoryId: 1 },
+  { id: 4, name: 'Strawberry Shake', price: 75, description: 'Fresh strawberry blended shake', categoryId: 2 },
+  { id: 5, name: 'Coke', price: 40, description: 'Chilled Coca-Cola 330ml', categoryId: 2 },
+  { id: 6, name: 'Iced Tea', price: 50, description: 'Sweetened iced tea with lemon', categoryId: 2 },
+  { id: 7, name: 'Cheesecake Slice', price: 95, description: 'Creamy New York-style cheesecake', categoryId: 3 },
+  { id: 8, name: 'Fries', price: 60, description: 'Crispy golden french fries', categoryId: 4 },
+];
+
 const STATUSES = ['Available', 'Occupied', 'Reserved'];
-const STATUS_MAP = { EMPTY: 'Available', OCCUPIED: 'Occupied', RESERVED: 'Reserved' };
-const REVERSE_STATUS_MAP = { Available: 'EMPTY', Occupied: 'OCCUPIED', Reserved: 'RESERVED' };
-const TABLES_PER_PAGE = 12;
+function makeInitTables(n) {
+  return Array.from({ length: n }, (_, i) => ({ id: i + 1, status: STATUSES[i % STATUSES.length] }));
+}
+
+const TABLES_PER_PAGE = 10;
 const categorySlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-const menuItemSlug = (item) => item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
-const menuPath = (category, item = null) => `/restaurant-management/edit-menu?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;
-const withPage = (path, page) => (page > 1 ? `${path}${path.includes('?') ? '&' : '?'}page=${page}` : path);
-const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
+const menuPath = (category) => `/restaurant-management/edit-menu/${categorySlug(category.name)}`;
+const withPage = (path, page) => (page > 1 ? `${path}?page=${page}` : path);
+const itemTag = (item, category) => `${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '')}_(${categorySlug(category.name).replace(/-/g, '_')})`;
 const normalizeName = (name) => categorySlug(name);
 const toTitleCase = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 const toSentenceCase = (text) => text.trim().replace(/\s+/g, ' ').toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
@@ -76,7 +93,7 @@ function StatusBadge({ status }) {
 function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteItem, onAddCategory, onEditCategory, onDeleteCategory }) {
   const [itemName, setItemName] = useState(mode?.type === 'editItem' ? mode.item.name : '');
   const [itemPrice, setItemPrice] = useState(mode?.type === 'editItem' ? String(mode.item.price) : '');
-  const [itemDesc, setItemDesc] = useState(mode?.type === 'editItem' ? (mode.item.description || '') : '');
+  const [itemDesc, setItemDesc] = useState(mode?.type === 'editItem' ? mode.item.description : '');
   const [itemCat, setItemCat] = useState(mode?.type === 'editItem' ? String(mode.item.categoryId) : String(categories[0]?.id ?? ''));
   const [catName, setCatName] = useState(mode?.type === 'editCategory' ? mode.category.name : '');
   const [formError, setFormError] = useState('');
@@ -92,7 +109,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
     deleteCategory: 'Delete Category',
   }[mode.type] || 'Panel';
 
-  const handleAddOrSave = async () => {
+  const handleAddOrSave = () => {
     if (mode.type === 'addItem') {
       if (!itemName.trim() || !itemPrice.trim() || !itemDesc.trim() || !itemCat) {
         setFormError('Please complete every item field.');
@@ -111,8 +128,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
         return;
       }
       const formattedName = toTitleCase(itemName);
-      const result = await onAddItem({ name: formattedName, price: parseFloat(itemPrice), description: toSentenceCase(itemDesc), category_id: itemCat });
-      if (result === false) {
+      if (onAddItem({ id: Date.now(), name: formattedName, price: parseFloat(itemPrice), description: toSentenceCase(itemDesc), categoryId: parseInt(itemCat, 10) }) === false) {
         setFormError('An item with this name already exists.');
         return;
       }
@@ -133,8 +149,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
         setFormError('Price must be between ₱0.01 and ₱10,000.00.');
         return;
       }
-      const result = await onEditItem(mode.item.id, { name: toTitleCase(itemName), price: parseFloat(itemPrice), description: toSentenceCase(itemDesc) });
-      if (result === false) {
+      if (onEditItem({ ...mode.item, name: toTitleCase(itemName), price: parseFloat(itemPrice), description: toSentenceCase(itemDesc) }) === false) {
         setFormError('An item with this name already exists.');
         return;
       }
@@ -144,8 +159,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
         return;
       }
       const formattedName = toTitleCase(catName);
-      const result = await onAddCategory(formattedName);
-      if (result === false) {
+      if (onAddCategory({ id: Date.now(), name: formattedName }) === false) {
         setFormError('A category with this name already exists.');
         return;
       }
@@ -154,8 +168,7 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
         setFormError('Please enter a category name.');
         return;
       }
-      const result = await onEditCategory(mode.category.id, { name: toTitleCase(catName) });
-      if (result === false) {
+      if (onEditCategory({ ...mode.category, name: toTitleCase(catName) }) === false) {
         setFormError('A category with this name already exists.');
         return;
       }
@@ -264,47 +277,23 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
 function MenuInterface() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    categories: dbCategories,
-    menuItems: dbMenuItems,
-    addMenuItem: posAddMenuItem,
-    updateMenuItem: posUpdateMenuItem,
-    deleteMenuItem: posDeleteMenuItem,
-    addCategory: posAddCategory,
-    updateCategory: posUpdateCategory,
-    deleteCategory: posDeleteCategory,
-  } = usePOS();
-
-  // Map DB data to component-friendly shapes
-  const categories = useMemo(() =>
-    dbCategories.map((c) => ({ id: c.id, name: c.name })),
-    [dbCategories]
-  );
-
-  const items = useMemo(() =>
-    dbMenuItems.map((m) => ({
-      id: m.id,
-      name: m.name,
-      price: Number(m.price),
-      description: m.description || '',
-      categoryId: m.category_id,
-      status: m.status,
-    })),
-    [dbMenuItems]
-  );
-
+  const [categories, setCategories] = useState(INIT_CATEGORIES);
+  const [items, setItems] = useState(INIT_ITEMS);
   const [search, setSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [panel, setPanel] = useState(null);
   const PER_PAGE = 5;
 
-  const categorySlugFromRoute = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
+  const categorySlugFromRoute = location.pathname.split('/').filter(Boolean).at(-1);
   const activeCategory = categories.find((cat) => categorySlug(cat.name) === categorySlugFromRoute) ?? categories[0];
-  const activeCat = activeCategory?.id ?? '';
+  const activeCat = activeCategory?.id ?? 0;
 
   const searchTerm = search.trim().toLowerCase();
-  const selectedItemSlug = unquoteQueryValue(new URLSearchParams(location.search).get('item'));
-  const selectedItem = selectedItemSlug ? items.find((item) => item.categoryId === activeCat && menuItemSlug(item) === selectedItemSlug) : null;
+  const selectedTag = (new URLSearchParams(location.search).get('tag') ?? '').replace(/^"|"$/g, '');
+  const selectedItem = selectedTag ? items.find((item) => {
+    const category = categories.find((cat) => cat.id === item.categoryId);
+    return category && itemTag(item, category) === selectedTag;
+  }) : null;
   const keywordMatches = searchTerm ? items.filter((item) => item.name.toLowerCase().includes(searchTerm)).slice(0, 6) : [];
   const filtered = selectedItem ? [selectedItem] : items.filter((it) => it.categoryId === activeCat);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -314,34 +303,32 @@ function MenuInterface() {
   const pageStart = filtered.length === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1;
   const pageEnd = Math.min(currentPage * PER_PAGE, filtered.length);
 
-  // CRUD wired to POSContext
-  const addItem = async (item) => {
+  const addItem = (item) => {
     if (items.some((existing) => normalizeName(existing.name) === normalizeName(item.name))) return false;
-    await posAddMenuItem(item);
+    setItems((prev) => [...prev, item]);
     return true;
   };
-  const editItem = async (id, updates) => {
-    if (items.some((existing) => existing.id !== id && normalizeName(existing.name) === normalizeName(updates.name))) return false;
-    await posUpdateMenuItem(id, updates);
+  const editItem = (updated) => {
+    if (items.some((existing) => existing.id !== updated.id && normalizeName(existing.name) === normalizeName(updated.name))) return false;
+    setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
     return true;
   };
-  const deleteItem = async (id) => {
-    await posDeleteMenuItem(id);
-  };
-  const addCategory = async (name) => {
-    if (categories.some((existing) => normalizeName(existing.name) === normalizeName(name))) return false;
-    await posAddCategory(name);
+  const deleteItem = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
+  const addCategory = (cat) => {
+    if (categories.some((existing) => normalizeName(existing.name) === normalizeName(cat.name))) return false;
+    setCategories((prev) => [...prev, cat]);
     return true;
   };
-  const editCategory = async (id, updates) => {
-    if (categories.some((existing) => existing.id !== id && normalizeName(existing.name) === normalizeName(updates.name))) return false;
-    await posUpdateCategory(id, updates);
+  const editCategory = (updated) => {
+    if (categories.some((existing) => existing.id !== updated.id && normalizeName(existing.name) === normalizeName(updated.name))) return false;
+    setCategories((prev) => prev.map((category) => (category.id === updated.id ? updated : category)));
     return true;
   };
-  const handleDeleteCategory = async (id) => {
-    await posDeleteCategory(id);
-    const remaining = categories.filter((c) => c.id !== id);
-    if (activeCat === id) navigate(remaining[0] ? menuPath(remaining[0]) : '/restaurant-management/edit-menu');
+  const deleteCategory = (id) => {
+    const remainingCategories = categories.filter((category) => category.id !== id);
+    if (activeCat === id) navigate(remainingCategories[0] ? menuPath(remainingCategories[0]) : '/restaurant-management/edit-menu');
+    setCategories(remainingCategories);
+    setItems((prev) => prev.filter((i) => i.categoryId !== id));
   };
 
   const selectCategory = () => {
@@ -353,7 +340,7 @@ function MenuInterface() {
     if (!category) return;
     setSearch(item.name);
     setIsSearchOpen(false);
-    navigate(menuPath(category, item));
+    navigate(`${menuPath(category)}?tag="${itemTag(item, category)}"`);
   };
   const goToMenuPage = (nextPage) => {
     const category = categories.find((cat) => cat.id === activeCat);
@@ -448,7 +435,7 @@ function MenuInterface() {
                         <td className="rmc61"><div className="rmc62"><ImageIcon /></div></td>
                         <td className="rmc61"><div className="rmc63">{item.name}</div><div className="rmc40">{item.description}</div></td>
                         <td className="rmc64">₱{item.price.toFixed(2)}</td>
-                        <td className="rmc61"><span className="rmc65">{item.status || 'Active'}</span></td>
+                        <td className="rmc61"><span className="rmc65">Active</span></td>
                         <td className="rmc66"><div className="rmc67"><button className="rmc51" onClick={() => setPanel({ type: 'editItem', item })} aria-label="Edit item">✎</button><button className="rmc52" onClick={() => setPanel({ type: 'deleteItem', item })} aria-label="Delete item">✕</button></div></td>
                       </tr>
                     ))}
@@ -470,8 +457,31 @@ function MenuInterface() {
 
       </main>
 
+<<<<<<< HEAD
+=======
+      <aside className="rmc71">
+        <div>
+          <p className="rmc20">Quick Stats</p>
+          <div className="rmc72">
+            <div className="rmc73"><div className="rmc74">{items.length}</div><div className="rmc75">Total Items</div></div>
+            <div className="rmc73"><div className="rmc74">{categories.length}</div><div className="rmc75">Categories</div></div>
+          </div>
+        </div>
+
+        <div>
+          <p className="rmc20">Categories</p>
+          <div className="rmc21">
+            {categories.map((cat) => (
+              <div key={cat.id} className="rmc76"><span className="rmc77">{cat.name}</span><div className="rmc78"><button className="rmc79" onClick={() => setPanel({ type: 'editCategory', category: cat })}>✎</button><button className="rmc80" onClick={() => setPanel({ type: 'deleteCategory', category: cat })}>✕</button></div></div>
+            ))}
+            <button className="rmc81" onClick={() => setPanel({ type: 'addCategory' })}>＋ Add Category</button>
+          </div>
+        </div>
+      </aside>
+
+>>>>>>> e7dcc2125cb7c83cf9c81cff5f44ab0b4bff68f8
       {panel && (
-        <MenuPanel mode={panel} categories={categories} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={handleDeleteCategory} />
+        <MenuPanel mode={panel} categories={categories} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />
       )}
     </div>
   );
@@ -481,74 +491,32 @@ function MenuInterface() {
 function TableInterface() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    tables: dbTables,
-    addTable: posAddTable,
-    removeTable: posRemoveTable,
-    refetchTables,
-  } = usePOS();
+  const [tableCount, setTableCount] = useState(20);
+  const [tables, setTables] = useState(() => makeInitTables(20));
 
-
-
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  const tables = useMemo(() =>
-    dbTables.map((t) => ({
-      id: t.table_number,
-      dbId: t.id,
-      status: STATUS_MAP[t.status] || 'Available',
-      dbStatus: t.status,
-    })),
-    [dbTables]
-  );
-
-  const tableCount = tables.length;
-
-  const updateCount = async (n) => {
+  const updateCount = (n) => {
     const clamped = Math.max(0, Math.min(100, n));
-    if (clamped > tableCount) {
-      // Add tables
-      for (let i = tableCount + 1; i <= clamped; i++) {
-        await posAddTable(i, 4);
-      }
-    } else if (clamped < tableCount) {
-      // Remove tables from the end
-      const sorted = [...dbTables].sort((a, b) => b.table_number - a.table_number);
-      for (let i = 0; i < tableCount - clamped; i++) {
-        await posRemoveTable(sorted[i].id);
-      }
-    }
+    setTableCount(clamped);
+    setTables((prev) => {
+      if (clamped > prev.length) return [...prev, ...Array.from({ length: clamped - prev.length }, (_, i) => ({ id: prev.length + i + 1, status: 'Available' }))];
+      return prev.slice(0, clamped);
+    });
     navigate('/restaurant-management/table-list');
   };
 
-  const cycleStatus = async (tableNum) => {
-    const table = dbTables.find((t) => t.table_number === tableNum);
-    if (!table) return;
-    const currentIdx = ['EMPTY', 'OCCUPIED', 'RESERVED'].indexOf(table.status);
-    const nextStatus = ['EMPTY', 'OCCUPIED', 'RESERVED'][(currentIdx + 1) % 3];
-    await supabase.from('restaurant_tables').update({ status: nextStatus }).eq('id', table.id);
-    await refetchTables();
-  };
-
-  const filteredTables = statusFilter === 'All' ? tables : tables.filter((t) => t.status === statusFilter);
-  const totalPages = Math.max(1, Math.ceil(filteredTables.length / TABLES_PER_PAGE));
+  const cycleStatus = (id) => setTables((prev) => prev.map((t) => (t.id === id ? { ...t, status: STATUSES[(STATUSES.indexOf(t.status) + 1) % STATUSES.length] } : t)));
+  const totalPages = Math.max(1, Math.ceil(tableCount / TABLES_PER_PAGE));
   const requestedPage = Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
   const currentPage = Math.min(Math.max(requestedPage || 1, 1), totalPages);
-  const visible = filteredTables.slice((currentPage - 1) * TABLES_PER_PAGE, currentPage * TABLES_PER_PAGE);
+  const visible = tables.slice((currentPage - 1) * TABLES_PER_PAGE, currentPage * TABLES_PER_PAGE);
   const countByStatus = (s) => tables.filter((t) => t.status === s).length;
   const goToTablePage = (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
     navigate(withPage('/restaurant-management/table-list', safePage));
   };
-  const selectStatusFilter = (status) => {
-    setStatusFilter(status);
-    setIsFilterOpen(false);
-    navigate('/restaurant-management/table-list');
-  };
 
   return (
-    <div className="rmc90 table-management-layout">
+    <div className="rmc90">
 
       <aside className="rmc92">
         <div className="rmc82">
@@ -574,10 +542,11 @@ function TableInterface() {
         </div>
       </aside>
 
-      <main className="rmc30 table-management-area">
+      <main className="rmc30">
         <div className="rmc93">
           <div>
             <h2 className="rmc39">Restaurant Tables</h2>
+<<<<<<< HEAD
           <p className="rmc40">Change the total number of table items and view their status.</p>
           </div>
           <div className="table-management-summary" aria-label="Table status summary">
@@ -596,6 +565,10 @@ function TableInterface() {
               </span>
           </div>
           ))}
+=======
+            <p className="rmc40">{tableCount} table{tableCount !== 1 ? 's' : ''} configured</p>
+          </div>
+>>>>>>> e7dcc2125cb7c83cf9c81cff5f44ab0b4bff68f8
         </div>
 
         <div className="rmc41">
@@ -618,7 +591,7 @@ function TableInterface() {
         </div>
 
         <div className="rmc105">
-          <span className="rmc14">{filteredTables.length ? Math.min((currentPage - 1) * TABLES_PER_PAGE + 1, filteredTables.length) : 0}–{Math.min(currentPage * TABLES_PER_PAGE, filteredTables.length)} of {filteredTables.length}</span>
+          <span className="rmc14">{Math.min((currentPage - 1) * TABLES_PER_PAGE + 1, tableCount)}–{Math.min(currentPage * TABLES_PER_PAGE, tableCount)} of {tableCount}</span>
           <div className="rmc69">
             <button className="rmc106" disabled={currentPage <= 1} onClick={() => goToTablePage(currentPage - 1)}>◀ Previous</button>
             <span className="rmc107">{currentPage} / {totalPages}</span>
@@ -626,31 +599,6 @@ function TableInterface() {
           </div>
         </div>
       </main>
-
-      <aside className="table-counter-panel">
-        <p className="table-counter-label">TABLE COUNTER</p>
-        <div className="table-counter-heading">
-          <h2>Table settings</h2>
-          <p>Configure the total number of restaurant tables.</p>
-        </div>
-        <div className="table-counter-control">
-          <button onClick={() => updateCount(tableCount - 1)} aria-label="Remove table">−</button>
-          <input type="number" value={tableCount} onChange={(e) => { const count = parseInt(e.target.value, 10); updateCount(Number.isNaN(count) ? 0 : count); }} min={0} max={100} aria-label="Table count" />
-          <button onClick={() => updateCount(tableCount + 1)} aria-label="Add table">+</button>
-        </div>
-        <div className="table-filter-control">
-          <button className="table-filter-toggle" onClick={() => setIsFilterOpen((open) => !open)} aria-expanded={isFilterOpen}>
-            <span aria-hidden="true">⌕</span> Filter <small>{statusFilter}</small>
-          </button>
-          {isFilterOpen && (
-            <div className="table-filter-options" role="menu" aria-label="Filter tables by status">
-              {['All', ...STATUSES].map((status) => (
-                <button key={status} className={statusFilter === status ? 'active' : ''} onClick={() => selectStatusFilter(status)} role="menuitem">{status}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
     </div>
   );
 }
@@ -661,9 +609,7 @@ export default function RestaurantManagement() {
   const interfaceCanvas = useFixedInterfaceCanvas();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const tab = location.pathname.includes('/table-list') ? 'tables' : 'menu';
-  const menuRoute = location.pathname.includes('/edit-menu')
-    ? `/restaurant-management/edit-menu${location.search || '?category="meals"'}`
-    : '/restaurant-management/edit-menu?category="meals"';
+  const menuRoute = location.pathname.includes('/edit-menu/') ? location.pathname : '/restaurant-management/edit-menu/meals';
 
   useEffect(() => {
     const intervalId = setInterval(() => setCurrentDateTime(new Date()), 1000);

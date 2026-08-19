@@ -1,137 +1,194 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { usePOS } from '../../context/POSContext';
-import './kitchen.css';
+import { useMemo, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { usePOS } from "../../context/POSContext";
+import "./kitchen.css";
 
-function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener('resize', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
-    return () => { window.removeEventListener('resize', updateScale); window.visualViewport?.removeEventListener('resize', updateScale); };
-  }, []);
-  if (typeof window === 'undefined') return { scale: 1, width: '100%', height: '100vh' };
-  const pixelRatio = window.devicePixelRatio || 1;
-  return { scale: 1 / pixelRatio, width: `${Math.round(window.innerWidth * pixelRatio)}px`, height: `${Math.round(window.innerHeight * pixelRatio)}px` };
-}
-
-function formatElapsed(createdAt, now) {
-  const created = typeof createdAt === 'string' ? new Date(createdAt).getTime() : createdAt;
-  const seconds = Math.max(0, Math.floor((now - created) / 1000));
-  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-function Kitchen() {
-  const navigate = useNavigate();
-  const location = useLocation();
+export default function Kitchen() {
   const {
     orders,
     orderItems,
-    getItemsForOrder,
     updateOrderStatus,
+    updateOrderItemStatus,
     loading,
   } = usePOS();
+  const [now, setNow] = useState(Date.now());
 
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
-  const [currentPage, setCurrentPage] = useState(1);
-  const interfaceCanvas = useFixedInterfaceCanvas();
-  const viewFromPath = location.pathname.split('/').filter(Boolean).at(-1);
-  const activeView = ['active-orders', 'completed-orders', 'cancelled-orders'].includes(viewFromPath) ? viewFromPath : 'active-orders';
-
-  // Map DB orders to kitchen tickets
-  const tickets = useMemo(() => {
-    return orders.map((order) => {
-      const items = getItemsForOrder(order.id);
-      // Map order status to kitchen view status
-      let kitchenStatus;
-      if (order.status === 'COMPLETED' || order.status === 'READY') {
-        kitchenStatus = 'COMPLETED';
-      } else if (order.status === 'CANCELLED') {
-        kitchenStatus = 'CANCELLED';
-      } else {
-        kitchenStatus = 'ACTIVE'; // PENDING, IN_PROGRESS
-      }
-
-      return {
-        id: order.id,
-        displayId: order.id.slice(0, 4).toUpperCase(),
-        table: order.table_number ? String(order.table_number).padStart(2, '0') : '--',
-        server: order.server_name || 'Unknown',
-        orderType: order.order_type || 'DINE-IN',
-        createdAt: order.created_at,
-        completedAt: order.updated_at,
-        status: kitchenStatus,
-        items: items.map((oi) => ({
-          name: oi.item_name,
-          qty: oi.quantity,
-          notes: Array.isArray(oi.modifiers) && oi.modifiers.length > 0 ? oi.modifiers : undefined,
-          cancelled: oi.status === 'CANCELLED',
-        })),
-      };
-    });
-  }, [orders, orderItems, getItemsForOrder]);
-
-  const visibleTickets = useMemo(() => tickets.filter((ticket) => {
-    if (activeView === 'completed-orders') return ticket.status === 'COMPLETED';
-    if (activeView === 'cancelled-orders') return ticket.status === 'CANCELLED';
-    return ticket.status === 'ACTIVE';
-  }), [tickets, activeView]);
-
-  const ticketsPerPage = 12;
-  const totalPages = Math.max(1, Math.ceil(visibleTickets.length / ticketsPerPage));
-  const activePage = Math.min(currentPage, totalPages);
-  const ticketStart = (activePage - 1) * ticketsPerPage;
-  const pagedTickets = visibleTickets.slice(ticketStart, ticketStart + ticketsPerPage);
-
+  // Tick every 30s to update elapsed times
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
-  useEffect(() => {
-    if (!['active-orders', 'completed-orders', 'cancelled-orders'].includes(viewFromPath)) navigate('/kitchen/active-orders', { replace: true });
-  }, [viewFromPath, navigate]);
 
-  const navigateToView = (view) => { setCurrentPage(1); navigate(`/kitchen/${view}`); };
+  // Show PENDING orders as active kitchen tickets
+  const tickets = useMemo(() => {
+    return orders
+      .filter((o) => o.status === "PENDING")
+      .map((order) => {
+        const items = orderItems.filter((oi) => oi.order_id === order.id);
+        const elapsed = Math.floor(
+          (now - new Date(order.created_at).getTime()) / 60000,
+        );
+        return { ...order, items, elapsed };
+      })
+      .sort((a, b) => b.elapsed - a.elapsed); // oldest first
+  }, [orders, orderItems, now]);
 
-  const handleUpdateStatus = async (orderId, status) => {
-    await updateOrderStatus(orderId, status);
+  const markItemCooking = async (itemId) => {
+    await updateOrderItemStatus(itemId, "COOKING");
   };
 
-  const labelForView = activeView === 'active-orders' ? 'Active orders' : activeView === 'completed-orders' ? 'Completed orders' : 'Cancelled orders';
+  const markItemReady = async (itemId) => {
+    await updateOrderItemStatus(itemId, "SERVED");
+  };
 
-  if (loading) {
-    return <div className="kitchen-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.2rem' }}>Loading…</div>;
-  }
+  const completeTicket = async (orderId) => {
+    // Mark all items as SERVED and order as COMPLETED
+    // Use ticket items from the current render instead of re-filtering from possibly stale orderItems
+    const ticket = tickets.find((t) => t.id === orderId);
+    const items = ticket
+      ? ticket.items
+      : orderItems.filter((oi) => oi.order_id === orderId);
+    await Promise.all(
+      items
+        .filter((item) => item.status !== "SERVED")
+        .map((item) => updateOrderItemStatus(item.id, "SERVED")),
+    );
+    await updateOrderStatus(orderId, "COMPLETED");
+  };
+
+  if (loading)
+    return (
+      <div className="page">
+        <p style={{ fontSize: "1.2rem" }}>Loading kitchen...</p>
+      </div>
+    );
 
   return (
-    <div className="kitchen-app" style={{ '--kitchen-scale': interfaceCanvas.scale, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height }}>
-      <header className="kitchen-topbar">
-        <div className="kitchen-brand"><span className="kitchen-brand-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg></span><span>Kitchen Interface</span></div>
-        <div className="kitchen-topbar-right"><span>{new Date(currentTime).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, {new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</span><button className="kitchen-return-button" onClick={() => navigate('/')} aria-label="Return to interface selector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg></button></div>
-      </header>
-      <nav className="kitchen-tab-group" aria-label="Kitchen sections">
-        <button className={activeView === 'active-orders' ? 'active' : ''} onClick={() => navigateToView('active-orders')}>ACTIVE ORDERS <span>{tickets.filter((ticket) => ticket.status === 'ACTIVE').length}</span></button>
-        <button className={activeView === 'completed-orders' ? 'active' : ''} onClick={() => navigateToView('completed-orders')}>COMPLETED ORDERS <span>{tickets.filter((ticket) => ticket.status === 'COMPLETED').length}</span></button>
-        <button className={activeView === 'cancelled-orders' ? 'active' : ''} onClick={() => navigateToView('cancelled-orders')}>CANCELLED ORDERS <span>{tickets.filter((ticket) => ticket.status === 'CANCELLED').length}</span></button>
-      </nav>
-      <main className="kitchen-workspace">
-        <div className="kitchen-content">
-          <div className="kitchen-heading"><div><h1>{labelForView}</h1><p>{activeView === 'active-orders' ? 'Review new tickets and update their kitchen status.' : 'Review tickets that have already been processed.'}</p></div></div>
-          {visibleTickets.length === 0 ? <div className="kitchen-empty"><div>✓</div><h2>No {labelForView.toLowerCase()}</h2><p>{activeView === 'active-orders' ? 'The kitchen is all caught up.' : 'Tickets moved here will remain available for review.'}</p></div> : <section className="ticket-grid">{pagedTickets.map((ticket) => {
-          const urgent = ticket.status === 'ACTIVE' && currentTime - new Date(ticket.createdAt).getTime() > 15 * 60000;
-          return <article className={`kitchen-ticket ${urgent ? 'urgent' : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
-            <header className="ticket-header"><div><strong>#{ticket.displayId}</strong><span>Table #{ticket.table}</span></div><time>◷ {formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}</time></header>
-            <div className="ticket-meta"><span>{ticket.server}</span><span>{ticket.orderType}</span></div>
-            <div className="ticket-items">{ticket.items.map((item, index) => <div className={`ticket-item ${item.cancelled ? 'cancelled' : ''}`} key={`${ticket.id}-${index}`}><div><strong>{item.name}</strong>{item.cancelled && <small>Item cancelled</small>}{item.notes?.map((note) => <em key={note}>{note}</em>)}</div><span>×{item.qty}</span></div>)}</div>
-            <footer className="ticket-actions">{activeView === 'active-orders' ? <><button className="cancel-ticket" onClick={() => handleUpdateStatus(ticket.id, 'CANCELLED')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>Cancel</button><button className="complete-ticket" onClick={() => handleUpdateStatus(ticket.id, 'READY')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>Complete</button></> : <span className={`ticket-status ${ticket.status.toLowerCase()}`}>{ticket.status === 'COMPLETED' ? '✓ Completed' : 'Cancelled'}</span>}</footer>
-          </article>;
-          })}</section>}
+    <div className="page">
+      <div className="page-header">
+        <h1>Kitchen Display</h1>
+        <div className="flex gap-2 items-center flex-wrap">
+          <span className="badge badge-yellow">{tickets.length} active</span>
+          <Link to="/" className="btn btn-sm">
+            ← Back
+          </Link>
         </div>
-        <footer className="kitchen-pagination"><span>{visibleTickets.length ? `${ticketStart + 1}–${Math.min(ticketStart + ticketsPerPage, visibleTickets.length)} of ${visibleTickets.length}` : '0 of 0'}</span><div className="kitchen-pagination-actions"><button disabled={activePage <= 1} onClick={() => setCurrentPage(activePage - 1)}>◀ Previous</button><span>{activePage} / {totalPages}</span><button disabled={activePage >= totalPages} onClick={() => setCurrentPage(activePage + 1)}>Next ▶</button></div></footer>
-      </main>
+      </div>
+
+      {tickets.length === 0 ? (
+        <div className="card text-center" style={{ padding: 40 }}>
+          <p style={{ fontSize: "1.3rem" }}>
+            No active tickets — all caught up!
+          </p>
+        </div>
+      ) : (
+        <div className="ticket-list">
+          {tickets.map((ticket) => {
+            const isUrgent = ticket.elapsed > 15;
+
+            return (
+              <div
+                key={ticket.id}
+                className={`ticket ${isUrgent ? "ticket-urgent" : ""}`}
+              >
+                <div className="ticket-header">
+                  <span>Table {ticket.table_number || "—"}</span>
+                  <div className="flex gap-2 items-center">
+                    <span className="badge badge-blue">PENDING</span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: isUrgent ? "#dc2626" : "#666",
+                        fontSize: "1.1rem",
+                      }}
+                    >
+                      {ticket.elapsed}m
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "6px 18px",
+                    borderBottom: "1px solid #e0e0e0",
+                    fontSize: "0.9rem",
+                    color: "#666",
+                  }}
+                >
+                  Server: {ticket.server_name || "—"} • {ticket.order_type}
+                </div>
+
+                <div className="ticket-body">
+                  {ticket.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="ticket-item"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <strong>×{item.quantity}</strong> {item.item_name}
+                        {item.modifiers && item.modifiers.length > 0 && (
+                          <div
+                            style={{
+                              fontSize: "0.85rem",
+                              color: "#b45309",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            {item.modifiers.join(", ")}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <span
+                          className={`badge ${
+                            item.status === "SERVED"
+                              ? "badge-green"
+                              : item.status === "COOKING"
+                                ? "badge-yellow"
+                                : "badge-gray"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                        {item.status === "PENDING" && (
+                          <button
+                            className="btn btn-sm btn-warning"
+                            onClick={() => markItemCooking(item.id)}
+                          >
+                            Cook
+                          </button>
+                        )}
+                        {item.status === "COOKING" && (
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => markItemReady(item.id)}
+                          >
+                            Done
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="ticket-footer">
+                  <button
+                    className="btn btn-success btn-block"
+                    onClick={() => completeTicket(ticket.id)}
+                  >
+                    ✓ Complete — Served
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
-
-export default Kitchen;
