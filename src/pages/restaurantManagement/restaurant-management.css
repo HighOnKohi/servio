@@ -120,7 +120,6 @@
 .rmc105 { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-top:1px solid #f3f4f6; background:#fff; }
 .rmc106 { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; }
 .rmc107 { font-size:0.9rem; color:#9ca3af; padding:0 6px; }
-<<<<<<< HEAD
 
 /* Manage Tables mirrors the card-focused Cashier Overview. */
 .table-management-layout { display:grid; grid-template-columns:minmax(0, 1fr) 360px; min-height:0; background:#f8fafc; }
@@ -186,8 +185,6 @@
 .table-counter-statuses { margin-top:8px; padding:16px 8px 0; border-top:1px solid #f3f4f6; }
 .table-counter-status { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; color:#64748b; font-size:14px; }
 .table-counter-status .restaurant-management-status-badge { min-width:90px; }
-=======
->>>>>>> e7dcc2125cb7c83cf9c81cff5f44ab0b4bff68f8
 .rmc108 { min-height: 100vh; }
 .rmc109 { border-bottom:1px solid #e5e7eb; background:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
 .rmc110 { display:flex; align-items:center; gap:10px; }

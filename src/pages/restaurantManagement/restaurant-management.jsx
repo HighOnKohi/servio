@@ -457,29 +457,6 @@ function MenuInterface() {
 
       </main>
 
-<<<<<<< HEAD
-=======
-      <aside className="rmc71">
-        <div>
-          <p className="rmc20">Quick Stats</p>
-          <div className="rmc72">
-            <div className="rmc73"><div className="rmc74">{items.length}</div><div className="rmc75">Total Items</div></div>
-            <div className="rmc73"><div className="rmc74">{categories.length}</div><div className="rmc75">Categories</div></div>
-          </div>
-        </div>
-
-        <div>
-          <p className="rmc20">Categories</p>
-          <div className="rmc21">
-            {categories.map((cat) => (
-              <div key={cat.id} className="rmc76"><span className="rmc77">{cat.name}</span><div className="rmc78"><button className="rmc79" onClick={() => setPanel({ type: 'editCategory', category: cat })}>✎</button><button className="rmc80" onClick={() => setPanel({ type: 'deleteCategory', category: cat })}>✕</button></div></div>
-            ))}
-            <button className="rmc81" onClick={() => setPanel({ type: 'addCategory' })}>＋ Add Category</button>
-          </div>
-        </div>
-      </aside>
-
->>>>>>> e7dcc2125cb7c83cf9c81cff5f44ab0b4bff68f8
       {panel && (
         <MenuPanel mode={panel} categories={categories} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />
       )}
@@ -546,7 +523,6 @@ function TableInterface() {
         <div className="rmc93">
           <div>
             <h2 className="rmc39">Restaurant Tables</h2>
-<<<<<<< HEAD
           <p className="rmc40">Change the total number of table items and view their status.</p>
           </div>
           <div className="table-management-summary" aria-label="Table status summary">
@@ -558,17 +534,13 @@ function TableInterface() {
           {visible.length === 0 ? (
             <div className="table-management-empty"><GridIcon /><p>No tables found</p></div>
           ) : visible.map((table) => (
-          <div key={table.id} className={`table-management-card`} title={table.status}>
+            <div key={table.id} className={`table-management-card`} title={table.status}>
               <span className="table-number-circle">{String(table.id).padStart(2, '0')}</span>
               <span className="table-management-card-top">
-              <span className={`table-management-status ${table.status.toLowerCase()}`}>{table.status}</span>
+                <span className={`table-management-status ${table.status.toLowerCase()}`}>{table.status}</span>
               </span>
-          </div>
+            </div>
           ))}
-=======
-            <p className="rmc40">{tableCount} table{tableCount !== 1 ? 's' : ''} configured</p>
-          </div>
->>>>>>> e7dcc2125cb7c83cf9c81cff5f44ab0b4bff68f8
         </div>
 
         <div className="rmc41">
