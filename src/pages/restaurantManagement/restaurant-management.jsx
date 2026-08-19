@@ -364,14 +364,27 @@ function MenuInterface() {
 
   return (
     <div className="rmc22">
-      <aside className="rmc29">
-        <div className="rmc19">
+      <aside className="rmc29 restaurant-management-sidebar">
+        <div className="rmc19 restaurant-management-sidebar-inner">
           <p className="rmc20">Categories</p>
-          <div className="rmc21">
+          <div className="rmc21 restaurant-management-category-list">
             {categories.map((cat) => (
-              <Link key={cat.id} to={menuPath(cat)} onClick={selectCategory} className={`restaurant-management-category-button ${activeCat === cat.id ? 'restaurant-management-category-button-active' : 'restaurant-management-category-button-inactive'}`}>{cat.name}</Link>
+              <div key={cat.id} className={`restaurant-management-category-row ${activeCat === cat.id ? 'restaurant-management-category-row-active' : ''}`}>
+                <Link to={menuPath(cat)} onClick={selectCategory} className={`restaurant-management-category-button ${activeCat === cat.id ? 'restaurant-management-category-button-active' : 'restaurant-management-category-button-inactive'}`}>
+                  {cat.name}
+                </Link>
+                <div className="restaurant-management-category-actions">
+                  <button type="button" className="restaurant-management-category-action" onClick={() => setPanel({ type: 'editCategory', category: cat })} aria-label={`Edit ${cat.name}`}>
+                    ✎
+                  </button>
+                  <button type="button" className="restaurant-management-category-action restaurant-management-category-action--delete" onClick={() => setPanel({ type: 'deleteCategory', category: cat })} aria-label={`Delete ${cat.name}`}>
+                    ✕
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
+          <button type="button" className="restaurant-management-add-category" onClick={() => setPanel({ type: 'addCategory' })}>＋ Add Category</button>
         </div>
       </aside>
 
@@ -456,26 +469,6 @@ function MenuInterface() {
         </div>
 
       </main>
-
-      <aside className="rmc71">
-        <div>
-          <p className="rmc20">Quick Stats</p>
-          <div className="rmc72">
-            <div className="rmc73"><div className="rmc74">{items.length}</div><div className="rmc75">Total Items</div></div>
-            <div className="rmc73"><div className="rmc74">{categories.length}</div><div className="rmc75">Categories</div></div>
-          </div>
-        </div>
-
-        <div>
-          <p className="rmc20">Edit Categories</p>
-          <div className="rmc21">
-            {categories.map((cat) => (
-              <div key={cat.id} className="rmc76"><span className="rmc77">{cat.name}</span><div className="rmc78"><button className="rmc79" onClick={() => setPanel({ type: 'editCategory', category: cat })}>✎</button><button className="rmc80" onClick={() => setPanel({ type: 'deleteCategory', category: cat })}>✕</button></div></div>
-            ))}
-            <button className="rmc81" onClick={() => setPanel({ type: 'addCategory' })}>＋ Add Category</button>
-          </div>
-        </div>
-      </aside>
 
       {panel && (
         <MenuPanel mode={panel} categories={categories} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={handleDeleteCategory} />
@@ -569,7 +562,14 @@ function TableInterface() {
           </div>
           <div className="rmc86">
             <p className="rmc20">Status Key</p>
-            <div className="rmc87">{STATUSES.map((s) => (<div key={s} className="rmc88"><StatusBadge status={s} /><span className="rmc89">{countByStatus(s)}</span></div>))}</div>
+            <div className="rmc87 status-key">
+              {STATUSES.map((s) => (
+                <div key={s} className="status-key-row">
+                  <span className="status-key-label">{s}</span>
+                  <span className={`status-key-count status-key-count--${s.toLowerCase()}`}>{countByStatus(s)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </aside>
@@ -578,7 +578,7 @@ function TableInterface() {
         <div className="rmc93">
           <div>
             <h2 className="rmc39">Restaurant Tables</h2>
-            <p className="rmc40">Click a table to update its availability and status.</p>
+          <p className="rmc40">Change the total number of table items and view their status.</p>
           </div>
           <div className="table-management-summary" aria-label="Table status summary">
             {STATUSES.map((status) => <span key={status}><strong>{countByStatus(status)}</strong> {status.toLowerCase()}</span>)}
@@ -589,12 +589,12 @@ function TableInterface() {
           {visible.length === 0 ? (
             <div className="table-management-empty"><GridIcon /><p>No tables found</p></div>
           ) : visible.map((table) => (
-            <button key={table.id} className={`table-management-card ${table.status.toLowerCase()}`} onClick={() => cycleStatus(table.id)} title="Click to change status">
+          <div key={table.id} className={`table-management-card`} title={table.status}>
+              <span className="table-number-circle">{String(table.id).padStart(2, '0')}</span>
               <span className="table-management-card-top">
-                <span className="table-management-number">{String(table.id).padStart(2, '0')}</span>
-                <span className="table-management-status">{table.status}</span>
+              <span className={`table-management-status ${table.status.toLowerCase()}`}>{table.status}</span>
               </span>
-            </button>
+          </div>
           ))}
         </div>
 
