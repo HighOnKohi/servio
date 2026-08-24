@@ -598,12 +598,12 @@ export function POSProvider({ children }) {
   );
 
   /**
-   * Finalizes a table's session when they pay their bill.
-   * Marks all active orders on that table as COMPLETED and resets the table status to EMPTY.
-   */
+ * Finalizes a table's session when they pay their bill.
+ * Deletes all active orders on that table and resets the table status to EMPTY.
+ */
   const billOutTable = useCallback(
     async (tableNumber) => {
-      // Gather current orders for receipt generation before they are marked as completed
+      // Gather current orders for receipt generation before they are deleted
       const tableOrders = orders.filter(
         (o) =>
           o.table_number === tableNumber &&
@@ -614,12 +614,19 @@ export function POSProvider({ children }) {
         orderItems.filter((oi) => oi.order_id === o.id),
       );
 
-      // Mark the active orders as COMPLETED
-      await supabase
-        .from("orders")
-        .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
-        .eq("table_number", tableNumber)
-        .neq("status", "COMPLETED");
+      // Delete the active order items first (due to foreign key constraints)
+      if (tableOrders.length > 0) {
+        const orderIds = tableOrders.map((o) => o.id);
+        await supabase.from("order_items").delete().in("order_id", orderIds);
+        
+        // Then delete the parent orders
+        await supabase
+          .from("orders")
+          .delete()
+          .eq("table_number", tableNumber)
+          .neq("status", "COMPLETED")
+          .neq("status", "CANCELLED");
+      }
         
       // Reset the physical table to make it available for the next guest
       await supabase
