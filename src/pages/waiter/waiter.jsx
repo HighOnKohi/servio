@@ -206,11 +206,16 @@ export default function Waiter() {
     });
   }
 
-  /** Removes a specific menu item from the local cart. */
+  /** Decrements a specific menu item from the local cart and removes it only at qty 1. */
   function removeItem(itemId) {
     setCarts((prev) => {
-      const currentCart = (prev[selectedId] || []).filter((item) => item.id !== itemId);
-      return { ...prev, [selectedId]: currentCart };
+      const currentCart = prev[selectedId] || [];
+      const updatedCart = currentCart.flatMap((item) => {
+        if (item.id !== itemId) return item;
+        if (item.qty <= 1) return [];
+        return { ...item, qty: item.qty - 1 };
+      });
+      return { ...prev, [selectedId]: updatedCart };
     });
   }
 
