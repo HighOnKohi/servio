@@ -447,6 +447,7 @@ export function POSProvider({ children }) {
 
       // Step 5: Update the physical table's status to reflect that guests are eating
       if (tableNumber) {
+        const total = parseFloat(items.reduce((sum, item) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0).toFixed(2));
         await supabase
           .from("restaurant_tables")
           .update({
