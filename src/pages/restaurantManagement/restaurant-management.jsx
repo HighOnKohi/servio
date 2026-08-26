@@ -419,13 +419,6 @@ function MenuInterface() {
           <button className="rmc36" onClick={() => setPanel({ type: 'addItem' })}>＋ New Item</button>
         </div>
 
-        <div className="rmc38">
-          <div>
-            <h2 className="rmc39">{activeCategory?.name ?? 'Menu Items'}</h2>
-            <p className="rmc40">{filtered.length} item{filtered.length !== 1 ? 's' : ''}</p>
-          </div>
-        </div>
-
         <div className="rmc41">
           {visible.length === 0 ? (
             <div className="rmc42"><GridIcon /><p className="rmc43">No items found</p></div>
@@ -574,10 +567,6 @@ function TableInterface() {
 
       <main className="rmc30 table-management-area">
         <div className="rmc93">
-          <div>
-            <h2 className="rmc39">Restaurant Tables</h2>
-          <p className="rmc40">Change the total number of table items and view their status.</p>
-          </div>
           <div className="table-management-summary" aria-label="Table status summary">
             {STATUSES.map((status) => <span key={status}><strong>{countByStatus(status)}</strong> {status.toLowerCase()}</span>)}
           </div>
@@ -630,11 +619,6 @@ function TableInterface() {
       </main>
 
       <aside className="table-counter-panel">
-        <p className="table-counter-label">TABLE COUNTER</p>
-        <div className="table-counter-heading">
-          <h2>Table settings</h2>
-          <p>Configure the total number of restaurant tables.</p>
-        </div>
         <div className="table-counter-control">
           <button onClick={() => updateCount(tableCount - 1)} aria-label="Remove table">−</button>
           <input type="number" value={tableCount} onChange={(e) => { const count = parseInt(e.target.value, 10); updateCount(Number.isNaN(count) ? 0 : count); }} min={0} max={100} aria-label="Table count" />

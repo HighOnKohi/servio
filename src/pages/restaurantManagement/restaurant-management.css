@@ -1,4 +1,4 @@
-.restaurant-management-root { --restaurant-scale: 1; min-height:0; zoom:var(--restaurant-scale); font-family: system-ui, -apple-system, sans-serif; background: #ffffff; display: flex; flex-direction: column; }
+.restaurant-management-root { --restaurant-scale: 1; min-height:0; zoom:var(--restaurant-scale); font-family: system-ui, -apple-system, sans-serif; background: #eef2f7; display: flex; flex-direction: column; }
 
 /* Modal */
 .rmc2 { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; background: rgba(15,23,42,0.34); }
@@ -109,9 +109,9 @@
 .rmc96 { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center; }
 
 @media (min-width: 0px) {
-  .rmc29 { display:block; width:220px; flex-shrink:0; border-right:1px solid #e5e7eb; background:#fff; padding-top:8px; }
-  .rmc92 { display:block; width:220px; flex-shrink:0; border-right:1px solid #e5e7eb; background:#fff; padding:12px 16px; }
-  .rmc71 { display:block; width:260px; flex-shrink:0; border-left:1px solid #e5e7eb; background:#fff; padding:12px 16px; }
+.rmc29 { display:block; width:220px; flex-shrink:0; border-right:1px solid #d6deea; background:#e7edf4; padding-top:8px; }
+  .rmc92 { display:block; width:220px; flex-shrink:0; border-right:1px solid #d6deea; background:#e7edf4; padding:12px 16px; }
+  .rmc71 { display:block; width:260px; flex-shrink:0; border-left:1px solid #d6deea; background:#e7edf4; padding:12px 16px; }
 }
 .rmc97 { color:#9ca3af; font-size:0.9rem; }
 .rmc98 { border-bottom:1px solid #f3f4f6; background:#f8fafc; }
@@ -135,12 +135,12 @@
 .table-management-grid { display:grid; flex:1; min-height:0; grid-template-columns:repeat(4, minmax(130px, 1fr)); grid-template-rows:repeat(3, minmax(0, 1fr)); gap:14px; padding:0 16px; }
 .table-management-card { min-width:0; min-height:0; display:flex; flex-direction:column; padding:18px; border:2px solid #e6e9ec; border-radius:14px; background:#fff; color:#111827; font:inherit; text-align:left; transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; position:relative; overflow:hidden; }
 .table-management-card:hover { transform:translateY(-2px); box-shadow:0 7px 16px rgba(15,23,42,.08); }
-.table-management-card.available { background:#f0fdf4; border-color:#dcfce7; }
-.table-management-card.available:hover { border-color:#86efac; }
-.table-management-card.occupied { background:#fef3c7; border-color:#fde68a; }
-.table-management-card.occupied:hover { border-color:#fde047; }
-.table-management-card.reserved { background:#e0e7ff; border-color:#c7d2fe; }
-.table-management-card.reserved:hover { border-color:#a5b4fc; }
+.table-management-card.available { background:#dff3e6; border-color:#b9ddc6; }
+.table-management-card.available:hover { border-color:#8dc59e; }
+.table-management-card.occupied { background:#f7dfab; border-color:#dfc16c; }
+.table-management-card.occupied:hover { border-color:#caa74a; }
+.table-management-card.reserved { background:#cfd7ff; border-color:#aab7ff; }
+.table-management-card.reserved:hover { border-color:#8597f5; }
 .table-management-card-center { display:flex; flex:1; min-height:120px; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
 .table-management-number { color:#111827; font-size:clamp(2.5rem, 4vw, 4.5rem); font-weight:800; line-height:1; letter-spacing:-.03em; }
 .table-management-status-text { color:#64748b; font-size:12px; font-weight:700; letter-spacing:.07em; }
@@ -162,7 +162,7 @@
 .status-key-count--reserved { background:#f59e0b; color:#fff; border:1px solid #f59e0b; }
 .table-management-empty { grid-column:1 / -1; display:grid; place-items:center; color:#94a3b8; font-size:14px; }
 .table-management-empty p { margin:8px 0 0; }
-.table-management-area > .rmc41 { display:none; }
+.table-management-area > .rmc41 { display:none; margin: 18px 16px 0; }
 .table-management-area > .rmc105 { height:67px; box-sizing:border-box; flex-shrink:0; margin-top:12px; padding:12px 16px; border-top:1px solid #f3f4f6; background:#fff; color:#94a3b8; }
 .table-counter-panel { display:flex; flex-direction:column; min-height:0; overflow:auto; border-left:1px solid #e5e7eb; background:#fff; padding:13px 16px; }
 .table-counter-label { margin:0 0 12px; color:#9ca3af; font-size:.75rem; letter-spacing:1px; text-transform:uppercase; }
@@ -211,9 +211,9 @@
 .restaurant-management-image-placeholder--md { height:128px; }
 .restaurant-management-image-placeholder--lg { height:176px; }
 .restaurant-management-status-badge { display:inline-flex; align-items:center; justify-content:center; min-width:90px; padding:8px 10px; border-radius:9999px; font-size:0.9rem; line-height:1; }
-.restaurant-management-status-badge--available { border:1px solid #86efac; color:#166534; background:#ecfdf5; }
-.restaurant-management-status-badge--occupied { background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; }
-.restaurant-management-status-badge--reserved { border:1px solid #fdba74; color:#92400e; background:#fff7ed; }
+.restaurant-management-status-badge--available { border:1px solid #86efac; color:#14532d; background:#dff3e6; }
+.restaurant-management-status-badge--occupied { background:#fae2b6; color:#92400e; border:1px solid #e7b96d; }
+.restaurant-management-status-badge--reserved { border:1px solid #aab7ff; color:#3730a3; background:#cfd7ff; }
 .restaurant-management-sidebar { display:flex; }
 .restaurant-management-sidebar-inner { display:flex; flex-direction:column; height:100%; }
 .restaurant-management-category-list { display:flex; flex:1; flex-direction:column; gap:12px; min-height:0; }
@@ -362,8 +362,10 @@
   .rmc35 { height: 55px; box-sizing: border-box; border-radius: 14px; }
   .rmc36 { height: 53px; padding: 0 21px; border-radius: 14px; }
   .rmc38 { padding: 22px 16px 20px; }
+.rmc41 { margin: 12px 16px 0; }
+.rmc53 { border-radius:14px; overflow:hidden; }
   .rmc93 { padding: 22px 16px 12px; }
-  .rmc41 { overflow: hidden; padding: 0 16px 20px; }
+  .rmc41 { overflow: hidden; padding: 0 16px 20px; margin-top: 12px; }
   .rmc53 { border-color: #cbd5e1; border-radius: 14px; box-shadow: 0 9px 23px rgba(15, 23, 42, .05); }
   .rmc54 th, .rmc54 td { padding: 16px 18px; }
   .rmc54 th { height: 58px; box-sizing: border-box; }

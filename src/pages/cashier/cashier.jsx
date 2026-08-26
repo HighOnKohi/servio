@@ -473,10 +473,6 @@ function Cashier() {
       </nav>
 
       {!isMenuOrdering && <div className="action-row">
-        <div>
-          <h1>Active Tables</h1>
-          <p>Choose a table to review its order and bill.</p>
-        </div>
         <div className="table-summary">
           <span><strong>{tables.filter((table) => !table.occupied && !reservedTables.includes(table.id)).length}</strong> available</span>
           <span><strong>{tables.filter((table) => table.occupied).length}</strong> occupied</span>
@@ -526,12 +522,7 @@ function Cashier() {
                   )}
                 </div>
               </div>
-              <div className="menu-catalog-heading">
-                <div>
-                  <h1>{menuCategories.find((category) => category.id === activeMenuCategory)?.name}</h1>
-                  <p>Tap an item to add it to Table #{selected?.label}.</p>
-                </div>
-              </div>
+              <div className="menu-catalog-heading" />
               <div className="menu-item-grid">
                 {pagedMenuItems.map((item) => (
                   <button key={item.id} className="menu-item-card" onClick={() => addMenuItem(item)}>
