@@ -251,6 +251,30 @@ export function POSProvider({ children }) {
   /** Removes a physical table from the system. */
   const removeTable = useCallback(
     async (tableId) => {
+      const table = tables.find((entry) => entry.id === tableId);
+      if (!table) return { error: new Error("Table not found") };
+
+      const { data: tableOrders, error: ordersFetchError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_number", table.table_number);
+      if (ordersFetchError) return { error: ordersFetchError };
+
+      const orderIds = (tableOrders ?? []).map((order) => order.id);
+      if (orderIds.length > 0) {
+        const { error: deleteItemsError } = await supabase
+          .from("order_items")
+          .delete()
+          .in("order_id", orderIds);
+        if (deleteItemsError) return { error: deleteItemsError };
+
+        const { error: deleteOrdersError } = await supabase
+          .from("orders")
+          .delete()
+          .in("id", orderIds);
+        if (deleteOrdersError) return { error: deleteOrdersError };
+      }
+
       const { error } = await supabase
         .from("restaurant_tables")
         .delete()
@@ -258,7 +282,7 @@ export function POSProvider({ children }) {
       if (!error) await refetchTables();
       return { error };
     },
-    [refetchTables],
+    [refetchTables, tables],
   );
 
   /** Adds a new item to the menu. */

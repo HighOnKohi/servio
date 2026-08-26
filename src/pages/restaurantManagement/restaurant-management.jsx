@@ -508,15 +508,13 @@ function TableInterface() {
   const updateCount = async (n) => {
     const clamped = Math.max(0, Math.min(100, n));
     if (clamped > tableCount) {
-      // Add tables
       for (let i = tableCount + 1; i <= clamped; i++) {
         await posAddTable(i, 4);
       }
     } else if (clamped < tableCount) {
-      // Remove tables from the end
       const sorted = [...dbTables].sort((a, b) => b.table_number - a.table_number);
       for (let i = 0; i < tableCount - clamped; i++) {
-        await posRemoveTable(sorted[i].id);
+        if (sorted[i]) await posRemoveTable(sorted[i].id);
       }
     }
     navigate('/restaurant-management/table-list');
