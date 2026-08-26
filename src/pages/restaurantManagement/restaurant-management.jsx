@@ -588,14 +588,18 @@ function TableInterface() {
         <div className="table-management-grid">
           {visible.length === 0 ? (
             <div className="table-management-empty"><GridIcon /><p>No tables found</p></div>
-          ) : visible.map((table) => (
-          <div key={table.id} className={`table-management-card`} title={table.status}>
-              <span className="table-number-circle">{String(table.id).padStart(2, '0')}</span>
-              <span className="table-management-card-top">
-              <span className={`table-management-status ${table.status.toLowerCase()}`}>{table.status}</span>
-              </span>
-          </div>
-          ))}
+          ) : visible.map((table) => {
+            const normalizedStatus = table.status === 'EMPTY' ? 'AVAILABLE' : table.status;
+            const statusClass = normalizedStatus.toLowerCase();
+            return (
+              <div key={table.id} className={`table-management-card ${statusClass}`} title={normalizedStatus}>
+                <div className="table-management-card-center">
+                  <div className="table-management-number">{table.id}</div>
+                  <div className="table-management-status-text">{normalizedStatus}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="rmc41">
