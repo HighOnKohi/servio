@@ -54,6 +54,7 @@ function Cashier() {
     createOrder,
     billOutTable,
     updateOrderStatus,
+    reserveTable,
     loading,
     formatPrice,
   } = usePOS();
@@ -89,7 +90,9 @@ function Cashier() {
       status: t.status,
       table_number: t.table_number,
       occupied: t.status === 'OCCUPIED',
+      reserved: t.status === 'RESERVED' || t.reserved === true,
       occupiedSince: t.occupied_since,
+      reservedSince: t.reserved_since,
       currentBill: Number(t.current_bill) || 0,
     })),
     [dbTables]
@@ -372,12 +375,8 @@ function Cashier() {
   }
 
   function toggleReservation() {
-    if (!selectedId) return;
-    setReservedTables((prev) =>
-      prev.includes(selectedId)
-        ? prev.filter((id) => id !== selectedId)
-        : [...prev, selectedId]
-    );
+    if (!selectedId || !selected || selected.occupied) return;
+    reserveTable(selected.table_number);
   }
 
   function printReceipt() {
@@ -395,8 +394,10 @@ function Cashier() {
 
   // Compute elapsed time for occupied tables
   const getElapsedTime = useCallback((table) => {
-    if (!table.occupied || !table.occupiedSince) return '';
-    const elapsedMs = currentTime - new Date(table.occupiedSince).getTime();
+    if (!table.occupied && !table.reserved) return '';
+    const startedAt = table.occupied ? table.occupiedSince : table.reservedSince;
+    if (!startedAt) return '';
+    const elapsedMs = currentTime - new Date(startedAt).getTime();
     if (elapsedMs < 0) return '';
     const minutes = Math.floor(elapsedMs / 60000);
     const seconds = Math.floor((elapsedMs % 60000) / 1000);
@@ -556,7 +557,7 @@ function Cashier() {
         <section className="cashier-table-area">
           <div className="table-grid">
           {visibleTables.map((table) => {
-            const isReserved = reservedTables.includes(table.id);
+            const isReserved = table.reserved;
             const elapsed = getElapsedTime(table);
             return (
               <div
@@ -569,8 +570,11 @@ function Cashier() {
                 <div className="table-card-center">
                   <div className="table-number">{table.label}</div>
                   <div className="table-status">
-                    {isReserved ? 'RESERVED' : table.occupied ? elapsed || 'ACTIVE' : 'AVAILABLE'}
+                    {table.occupied ? 'OCCUPIED' : isReserved ? 'RESERVED' : 'AVAILABLE'}
                   </div>
+                </div>
+                <div className="table-card-footer">
+                  {elapsed && <span className="table-card-timer">{elapsed}</span>}
                 </div>
               </div>
             );
@@ -709,9 +713,9 @@ function Cashier() {
                     <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M856-390 570-104q-12 12-27 18t-30 6q-15 0-30-6t-27-18L103-457q-11-11-17-25.5T80-513v-287q0-33 23.5-56.5T160-880h287q16 0 31 6.5t26 17.5l352 353q12 12 17.5 27t5.5 30q0 15-5.5 29.5T856-390ZM513-160l286-286-353-354H160v286l353 354ZM260-640q25 0 42.5-17.5T320-700q0-25-17.5-42.5T260-760q-25 0-42.5 17.5T200-700q0 25 17.5 42.5T260-640Zm220 160Z"/></svg></span>
                     Discount
                   </button>
-                  <button className="reserve-button" onClick={toggleReservation}>
+                  <button className="reserve-button" onClick={toggleReservation} disabled={selected?.occupied}>
                     <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H5V5h10v5z"/></svg></span>
-                    {reservedTables.includes(selectedId) ? 'Unreserve' : 'Reserve'}
+                    {selected?.reserved ? 'Unreserve' : 'Reserve'}
                   </button>
                   <button className="bill-button" onClick={openPaymentModal} disabled={!hasItems}>
                     <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M560-440q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM280-320q-33 0-56.5-23.5T200-400v-320q0-33 23.5-56.5T280-800h560q33 0 56.5 23.5T920-720v320q0 33-23.5 56.5T840-320H280Zm80-80h400q0-33 23.5-56.5T840-480v-160q-33 0-56.5-23.5T760-720H360q0 33-23.5 56.5T280-640v160q33 0 56.5 23.5T360-400Zm440 240H120q-33 0-56.5-23.5T40-240v-440h80v440h680v80ZM280-400v-320 320Z"/></svg></span>

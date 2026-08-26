@@ -86,6 +86,7 @@
   padding: 0 16px; background: transparent;
 }
 .cashier-app .table-card {
+  position: relative;
   min-height: 0; display: flex; flex-direction: column; padding: 15px;
   border: 1px solid var(--cashier-line); border-radius: 11px; background: #fff; cursor: pointer;
   transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background-color .16s ease;
@@ -98,7 +99,7 @@
 .cashier-app .table-card.occupied:hover { border-color: #fde047; }
 .cashier-app .table-card.reserved { background: #e0e7ff; border-color: #c7d2fe; }
 .cashier-app .table-card.reserved:hover { border-color: #a5b4fc; }
-.cashier-app .table-card-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 120px; }
+.cashier-app .table-card-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 120px; flex: 1; }
 .cashier-app .table-number {
   font-size: 48px; font-weight: 700; color: var(--cashier-ink);
 }
@@ -106,7 +107,23 @@
 .cashier-app .table-card-body { display: flex; flex-direction: column; gap: 4px; margin: auto 0 12px; padding-top: 18px; }
 .cashier-app .table-label { color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .cashier-app .table-total { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
-.cashier-app .table-card-footer { min-height: 14px; color: var(--cashier-muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.cashier-app .table-card-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  min-height: 18px;
+  color: var(--cashier-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.cashier-app .table-card-timer {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cashier-muted);
+  white-space: nowrap;
+}
 .cashier-app .table-pagination {
   height: 67px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
   margin-top: 12px; padding: 12px 16px; border-top: 1px solid #f3f4f6; background: #fff; color: #94a3b8; font-size: .9rem;

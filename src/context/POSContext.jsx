@@ -30,6 +30,7 @@ export function POSProvider({ children }) {
   // --- Global State Definitions ---
   // Each of these state variables corresponds to a table in the Supabase database.
   const [tables, setTables] = useState([]);
+  const [reservationData, setReservationData] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -637,6 +638,7 @@ export function POSProvider({ children }) {
           current_bill: 0,
           guests_count: 0,
           occupied_since: null,
+          reserved_since: null,
         })
         .eq("table_number", tableNumber);
         
@@ -725,6 +727,36 @@ export function POSProvider({ children }) {
     return `${CURRENCY}${Number(amount).toFixed(2)}`;
   }, []);
 
+  const reserveTable = useCallback(
+    async (tableNumber) => {
+      const { data } = await supabase
+        .from("restaurant_tables")
+        .select("*")
+        .eq("table_number", tableNumber)
+        .single();
+
+      if (!data) return;
+
+      const isReserved = data.status === "RESERVED";
+      const nextUpdate = isReserved
+        ? { status: "EMPTY", reserved_since: null }
+        : { status: "RESERVED", reserved_since: new Date().toISOString(), occupied_since: null };
+
+      const { error } = await supabase
+        .from("restaurant_tables")
+        .update(nextUpdate)
+        .eq("table_number", tableNumber);
+
+      if (error) {
+        console.error("Error updating reservation:", error);
+        return;
+      }
+
+      await refetchTables();
+    },
+    [refetchTables],
+  );
+
   // Expose all data and functions via the Provider
   return (
     <POSContext.Provider
@@ -765,6 +797,7 @@ export function POSProvider({ children }) {
         updateOrderItemStatus,
         billOutTable,
         addProfile,
+        reserveTable,
         
         // Utility getters
         getOrdersForTable,
