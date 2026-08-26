@@ -19,7 +19,7 @@
 .rmc17 { color:#9ca3af; margin-top:6px; }
 .rmc18 { display:flex; flex-direction:column; height:100%; }
 .rmc19 { padding:20px 16px 12px 16px; overflow-y:auto; flex:1; }
-.rmc20 { font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#9ca3af; margin-bottom:12px; }
+.rmc20 { font-size:0.95rem; text-transform:uppercase; letter-spacing:1px; color:#0f172a; margin-bottom:12px; font-weight:700; margin-left: 15px}
 .rmc21 { display:block; gap:6px; }
 .rmc22 { display:flex; flex:1; min-height:0; position:relative; }
 .rmc23 { position:fixed; inset:0; z-index:40; display:flex; }
@@ -41,7 +41,7 @@
 .rmc38 { padding:20px 16px; display:flex; align-items:center; justify-content:space-between; }
 .rmc39 { font-size:1.125rem; font-weight:600; color:#111827; }
 .rmc40 { color:#9ca3af; font-size:0.9rem; margin-top:4px; }
-.rmc41 { padding:0 16px 20px 16px; flex:1; }
+.rmc41 { padding:0 16px 20px 16px; flex:1 }
 .rmc42 { padding:48px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#9ca3af; }
 .rmc43 { margin-top:12px; font-size:1rem; }
 .rmc44 { display:grid; grid-template-columns: repeat(1,1fr); gap:12px; }
@@ -216,6 +216,7 @@
 .restaurant-management-status-badge--reserved { border:1px solid #aab7ff; color:#3730a3; background:#cfd7ff; }
 .restaurant-management-sidebar { display:flex; }
 .restaurant-management-sidebar-inner { display:flex; flex-direction:column; height:100%; }
+.restaurant-management-category-divider { height:1px; margin:0 0 14px; background:#cfd8e3; }
 .restaurant-management-category-list { display:flex; flex:1; flex-direction:column; gap:12px; min-height:0; }
 
 /* Each row keeps consistent left padding with the sidebar content and aligns items to the full width of the sidebar padding */
@@ -362,7 +363,7 @@
   .rmc35 { height: 55px; box-sizing: border-box; border-radius: 14px; }
   .rmc36 { height: 53px; padding: 0 21px; border-radius: 14px; }
   .rmc38 { padding: 22px 16px 20px; }
-.rmc41 { margin: 12px 16px 0; }
+.rmc41 { margin: 12px 0px 0; }
 .rmc53 { border-radius:14px; overflow:hidden; }
   .rmc93 { padding: 22px 16px 12px; }
   .rmc41 { overflow: hidden; padding: 0 16px 20px; margin-top: 12px; }

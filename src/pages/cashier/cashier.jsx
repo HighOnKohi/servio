@@ -185,6 +185,7 @@ function Cashier() {
   const pagedMenuItems = visibleMenuItems.slice(menuPageStart, menuPageStart + menuItemsPerPage);
 
   const hasItems = existingItems.length > 0 || cart.length > 0;
+  const hasPunchedItems = existingItems.length > 0;
   const isUnsaved = cart.length > 0;
 
   function cashierPath(section, tableId = selectedId, page = 1) {
@@ -522,7 +523,6 @@ function Cashier() {
                   )}
                 </div>
               </div>
-              <div className="menu-catalog-heading" />
               <div className="menu-item-grid">
                 {pagedMenuItems.map((item) => (
                   <button key={item.id} className="menu-item-card" onClick={() => addMenuItem(item)}>
@@ -585,52 +585,12 @@ function Cashier() {
         <aside className="sidebar">
           {selected && (
             <>
-              <p className="sidebar-section-label">CURRENT BILL SELECTION</p>
               <div className="sidebar-header">
                 <div>
                   <div className="bill-title">Order details</div>
-                  <div className="bill-subtitle">Table #{selected.label} · Dine-in</div>
-                </div>
-                <div className="bill-selection-controls">
-                  {isMenuOrdering && (
-                    <div className="table-switcher">
-                      <button
-                        type="button"
-                        className="table-switcher-button"
-                        aria-label="Switch table"
-                        aria-expanded={showTableSwitcher}
-                        aria-haspopup="listbox"
-                        title="Switch table"
-                        onClick={() => setShowTableSwitcher((isOpen) => !isOpen)}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 7h11l-3-3" /><path d="m18 7-3 3" /><path d="M17 17H6l3 3" /><path d="m6 17 3-3" /></svg>
-                      </button>
-                      {showTableSwitcher && (
-                        <div className="table-switcher-dropdown" role="listbox" aria-label="Switch to another table">
-                          <p>Switch table</p>
-                          <div className="table-switcher-options">
-                            {tables.map((table) => (
-                              <button
-                                key={table.id}
-                                type="button"
-                                role="option"
-                                aria-selected={table.id === selectedId}
-                                className={table.id === selectedId ? 'selected' : ''}
-                                onClick={() => requestTableSwitch(table.id)}
-                              >
-                                <span>Table #{table.label}</span>
-                                <small>{table.occupied ? 'Occupied' : 'Empty'}</small>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="bill-subtitle">Table #{selected.label}</div>
                 </div>
               </div>
-
-              <div className="order-code">{existingOrders.length > 0 ? `#ORD-${existingOrders[0].id.slice(0, 4).toUpperCase()}` : '#ORD-NEW'}</div>
 
               <div className="items-list">
                 {/* Show existing punched items from DB */}
@@ -638,7 +598,6 @@ function Cashier() {
                   <div key={item.id} className="item-row">
                     <div>
                       <div className="item-name">{item.item_name} × {item.quantity} <small style={{opacity:0.5}}>✓</small></div>
-                      <div className="item-note">Dine-in</div>
                     </div>
                     <div className="item-right">
                       <span>{formatPrice(Number(item.price) * item.quantity)}</span>
@@ -650,10 +609,9 @@ function Cashier() {
                   <div className="empty-items">No items yet. Add from below.</div>
                 ) : (
                   cart.map((item) => (
-                    <div key={item.id} className="item-row">
+                    <div key={item.id} className="item-row pending">
                       <div>
                         <div className="item-name">{item.name} × {item.qty}</div>
-                        <div className="item-note">Dine-in</div>
                       </div>
                       <div className="item-right">
                         <span>{formatPrice(item.price * item.qty)}</span>
@@ -695,7 +653,7 @@ function Cashier() {
                     <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 2v5h10V5H7Zm0 9v5h10v-5H7Z"/></svg></span>
                     {punchingOrder ? 'Punching...' : 'Punch Order'}
                   </button>
-                  <button className="cancel-order-button" onClick={requestCancelOrder} disabled={!hasItems}>
+                  <button className="cancel-order-button" onClick={requestCancelOrder} disabled={!(selected?.occupied && hasPunchedItems)}>
                     <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4L17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19 12 13.4l5.6 5.6 1.4-1.4-5.6-5.6L19 6.4Z"/></svg></span>
                     Cancel Order
                   </button>

@@ -209,6 +209,7 @@
 .cashier-app .menu-catalog-heading h1 { margin: 0; color: #111827; font-size: 1.125rem; font-weight: 600; }
 .cashier-app .menu-catalog-heading p { margin: 4px 0 0; color: #9ca3af; font-size: .9rem; }
 .cashier-app .menu-item-grid {
+  margin-top: 14px;
   min-height: 0;
   flex: 1;
   display: grid;
@@ -280,11 +281,11 @@
 .cashier-app .order-code { width: fit-content; margin: 14px 8px 0; padding: 6px 9px; border-radius: 6px; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 600; }
 .cashier-app .items-list { flex: 1; min-height: 180px; overflow: auto; padding: 10px 8px; }
 .cashier-app .empty-items { display: grid; min-height: 145px; place-items: center; color: #94a3b8; font-size: 13px; text-align: center; }
-.cashier-app .item-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+.cashier-app .item-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
 .cashier-app .item-row:last-child { border-bottom: 0; }
-.cashier-app .item-name { font-size: 13px; font-weight: 650; }
+.cashier-app .item-name { font-size: 13px; font-weight: 650; line-height: 1.35; }
 .cashier-app .item-note { margin-top: 3px; color: #94a3b8; font-size: 11px; }
-.cashier-app .item-right { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; white-space: nowrap; }
+.cashier-app .item-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 13px; font-weight: 650; white-space: nowrap; }
 .cashier-app .item-remove { width: 32px; height: 32px; border: 1px solid var(--cashier-line); border-radius: 6px; background: #fff; color: #64748b; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
 .cashier-app .item-remove:hover { border-color: #fecaca; background: #fff1f2; color: #dc2626; }
 .cashier-app .summary { margin: 0 8px; padding: 14px 0; border-top: 1px solid #f3f4f6; border-bottom: 1px solid #f3f4f6; }

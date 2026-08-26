@@ -367,6 +367,7 @@ function MenuInterface() {
       <aside className="rmc29 restaurant-management-sidebar">
         <div className="rmc19 restaurant-management-sidebar-inner">
           <p className="rmc20">Categories</p>
+          <div className="restaurant-management-category-divider" />
           <div className="rmc21 restaurant-management-category-list">
             {categories.map((cat) => (
               <div key={cat.id} className={`restaurant-management-category-row ${activeCat === cat.id ? 'restaurant-management-category-row-active' : ''}`}>
