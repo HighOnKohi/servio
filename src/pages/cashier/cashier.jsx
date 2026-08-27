@@ -51,6 +51,7 @@ function Cashier() {
     orderItems,
     getOrdersForTable,
     getItemsForOrder,
+    addItemsToOrder,
     createOrder,
     billOutTable,
     removeOrderItem,
@@ -315,15 +316,24 @@ function Cashier() {
     if (!selected || cart.length === 0 || punchingOrder) return;
     setPunchingOrder(true);
     try {
-      await createOrder(selected.table_number, 'Cashier', cart.map((item) => ({
-        id: item.id,
-        menu_item_id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.qty,
-      })), 'DINE-IN');
+      if (selected?.occupied && existingOrders[0]) {
+        await addItemsToOrder(existingOrders[0].id, cart.map((item) => ({
+          id: item.id,
+          menu_item_id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.qty,
+        })));
+      } else {
+        await createOrder(selected.table_number, 'Cashier', cart.map((item) => ({
+          id: item.id,
+          menu_item_id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.qty,
+        })), 'DINE-IN');
+      }
 
-      // Clear the local cart only after successful database punch
       setCarts((prev) => ({ ...prev, [selectedId]: [] }));
     } catch (err) {
       console.error('Error punching order:', err);

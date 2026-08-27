@@ -521,22 +521,47 @@ export function POSProvider({ children }) {
    */
   const addItemsToOrder = useCallback(
     async (orderId, items) => {
-      // Insert the new items
-      const rows = items.map((i) => ({
-        order_id: orderId,
-        menu_item_id: i.id || null,
-        item_name: i.name || i.item_name,
-        quantity: i.quantity || 1,
-        price: Number(i.price),
-        modifiers: i.modifiers || [],
-        status: "PENDING",
-      }));
-      await supabase.from("order_items").insert(rows);
+      const { data: existingItems } = await supabase
+        .from("order_items")
+        .select("id, menu_item_id, item_name, quantity")
+        .eq("order_id", orderId);
 
-      // Deduct inventory for the newly added items
+      const existingByMenuItem = new Map(
+        (existingItems || [])
+          .filter((item) => item.menu_item_id)
+          .map((item) => [item.menu_item_id, item]),
+      );
+
+      const rowsToInsert = [];
+      for (const i of items) {
+        const menuItemId = i.id || i.menu_item_id || null;
+        const nextQuantity = Number(i.quantity || 1);
+        const existingItem = menuItemId ? existingByMenuItem.get(menuItemId) : null;
+
+        if (existingItem) {
+          await supabase
+            .from("order_items")
+            .update({ quantity: Number(existingItem.quantity || 0) + nextQuantity })
+            .eq("id", existingItem.id);
+        } else {
+          rowsToInsert.push({
+            order_id: orderId,
+            menu_item_id: menuItemId,
+            item_name: i.name || i.item_name,
+            quantity: nextQuantity,
+            price: Number(i.price),
+            modifiers: i.modifiers || [],
+            status: "PENDING",
+          });
+        }
+      }
+
+      if (rowsToInsert.length > 0) {
+        await supabase.from("order_items").insert(rowsToInsert);
+      }
+
       await deductIngredients(items);
 
-      // Recalculate the entire order's totals from the database
       const { data: allItems } = await supabase
         .from("order_items")
         .select("*")
@@ -551,13 +576,11 @@ export function POSProvider({ children }) {
         const currentBill = parseFloat(subtotal.toFixed(2));
         const total = parseFloat((subtotal + tax).toFixed(2));
         
-        // Update the order totals
         await supabase
           .from("orders")
           .update({ subtotal, tax, total })
           .eq("id", orderId);
 
-        // Update the table's active running bill
         const order = orders.find((o) => o.id === orderId);
         if (order && order.table_number) {
           const discountState = computeDiscountedTableTotal(currentBill, {
