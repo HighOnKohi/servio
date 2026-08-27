@@ -26,17 +26,30 @@ const normalizePercentDiscount = (value) => {
   return Math.min(100, Math.max(0, parsed));
 };
 
+const normalizeFloatDiscount = (value) => {
+  const parsed = Number(value) || 0;
+  return Math.max(0, parsed);
+};
+
 const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
   const safeSubtotal = Number(subtotal) || 0;
-  const pwdAmount = discounts.pwdDiscount ? safeSubtotal * 0.2 : 0;
-  const seniorAmount = discounts.seniorDiscount ? safeSubtotal * 0.15 : 0;
-  const percentRate = normalizePercentDiscount(discounts.percentDiscount);
-  const percentAmount = safeSubtotal * (percentRate / 100);
-  const discountAmount = Math.min(safeSubtotal, pwdAmount + seniorAmount + percentAmount);
+  const pwdRate = discounts.pwdDiscount ? 20 : 0;
+  const seniorRate = discounts.seniorDiscount ? 15 : 0;
+  const reservedRate = pwdRate + seniorRate;
+  const maxPercentDiscount = Math.max(0, 100 - reservedRate);
+  const percentRate = Math.min(maxPercentDiscount, normalizePercentDiscount(discounts.percentDiscount));
+  const percentDiscountAmount = safeSubtotal * ((reservedRate + percentRate) / 100);
+  const subtotalAfterPercent = Math.max(0, safeSubtotal - percentDiscountAmount);
+  const floatDiscount = Math.min(subtotalAfterPercent, normalizeFloatDiscount(discounts.floatDiscount));
+  const totalDiscountAmount = percentDiscountAmount + floatDiscount;
+
   return {
+    maxPercentDiscount,
     percentDiscount: percentRate,
-    discountAmount: parseFloat(discountAmount.toFixed(2)),
-    totalBill: parseFloat((safeSubtotal - discountAmount).toFixed(2)),
+    floatDiscount: parseFloat(floatDiscount.toFixed(2)),
+    percentDiscountAmount: parseFloat(percentDiscountAmount.toFixed(2)),
+    discountAmount: parseFloat(totalDiscountAmount.toFixed(2)),
+    totalBill: parseFloat((safeSubtotal - totalDiscountAmount).toFixed(2)),
   };
 }; // 12% VAT for Philippines
 const CURRENCY = "₱";
@@ -103,7 +116,10 @@ export function POSProvider({ children }) {
 
   /** Fetches all individual order items (the contents of the orders). */
   const refetchOrderItems = useCallback(async () => {
-    const { data } = await supabase.from("order_items").select("*");
+    const { data } = await supabase
+      .from("order_items")
+      .select("*")
+      .order("id", { ascending: true });
     if (data) setOrderItems(data);
   }, []);
 
@@ -911,6 +927,7 @@ export function POSProvider({ children }) {
         pwdDiscount: !!discounts.pwdDiscount,
         seniorDiscount: !!discounts.seniorDiscount,
         percentDiscount: discounts.percentDiscount,
+        floatDiscount: discounts.floatDiscount,
       });
 
       const { error: updateError } = await supabase
@@ -919,7 +936,7 @@ export function POSProvider({ children }) {
           pwd_discount: !!discounts.pwdDiscount,
           senior_discount: !!discounts.seniorDiscount,
           percent_discount: discountState.percentDiscount,
-          float_discount: discountState.discountAmount,
+          float_discount: discountState.floatDiscount,
           total_bill: discountState.totalBill,
         })
         .eq("table_number", tableNumber);

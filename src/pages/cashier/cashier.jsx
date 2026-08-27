@@ -124,6 +124,7 @@ function Cashier() {
   const [pwdDiscount, setPwdDiscount] = useState(false);
   const [seniorDiscount, setSeniorDiscount] = useState(false);
   const [percentDiscountValue, setPercentDiscountValue] = useState('');
+  const [floatDiscountValue, setFloatDiscountValue] = useState('');
 
   // Local cart for the cashier's menu-ordering (unpunched items), keyed by table ID
   const [carts, setCarts] = useState({});
@@ -171,11 +172,17 @@ function Cashier() {
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const subtotal = existingSubtotal + cartSubtotal;
+  const percentDiscountCap = Math.max(0, 100 - (pwdDiscount ? 20 : 0) - (seniorDiscount ? 15 : 0));
+  const normalizedPercentDiscountValue = Math.min(percentDiscountCap, Math.max(0, Number(percentDiscountValue) || 0));
+  const percentDiscountAmountPreview = subtotal * (((pwdDiscount ? 20 : 0) + (seniorDiscount ? 15 : 0) + normalizedPercentDiscountValue) / 100);
+  const floatDiscountCap = Math.max(0, subtotal - percentDiscountAmountPreview);
+  const normalizedFloatDiscountValue = Math.min(floatDiscountCap, Math.max(0, Number(floatDiscountValue) || 0));
   const selectedDiscounts = selected
     ? [
         selected.pwdDiscount ? { label: 'PWD Discount (20%)', amount: subtotal * 0.2 } : null,
         selected.seniorDiscount ? { label: 'Senior Discount (15%)', amount: subtotal * 0.15 } : null,
-        selected.percentDiscount > 0 ? { label: `Percent Discount (${selected.percentDiscount}%)`, amount: selected.floatDiscount || (subtotal * (selected.percentDiscount / 100)) } : null,
+        selected.percentDiscount > 0 ? { label: `Percent Discount (${selected.percentDiscount}%)`, amount: subtotal * (selected.percentDiscount / 100) } : null,
+        selected.floatDiscount > 0 ? { label: 'Float Discount', amount: selected.floatDiscount } : null,
       ].filter(Boolean)
     : [];
   const discount = selectedDiscounts.reduce((sum, item) => sum + item.amount, 0);
@@ -286,6 +293,7 @@ function Cashier() {
     setPwdDiscount(selected.pwdDiscount);
     setSeniorDiscount(selected.seniorDiscount);
     setPercentDiscountValue(String(selected.percentDiscount || ''));
+    setFloatDiscountValue(String(selected.floatDiscount || ''));
     setShowDiscountModal(true);
   }
 
@@ -294,7 +302,8 @@ function Cashier() {
     const result = await applyTableDiscount(selected.table_number, {
       pwdDiscount,
       seniorDiscount,
-      percentDiscount: Number(percentDiscountValue) || 0,
+      percentDiscount: normalizedPercentDiscountValue,
+      floatDiscount: normalizedFloatDiscountValue,
     });
     if (result !== null) setShowDiscountModal(false);
   }
@@ -811,14 +820,29 @@ function Cashier() {
               <label>
                 Percent discount
                 <input
-                  type="number"
+                  type="range"
                   min="0"
-                  max="100"
-                  step="0.01"
-                  value={percentDiscountValue}
+                  max={percentDiscountCap}
+                  step="1"
+                  value={normalizedPercentDiscountValue}
                   onChange={(e) => setPercentDiscountValue(e.target.value)}
                 />
               </label>
+              <div className="discount-caption">{normalizedPercentDiscountValue}% / max {percentDiscountCap}%</div>
+            </div>
+            <div className="custom-discount">
+              <label>
+                Float discount
+                <input
+                  type="number"
+                  min="0"
+                  max={floatDiscountCap}
+                  step="0.01"
+                  value={floatDiscountValue}
+                  onChange={(e) => setFloatDiscountValue(e.target.value)}
+                />
+              </label>
+              <div className="discount-caption">Max {formatPrice(floatDiscountCap)}</div>
             </div>
             <div className="modal-actions">
               <button onClick={() => setShowDiscountModal(false)}>Cancel</button>
