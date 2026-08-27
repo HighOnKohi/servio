@@ -101,6 +101,7 @@ function Cashier() {
       percentDiscount: Number(t.percent_discount) || 0,
       floatDiscount: Number(t.float_discount) || 0,
       totalBill: Number(t.total_bill ?? t.current_bill ?? 0),
+      currentBill: Number(t.current_bill ?? 0),
     })),
     [dbTables]
   );
@@ -182,12 +183,16 @@ function Cashier() {
         selected.pwdDiscount ? { label: 'PWD Discount (20%)', amount: subtotal * 0.2 } : null,
         selected.seniorDiscount ? { label: 'Senior Discount (15%)', amount: subtotal * 0.15 } : null,
         selected.percentDiscount > 0 ? { label: `Percent Discount (${selected.percentDiscount}%)`, amount: subtotal * (selected.percentDiscount / 100) } : null,
-        selected.floatDiscount > 0 ? { label: 'Float Discount', amount: selected.floatDiscount } : null,
+        selected.floatDiscount > 0 ? { label: 'Specific Discount', amount: selected.floatDiscount } : null,
       ].filter(Boolean)
     : [];
   const discount = selectedDiscounts.reduce((sum, item) => sum + item.amount, 0);
-  const displayedTotal = cart.length > 0 ? subtotal : Number(selected?.totalBill ?? subtotal) || subtotal;
-  const total = +displayedTotal.toFixed(2);
+  const displayedTotal = cart.length > 0
+    ? subtotal
+    : selected
+      ? (selected.totalBill ?? selected.currentBill ?? subtotal)
+      : subtotal;
+  const total = +Math.max(0, Number.isFinite(displayedTotal) ? displayedTotal : subtotal).toFixed(2);
 
   const tablesPerPage = 12;
   const totalTablePages = Math.max(1, Math.ceil(tables.length / tablesPerPage));
@@ -832,14 +837,22 @@ function Cashier() {
             </div>
             <div className="custom-discount">
               <label>
-                Float discount
+                Specific Discount
                 <input
                   type="number"
                   min="0"
                   max={floatDiscountCap}
                   step="0.01"
                   value={floatDiscountValue}
-                  onChange={(e) => setFloatDiscountValue(e.target.value)}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    if (rawValue === '') {
+                      setFloatDiscountValue('');
+                      return;
+                    }
+                    const clampedValue = Math.min(floatDiscountCap, Math.max(0, Number(rawValue) || 0));
+                    setFloatDiscountValue(String(clampedValue));
+                  }}
                 />
               </label>
               <div className="discount-caption">Max {formatPrice(floatDiscountCap)}</div>

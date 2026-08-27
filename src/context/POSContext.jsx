@@ -51,6 +51,24 @@ const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
     discountAmount: parseFloat(totalDiscountAmount.toFixed(2)),
     totalBill: parseFloat((safeSubtotal - totalDiscountAmount).toFixed(2)),
   };
+};
+
+const buildTableDiscountPayload = (subtotal, tableRow = {}) => {
+  const discountState = computeDiscountedTableTotal(subtotal, {
+    pwdDiscount: tableRow.pwd_discount === true,
+    seniorDiscount: tableRow.senior_discount === true,
+    percentDiscount: tableRow.percent_discount,
+    floatDiscount: tableRow.float_discount,
+  });
+
+  return {
+    current_bill: parseFloat((Number(subtotal) || 0).toFixed(2)),
+    total_bill: discountState.totalBill,
+    pwd_discount: tableRow.pwd_discount === true,
+    senior_discount: tableRow.senior_discount === true,
+    percent_discount: discountState.percentDiscount,
+    float_discount: discountState.floatDiscount,
+  };
 }; // 12% VAT for Philippines
 const CURRENCY = "₱";
 
@@ -599,21 +617,10 @@ export function POSProvider({ children }) {
 
         const order = orders.find((o) => o.id === orderId);
         if (order && order.table_number) {
-          const discountState = computeDiscountedTableTotal(currentBill, {
-            pwdDiscount: false,
-            seniorDiscount: false,
-            percentDiscount: 0,
-          });
+          const tableRow = tables.find((t) => t.table_number === order.table_number) || {};
           await supabase
           .from("restaurant_tables")
-          .update({
-            current_bill: currentBill,
-            total_bill: discountState.totalBill,
-            pwd_discount: false,
-            senior_discount: false,
-            percent_discount: discountState.percentDiscount,
-            float_discount: discountState.discountAmount,
-          })
+          .update(buildTableDiscountPayload(currentBill, tableRow))
           .eq("table_number", order.table_number);
         }
       }
@@ -630,6 +637,7 @@ export function POSProvider({ children }) {
       refetchTables,
       deductIngredients,
       orders,
+      tables,
     ],
   );
 
@@ -690,27 +698,16 @@ export function POSProvider({ children }) {
       const order = orders.find((o) => o.id === orderId);
       if (order && order.table_number) {
         const currentBill = parseFloat(subtotal.toFixed(2));
-        const discountState = computeDiscountedTableTotal(currentBill, {
-          pwdDiscount: false,
-          seniorDiscount: false,
-          percentDiscount: 0,
-        });
+        const tableRow = tables.find((t) => t.table_number === order.table_number) || {};
         await supabase
           .from("restaurant_tables")
-          .update({
-            current_bill: currentBill,
-            total_bill: discountState.totalBill,
-            pwd_discount: false,
-            senior_discount: false,
-            percent_discount: discountState.percentDiscount,
-            float_discount: discountState.discountAmount,
-          })
+          .update(buildTableDiscountPayload(currentBill, tableRow))
           .eq("table_number", order.table_number);
       }
 
       await Promise.all([refetchOrders(), refetchOrderItems(), refetchTables()]);
     },
-    [refetchOrders, refetchOrderItems, refetchTables, orders],
+    [refetchOrders, refetchOrderItems, refetchTables, orders, tables],
   );
 
   /** Updates the lifecycle status of an entire order (e.g., PENDING -> READY). */
