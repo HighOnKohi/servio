@@ -544,14 +544,6 @@ function TableInterface() {
 
       <aside className="rmc92">
         <div className="rmc82">
-          <div>
-            <p className="rmc20">Table Counter</p>
-            <div className="rmc69">
-              <button className="rmc83" onClick={() => updateCount(tableCount - 1)}>◀</button>
-              <input className="rmc84" type="number" value={tableCount} onChange={(e) => { const count = parseInt(e.target.value, 10); updateCount(Number.isNaN(count) ? 0 : count); }} min={0} max={100} />
-              <button className="rmc83" onClick={() => updateCount(tableCount + 1)}>▶</button>
-            </div>
-          </div>
           <div className="rmc86">
             <p className="rmc20">Status Key</p>
             <div className="rmc87 status-key">
@@ -565,7 +557,6 @@ function TableInterface() {
           </div>
         </div>
       </aside>
-
       <main className="rmc30 table-management-area">
         <div className="rmc93">
           <div className="table-management-summary" aria-label="Table status summary">

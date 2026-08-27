@@ -323,14 +323,15 @@
 .cashier-app .modal-description strong { color: #111827; }
 .cashier-app .modal-icon-close { width: 30px; height: 30px; border: 0; border-radius: 7px; background: #f8fafc; color: #64748b; cursor: pointer; font-size: 21px; line-height: 1; }
 .cashier-app .modal-icon-close:hover { background: #e2e8f0; color: #111827; }
-.cashier-app .discount-buttons, .cashier-app .payment-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-.cashier-app .discount-buttons button, .cashier-app .custom-discount button, .cashier-app .modal-actions button, .cashier-app .modal-close { border: 1px solid var(--cashier-line); border-radius: 8px; background: #fff; color: var(--cashier-ink); padding: 11px 13px; cursor: pointer; }
-.cashier-app .discount-buttons button:hover, .cashier-app .custom-discount button:hover, .cashier-app .modal-close:hover { background: #f8fafc; }
-.cashier-app .discount-buttons button { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
-.cashier-app .discount-buttons strong { color: #111827; }
+.cashier-app .discount-toggles, .cashier-app .payment-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.cashier-app .discount-toggle, .cashier-app .custom-discount input, .cashier-app .modal-actions button, .cashier-app .modal-close { border: 1px solid var(--cashier-line); border-radius: 8px; background: #fff; color: var(--cashier-ink); padding: 11px 13px; cursor: pointer; }
+.cashier-app .discount-toggle { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.cashier-app .discount-toggle input { accent-color: var(--cashier-ink); }
+.cashier-app .discount-toggle strong { color: #111827; }
+.cashier-app .discount-toggle.active { border-color: #111827; background: #f8fafc; }
 .cashier-app .custom-discount { display: flex; gap: 10px; align-items: flex-end; }
 .cashier-app .custom-discount label { flex: 1; display: flex; flex-direction: column; gap: 6px; color: var(--cashier-muted); font-size: 12px; }
-.cashier-app .custom-discount input { width: 100%; border: 1px solid var(--cashier-line); border-radius: 8px; padding: 10px; color: var(--cashier-ink); }
+.cashier-app .custom-discount input { width: 100%; padding: 10px; }
 .cashier-app .payment-options label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--cashier-line); border-radius: 8px; padding: 12px 13px; cursor: pointer; }
 .cashier-app .payment-options label:has(input:checked) { border-color: #111827; background: #f8fafc; }
 .cashier-app .payment-options input { accent-color: var(--cashier-ink); }

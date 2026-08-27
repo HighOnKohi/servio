@@ -19,7 +19,26 @@ import { supabase } from "../lib/supabaseClient";
 const POSContext = createContext(null);
 
 // Constants used across the application for calculations and display
-const TAX_RATE = 0.12; // 12% VAT for Philippines
+const TAX_RATE = 0.12;
+
+const normalizePercentDiscount = (value) => {
+  const parsed = Number(value) || 0;
+  return Math.min(100, Math.max(0, parsed));
+};
+
+const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
+  const safeSubtotal = Number(subtotal) || 0;
+  const pwdAmount = discounts.pwdDiscount ? safeSubtotal * 0.2 : 0;
+  const seniorAmount = discounts.seniorDiscount ? safeSubtotal * 0.15 : 0;
+  const percentRate = normalizePercentDiscount(discounts.percentDiscount);
+  const percentAmount = safeSubtotal * (percentRate / 100);
+  const discountAmount = Math.min(safeSubtotal, pwdAmount + seniorAmount + percentAmount);
+  return {
+    percentDiscount: percentRate,
+    discountAmount: parseFloat(discountAmount.toFixed(2)),
+    totalBill: parseFloat((safeSubtotal - discountAmount).toFixed(2)),
+  };
+}; // 12% VAT for Philippines
 const CURRENCY = "₱";
 
 /**
@@ -236,9 +255,6 @@ export function POSProvider({ children }) {
         .insert({
           table_number: tableNumber,
           capacity,
-          status: "EMPTY",
-          current_bill: 0,
-          guests_count: 0,
         })
         .select()
         .single();
@@ -472,12 +488,17 @@ export function POSProvider({ children }) {
 
       // Step 5: Update the physical table's status to reflect that guests are eating
       if (tableNumber) {
-        const total = parseFloat(items.reduce((sum, item) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0).toFixed(2));
+        const currentBill = parseFloat(items.reduce((sum, item) => sum + (Number(item.price) * (Number(item.quantity) || 1)), 0).toFixed(2));
         await supabase
           .from("restaurant_tables")
           .update({
             status: "OCCUPIED",
-            current_bill: total,
+            current_bill: currentBill,
+            total_bill: currentBill,
+            pwd_discount: false,
+            senior_discount: false,
+            percent_discount: 0,
+            float_discount: 0,
             occupied_since: new Date().toISOString(),
           })
           .eq("table_number", tableNumber);
@@ -527,6 +548,7 @@ export function POSProvider({ children }) {
           0,
         );
         const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
+        const currentBill = parseFloat(subtotal.toFixed(2));
         const total = parseFloat((subtotal + tax).toFixed(2));
         
         // Update the order totals
@@ -538,10 +560,22 @@ export function POSProvider({ children }) {
         // Update the table's active running bill
         const order = orders.find((o) => o.id === orderId);
         if (order && order.table_number) {
+          const discountState = computeDiscountedTableTotal(currentBill, {
+            pwdDiscount: false,
+            seniorDiscount: false,
+            percentDiscount: 0,
+          });
           await supabase
-            .from("restaurant_tables")
-            .update({ current_bill: total })
-            .eq("table_number", order.table_number);
+          .from("restaurant_tables")
+          .update({
+            current_bill: currentBill,
+            total_bill: discountState.totalBill,
+            pwd_discount: false,
+            senior_discount: false,
+            percent_discount: discountState.percentDiscount,
+            float_discount: discountState.discountAmount,
+          })
+          .eq("table_number", order.table_number);
         }
       }
 
@@ -563,30 +597,81 @@ export function POSProvider({ children }) {
   /** Removes a single item from an active order and recalculates the bill. */
   const removeOrderItem = useCallback(
     async (orderItemId, orderId) => {
-      await supabase.from("order_items").delete().eq("id", orderItemId);
+      const { data: item, error: fetchError } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("id", orderItemId)
+        .single();
 
-      // Recalculate totals for the remaining items
+      if (fetchError || !item) {
+        console.error("Failed to load order item for removal:", fetchError);
+        return;
+      }
+
+      if (Number(item.quantity) > 1) {
+        const { error: updateError } = await supabase
+          .from("order_items")
+          .update({ quantity: Number(item.quantity) - 1 })
+          .eq("id", orderItemId);
+
+        if (updateError) {
+          console.error("Failed to decrease order item quantity:", updateError);
+          return;
+        }
+      } else {
+        const { error: deleteError } = await supabase
+          .from("order_items")
+          .delete()
+          .eq("id", orderItemId);
+
+        if (deleteError) {
+          console.error("Failed to delete order item:", deleteError);
+          return;
+        }
+      }
+
       const { data: remaining } = await supabase
         .from("order_items")
         .select("*")
         .eq("order_id", orderId);
-        
-      if (remaining) {
-        const subtotal = remaining.reduce(
-          (sum, oi) => sum + Number(oi.price) * oi.quantity,
-          0,
-        );
-        const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
-        const total = parseFloat((subtotal + tax).toFixed(2));
+
+      const nextItems = remaining || [];
+      const subtotal = nextItems.reduce(
+        (sum, oi) => sum + Number(oi.price) * Number(oi.quantity || 0),
+        0,
+      );
+      const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
+      const total = parseFloat((subtotal + tax).toFixed(2));
+
+      await supabase
+        .from("orders")
+        .update({ subtotal, tax, total })
+        .eq("id", orderId);
+
+      const order = orders.find((o) => o.id === orderId);
+      if (order && order.table_number) {
+        const currentBill = parseFloat(subtotal.toFixed(2));
+        const discountState = computeDiscountedTableTotal(currentBill, {
+          pwdDiscount: false,
+          seniorDiscount: false,
+          percentDiscount: 0,
+        });
         await supabase
-          .from("orders")
-          .update({ subtotal, tax, total })
-          .eq("id", orderId);
+          .from("restaurant_tables")
+          .update({
+            current_bill: currentBill,
+            total_bill: discountState.totalBill,
+            pwd_discount: false,
+            senior_discount: false,
+            percent_discount: discountState.percentDiscount,
+            float_discount: discountState.discountAmount,
+          })
+          .eq("table_number", order.table_number);
       }
 
-      await Promise.all([refetchOrders(), refetchOrderItems()]);
+      await Promise.all([refetchOrders(), refetchOrderItems(), refetchTables()]);
     },
-    [refetchOrders, refetchOrderItems],
+    [refetchOrders, refetchOrderItems, refetchTables, orders],
   );
 
   /** Updates the lifecycle status of an entire order (e.g., PENDING -> READY). */
@@ -660,7 +745,11 @@ export function POSProvider({ children }) {
         .update({
           status: "EMPTY",
           current_bill: 0,
-          guests_count: 0,
+          total_bill: 0,
+          pwd_discount: false,
+          senior_discount: false,
+          percent_discount: 0,
+          float_discount: 0,
           occupied_since: null,
           reserved_since: null,
         })
@@ -781,6 +870,48 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
+  const applyTableDiscount = useCallback(
+    async (tableNumber, discounts = {}) => {
+      const { data: table, error } = await supabase
+        .from("restaurant_tables")
+        .select("current_bill")
+        .eq("table_number", tableNumber)
+        .single();
+
+      if (error || !table) {
+        console.error("Error loading table bill:", error);
+        return null;
+      }
+
+      const subtotal = Number(table.current_bill) || 0;
+      const discountState = computeDiscountedTableTotal(subtotal, {
+        pwdDiscount: !!discounts.pwdDiscount,
+        seniorDiscount: !!discounts.seniorDiscount,
+        percentDiscount: discounts.percentDiscount,
+      });
+
+      const { error: updateError } = await supabase
+        .from("restaurant_tables")
+        .update({
+          pwd_discount: !!discounts.pwdDiscount,
+          senior_discount: !!discounts.seniorDiscount,
+          percent_discount: discountState.percentDiscount,
+          float_discount: discountState.discountAmount,
+          total_bill: discountState.totalBill,
+        })
+        .eq("table_number", tableNumber);
+
+      if (updateError) {
+        console.error("Error applying table discount:", updateError);
+        return null;
+      }
+
+      await refetchTables();
+      return discountState.totalBill;
+    },
+    [refetchTables],
+  );
+
   // Expose all data and functions via the Provider
   return (
     <POSContext.Provider
@@ -820,6 +951,7 @@ export function POSProvider({ children }) {
         updateOrderStatus,
         updateOrderItemStatus,
         billOutTable,
+        applyTableDiscount,
         addProfile,
         reserveTable,
         

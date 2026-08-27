@@ -47,6 +47,10 @@ create table public.order_items (
   price numeric(10, 2) not null,
   modifiers jsonb null default '[]'::jsonb,
   status text null default 'PENDING'::text,
+  pwd_discount boolean not null default false,
+  senior_discount boolean not null default false,
+  float_discount double precision not null default '0'::double precision,
+  percent_discount numeric not null default '0'::numeric,
   constraint order_items_pkey primary key (id),
   constraint order_items_menu_item_id_fkey foreign KEY (menu_item_id) references menu_items (id),
   constraint order_items_order_id_fkey foreign KEY (order_id) references orders (id) on delete CASCADE
@@ -135,13 +139,20 @@ create table public.restaurant_tables (
   capacity integer not null,
   status text null default 'EMPTY'::text,
   current_bill numeric(10, 2) null default 0.00,
-  guests_count integer null default 0,
+  total_bill double precision not null default 0,
   occupied_since timestamp with time zone null,
+  reserved_since timestamp with time zone null,
+  pwd_discount boolean not null default false,
+  senior_discount boolean not null default false,
+  percent_discount numeric not null default '0'::numeric,
+  float_discount double precision not null default '0'::double precision,
   constraint restaurant_tables_pkey primary key (id),
   constraint restaurant_tables_table_number_key unique (table_number),
   constraint restaurant_tables_status_check check (
     (
-      status = any (array['EMPTY'::text, 'OCCUPIED'::text])
+      status = any (
+        array['EMPTY'::text, 'OCCUPIED'::text, 'RESERVED'::text]
+      )
     )
   )
 ) TABLESPACE pg_default;

@@ -53,8 +53,10 @@ function Cashier() {
     getItemsForOrder,
     createOrder,
     billOutTable,
+    removeOrderItem,
     updateOrderStatus,
     reserveTable,
+    applyTableDiscount,
     loading,
     formatPrice,
   } = usePOS();
@@ -93,7 +95,11 @@ function Cashier() {
       reserved: t.status === 'RESERVED' || t.reserved === true,
       occupiedSince: t.occupied_since,
       reservedSince: t.reserved_since,
-      currentBill: Number(t.current_bill) || 0,
+      pwdDiscount: t.pwd_discount === true,
+      seniorDiscount: t.senior_discount === true,
+      percentDiscount: Number(t.percent_discount) || 0,
+      floatDiscount: Number(t.float_discount) || 0,
+      totalBill: Number(t.total_bill ?? t.current_bill ?? 0),
     })),
     [dbTables]
   );
@@ -106,13 +112,17 @@ function Cashier() {
   const [showDiscardOrderModal, setShowDiscardOrderModal] = useState(false);
   const [showTableSwitcher, setShowTableSwitcher] = useState(false);
   const [showCancelOrderModal, setShowCancelOrderModal] = useState(false);
+  const [showDecreaseModal, setShowDecreaseModal] = useState(false);
   const [pendingTableId, setPendingTableId] = useState(null);
+  const [pendingItem, setPendingItem] = useState(null);
   const [receipt, setReceipt] = useState(null);
-  const [customDiscount, setCustomDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [reservedTables, setReservedTables] = useState([]);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [punchingOrder, setPunchingOrder] = useState(false);
+  const [pwdDiscount, setPwdDiscount] = useState(false);
+  const [seniorDiscount, setSeniorDiscount] = useState(false);
+  const [percentDiscountValue, setPercentDiscountValue] = useState('');
 
   // Local cart for the cashier's menu-ordering (unpunched items), keyed by table ID
   const [carts, setCarts] = useState({});
@@ -160,8 +170,16 @@ function Cashier() {
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const subtotal = existingSubtotal + cartSubtotal;
-  const discount = 0; // Discount will be applied at bill-out time
-  const total = +(subtotal - discount).toFixed(2);
+  const selectedDiscounts = selected
+    ? [
+        selected.pwdDiscount ? { label: 'PWD Discount (20%)', amount: subtotal * 0.2 } : null,
+        selected.seniorDiscount ? { label: 'Senior Discount (15%)', amount: subtotal * 0.15 } : null,
+        selected.percentDiscount > 0 ? { label: `Percent Discount (${selected.percentDiscount}%)`, amount: selected.floatDiscount || (subtotal * (selected.percentDiscount / 100)) } : null,
+      ].filter(Boolean)
+    : [];
+  const discount = selectedDiscounts.reduce((sum, item) => sum + item.amount, 0);
+  const displayedTotal = cart.length > 0 ? subtotal : Number(selected?.totalBill ?? subtotal) || subtotal;
+  const total = +displayedTotal.toFixed(2);
 
   const tablesPerPage = 12;
   const totalTablePages = Math.max(1, Math.ceil(tables.length / tablesPerPage));
@@ -254,17 +272,42 @@ function Cashier() {
     });
   }
 
-  function openDiscountModal() {
-    setCustomDiscount('');
-    setShowDiscountModal(true);
-  }
-
   function clearLocalCart() {
     setCarts((prev) => ({ ...prev, [selectedId]: [] }));
   }
 
   function requestClearOrder() {
     if (cart.length > 0) setShowClearOrderModal(true);
+  }
+
+  function openDiscountModal() {
+    if (!selected) return;
+    setPwdDiscount(selected.pwdDiscount);
+    setSeniorDiscount(selected.seniorDiscount);
+    setPercentDiscountValue(String(selected.percentDiscount || ''));
+    setShowDiscountModal(true);
+  }
+
+  async function applyDiscount() {
+    if (!selected) return;
+    const result = await applyTableDiscount(selected.table_number, {
+      pwdDiscount,
+      seniorDiscount,
+      percentDiscount: Number(percentDiscountValue) || 0,
+    });
+    if (result !== null) setShowDiscountModal(false);
+  }
+
+  function requestItemDecrease(item) {
+    setPendingItem(item);
+    setShowDecreaseModal(true);
+  }
+
+  async function confirmItemDecrease() {
+    if (!pendingItem) return;
+    await removeOrderItem(pendingItem.id, pendingItem.order_id);
+    setShowDecreaseModal(false);
+    setPendingItem(null);
   }
 
   /** Punches the local cart to the database via POSContext. */
@@ -601,6 +644,13 @@ function Cashier() {
                     </div>
                     <div className="item-right">
                       <span>{formatPrice(Number(item.price) * item.quantity)}</span>
+                      <button
+                        className="item-remove"
+                        onClick={() => requestItemDecrease(item)}
+                        title="Decrease quantity"
+                      >
+                        −
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -633,10 +683,12 @@ function Cashier() {
                   <span>Subtotal</span>
                   <span>{formatPrice(subtotal)}</span>
                 </div>
-                <div className="summary-row">
-                  <span>Discount</span>
-                  <span>-{formatPrice(discount)}</span>
-                </div>
+                {selectedDiscounts.map((item) => (
+                  <div className="summary-row" key={item.label}>
+                    <span>{item.label}</span>
+                    <span>-{formatPrice(item.amount)}</span>
+                  </div>
+                ))}
                 <div className="summary-total">
                   <span>Total</span>
                   <span>{formatPrice(total)}</span>
@@ -732,28 +784,51 @@ function Cashier() {
               <div><p className="modal-kicker">ORDER ADJUSTMENT</p><h2>Apply discount</h2></div>
               <button className="modal-icon-close" onClick={() => setShowDiscountModal(false)} aria-label="Close">×</button>
             </div>
-            <p className="modal-description">Choose a preset discount or enter a peso amount for Table #{selected?.label}.</p>
-            <div className="discount-buttons">
-              <button onClick={() => { setShowDiscountModal(false); }}><span>PWD</span><strong>20%</strong></button>
-              <button onClick={() => { setShowDiscountModal(false); }}><span>Senior</span><strong>15%</strong></button>
+            <p className="modal-description">Toggle the discounts to apply for Table #{selected?.label}.</p>
+            <div className="discount-toggles">
+              <label className={`discount-toggle ${pwdDiscount ? 'active' : ''}`}>
+                <input type="checkbox" checked={pwdDiscount} onChange={(e) => setPwdDiscount(e.target.checked)} />
+                <span>PWD</span>
+                <strong>20%</strong>
+              </label>
+              <label className={`discount-toggle ${seniorDiscount ? 'active' : ''}`}>
+                <input type="checkbox" checked={seniorDiscount} onChange={(e) => setSeniorDiscount(e.target.checked)} />
+                <span>Senior</span>
+                <strong>15%</strong>
+              </label>
             </div>
             <div className="custom-discount">
               <label>
-                Discount amount
+                Percent discount
                 <input
                   type="number"
                   min="0"
-                  max={subtotal}
+                  max="100"
                   step="0.01"
-                  value={customDiscount}
-                  onChange={(e) => setCustomDiscount(e.target.value)}
+                  value={percentDiscountValue}
+                  onChange={(e) => setPercentDiscountValue(e.target.value)}
                 />
               </label>
-              <button
-                onClick={() => setShowDiscountModal(false)}
-              >
-                Apply amount
-              </button>
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowDiscountModal(false)}>Cancel</button>
+              <button className="modal-print" onClick={applyDiscount}>Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDecreaseModal && pendingItem && (
+        <div className="modal-backdrop" onClick={() => setShowDecreaseModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-heading">
+              <div><p className="modal-kicker">DECREASE ITEM</p><h2>Remove one quantity?</h2></div>
+              <button className="modal-icon-close" onClick={() => setShowDecreaseModal(false)} aria-label="Close">×</button>
+            </div>
+            <p className="modal-description">Decrease <strong>{pendingItem.item_name}</strong> by 1 from Table #{selected?.label}?</p>
+            <div className="modal-actions">
+              <button onClick={() => setShowDecreaseModal(false)}>Cancel</button>
+              <button className="modal-print" onClick={confirmItemDecrease}>Confirm</button>
             </div>
           </div>
         </div>
