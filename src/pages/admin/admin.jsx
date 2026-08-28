@@ -1,7 +1,145 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../../lib/supabaseClient";
 import { usePOS } from "../../context/POSContext";
+import { useAuth } from "../../context/AuthContext";
 import "./admin.css";
+
+// ─── Register Staff Modal ─────────────────────────────────────────────────────
+// Uses a secondary Supabase client so that calling signUp does NOT disturb the
+// currently logged-in admin's session.
+const secondarySupabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+const ROLES = ["ADMIN", "CASHIER", "WAITER", "KITCHEN"];
+
+function RegisterStaffModal({ onClose, onSuccess }) {
+  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "WAITER" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    // Step 1: Create the auth user via the secondary client
+    const { data: signUpData, error: signUpError } = await secondarySupabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+    });
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    const newUserId = signUpData?.user?.id;
+    if (!newUserId) {
+      setError("Account was created but no user ID was returned. Check your Supabase email confirmation settings.");
+      setLoading(false);
+      return;
+    }
+
+    // Step 2: Immediately sign the secondary client back out so it doesn't pollute anything
+    await secondarySupabase.auth.signOut();
+
+    // Step 3: Insert the profile row using the primary (admin) supabase client
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert({ id: newUserId, full_name: form.full_name, role: form.role, status: "Active" });
+
+    if (profileError) {
+      setError(`Auth user created but profile insert failed: ${profileError.message}`);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    onSuccess(form.full_name);
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    fontSize: "0.85rem",
+    color: "#111827",
+    background: "#f8fafc",
+    boxSizing: "border-box",
+  };
+  const labelStyle2 = { display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", fontWeight: 600, color: "#374151" };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: 16, padding: "28px 32px",
+          width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 20px", fontSize: "1rem", fontWeight: 700, color: "#111827" }}>Register New Staff</h2>
+
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 12px", marginBottom: 14, fontSize: "0.82rem", color: "#dc2626" }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <label style={labelStyle2}>
+            Full Name
+            <input name="full_name" value={form.full_name} onChange={handleChange} placeholder="e.g. Maria Santos" required style={inputStyle} />
+          </label>
+          <label style={labelStyle2}>
+            Email Address
+            <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="staff@servio.com" required style={inputStyle} />
+          </label>
+          <label style={labelStyle2}>
+            Password
+            <input name="password" type="password" value={form.password} onChange={handleChange} placeholder="Min. 8 characters" required minLength={8} style={inputStyle} />
+          </label>
+          <label style={labelStyle2}>
+            Role
+            <select name="role" value={form.role} onChange={handleChange} style={inputStyle}>
+              {ROLES.map((r) => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
+            </select>
+          </label>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <button
+              type="button" onClick={onClose}
+              style={{ flex: 1, padding: "9px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", cursor: "pointer", fontSize: "0.85rem" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit" disabled={loading}
+              style={{ flex: 1, padding: "9px", border: "none", borderRadius: 8, background: loading ? "#93c5fd" : "#2563eb", color: "#fff", cursor: loading ? "not-allowed" : "pointer", fontWeight: 600, fontSize: "0.85rem" }}
+            >
+              {loading ? "Registering…" : "Register"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function useFixedInterfaceCanvas() {
   const [, refreshScale] = useState(0);
@@ -24,6 +162,7 @@ function useFixedInterfaceCanvas() {
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const {
     tables,
     menuItems,
@@ -33,7 +172,23 @@ const Admin = () => {
     ingredients,
     getLowStockIngredients,
     loading,
+    refetchProfiles,
   } = usePOS();
+
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState("");
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate("/login");
+  }, [logout, navigate]);
+
+  const handleRegistrationSuccess = useCallback((name) => {
+    setShowRegisterModal(false);
+    setRegisterSuccess(`${name} has been registered successfully.`);
+    refetchProfiles();
+    setTimeout(() => setRegisterSuccess(""), 4000);
+  }, [refetchProfiles]);
 
   const interfaceCanvas = useFixedInterfaceCanvas();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
@@ -154,7 +309,7 @@ const Admin = () => {
           </svg>
           <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Admin Dashboard</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: "0.82rem", color: "#64748b" }}>{date}, {time}</span>
           <button
             onClick={() => navigate("/")}
@@ -166,12 +321,27 @@ const Admin = () => {
               color: "#374151",
               cursor: "pointer",
             }}
-            aria-label="Return"
+            aria-label="Return to Interface Selector"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5" />
               <path d="m12 19-7-7 7-7" />
             </svg>
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none",
+              border: "1px solid #fca5a5",
+              borderRadius: 8,
+              padding: "6px 10px",
+              color: "#dc2626",
+              cursor: "pointer",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+            }}
+          >
+            Logout
           </button>
         </div>
       </header>
@@ -286,12 +456,36 @@ const Admin = () => {
           </table>
         </div>
 
-        <div style={sectionStyle}>
-          <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: "0 0 12px", color: "#111827" }}>Staff Profiles</h2>
+        <div style={{ ...sectionStyle, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: 0, color: "#111827" }}>Staff Profiles</h2>
+            <button
+              onClick={() => { setShowRegisterModal(true); setRegisterSuccess(""); }}
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              + Register Staff
+            </button>
+          </div>
+
+          {registerSuccess && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: "0.82rem", color: "#16a34a" }}>
+              ✓ {registerSuccess}
+            </div>
+          )}
+
           {profiles.length === 0 ? (
             <p style={{ color: "#94a3b8", fontSize: "0.85rem" }}>No profiles found.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", flex: 1 }}>
               {profiles.map((p) => (
                 <div
                   key={p.id}
@@ -317,6 +511,7 @@ const Admin = () => {
                       justifyContent: "center",
                       fontWeight: 700,
                       fontSize: "0.85rem",
+                      flexShrink: 0,
                     }}
                   >
                     {(p.full_name || "?")[0].toUpperCase()}
@@ -330,6 +525,14 @@ const Admin = () => {
             </div>
           )}
         </div>
+
+        {/* Register Staff Modal */}
+        {showRegisterModal && (
+          <RegisterStaffModal
+            onClose={() => setShowRegisterModal(false)}
+            onSuccess={handleRegistrationSuccess}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,9 +8,9 @@ This document provides a comprehensive overview of the Servio Point-of-Sale (POS
 
 Servio is a real-time, web-based POS system built with modern web technologies:
 - **Frontend**: React (bootstrapped with Vite) for building the user interfaces.
-- **Routing**: `react-router-dom` for navigation between different interfaces (Waiter, Cashier, etc.).
-- **Backend/Database**: Supabase (PostgreSQL) handles data persistence, authentication, and real-time data synchronization.
-- **State Management**: React Context API (`POSContext.jsx`) acts as the central hub, managing state and coordinating API calls.
+- **Routing**: `react-router-dom` for navigation between different interfaces (Waiter, Cashier, Kitchen, Admin, etc.) and handling authentication routing.
+- **Backend/Database**: Supabase (PostgreSQL) handles data persistence, and real-time data synchronization.
+- **State Management**: React Context API (`POSContext.jsx` and `AuthContext.jsx`) acts as the central hub, managing state, authentication, and coordinating API calls.
 
 ---
 
@@ -25,33 +25,50 @@ The system relies on a relational database hosted on Supabase. Here are the prim
 - **`orders`**: A group of items ordered for a specific table. Tracks the server, order type (Dine-in/Takeout), total amount, and status (`PENDING`, `IN_PROGRESS`, `READY`, `COMPLETED`, `CANCELLED`).
 - **`order_items`**: The individual items within an order. Tracks quantity, historical price, and specific item status.
 - **`ingredients`**: Inventory items used to prepare menu items. Tracks stock levels, low-stock thresholds, units, and cost.
-- **`recipe_ingredients`**: (Future expansion) Maps `menu_items` to `ingredients` to automatically deduct stock when an item is ordered.
+- **`recipe_ingredients`**: Maps `menu_items` to `ingredients` to automatically deduct stock when an item is ordered.
 
 ---
 
-## 3. Core State & Logic (`POSContext.jsx`)
+## 3. Core State & Logic
 
+### `AuthContext.jsx`
+Manages the application's authentication state.
+- Exposes user session data (`user`) and boolean flag `isAuthenticated`.
+- Provides `login` and `logout` functions to handle secure access to terminal interfaces.
+
+### `POSContext.jsx`
 `POSContext.jsx` is the "brain" of the frontend. It connects to Supabase and provides data and functions to the rest of the app via the `usePOS()` hook.
 
-### Key Responsibilities:
+**Key Responsibilities:**
 1. **Data Fetching**: Loads all initial data (tables, menu items, orders, inventory) when the app starts.
-2. **Real-time Subscriptions**: Listens for changes in the Supabase database. If another terminal updates an order or table, the context instantly updates the local state, ensuring all screens (Waiter, Kitchen, Cashier) stay perfectly in sync.
+2. **Real-time Subscriptions**: Listens for changes in the Supabase database. If another terminal updates an order or table, the context instantly updates the local state, ensuring all screens stay perfectly in sync.
 3. **Exposed Functions**: Provides helper functions that interfaces call to modify data.
 
-### Core Functions provided by `usePOS()`:
-- `createOrder(tableNumber, serverName, items, orderType)`: Punches a new order.
-- `addItemsToOrder(orderId, newItems)`: Adds more items to an existing active order.
-- `updateOrderStatus(orderId, status)`: Moves an order through its lifecycle (e.g., used by the Kitchen).
+**Core Functions provided by `usePOS()`:**
+- `createOrder(tableNumber, serverName, items, orderType)`: Punches a new order and deducts associated ingredients from inventory.
+- `addItemsToOrder(orderId, newItems)`: Adds more items to an existing active order and recalculates bills.
+- `updateOrderStatus(orderId, status)`: Moves an order through its lifecycle.
+- `updateOrderItemStatus(orderItemId, status)`: Updates specific items within an order.
 - `billOutTable(tableNumber)`: Completes all active orders for a table and resets the table to `EMPTY`.
 - `addMenuItem()`, `updateMenuItem()`, `deleteMenuItem()`: Menu management CRUD operations.
 - `addCategory()`, `updateCategory()`, `deleteCategory()`: Category management CRUD operations.
 - `addIngredient()`, `updateIngredient()`, `deleteIngredient()`: Inventory management CRUD operations.
+- `addTable()`, `removeTable()`: Physical table management.
+- `addRecipeIngredient()`, `removeRecipeIngredient()`: Manage mappings between menu items and required ingredients for automated inventory deduction.
 
 ---
 
 ## 4. Application Interfaces (What Stuff Does)
 
-The application is split into specialized interfaces designed for different staff roles.
+The application is split into specialized interfaces designed for different staff roles and terminal locations.
+
+### 🔐 Login Interface (`/login`)
+**Purpose**: Secure terminal access.
+- **Functionality**: Validates user credentials (mock implementation currently) before granting access to the system.
+
+### 🎛️ Interface Selector (`/`)
+**Purpose**: A central hub to navigate to specific role-based interfaces.
+- **Functionality**: Displays options to access Restaurant Management, Cashier, Waiter, Kitchen, Admin, and Inventory interfaces. Shows the current user profile, real-time clock, and provides a logout mechanism.
 
 ### 🍽️ Waiter Interface (`/waiter/menu-ordering`)
 **Purpose**: For floor staff to take orders directly at the table.
@@ -78,7 +95,7 @@ The application is split into specialized interfaces designed for different staf
   - **Billing**: Apply custom or preset discounts (PWD, Senior), select payment methods (Cash, Credit, QR), bill out tables, and print receipts.
 - **Data Flow**: Full read/write access to orders and tables. Bills out tables (via `billOutTable`).
 
-### 📋 Restaurant Management (`/restaurant-management`)
+### 📋 Restaurant Management (`/restaurant-management/edit-menu`)
 **Purpose**: For managers to configure the restaurant setup.
 - **Functionality**:
   - **Edit Menu**: Add, update, or remove menu items and categories.
@@ -108,9 +125,10 @@ The application is split into specialized interfaces designed for different staf
 
 Here is how data flows through the system during a typical customer visit:
 
-1. **Ordering**: A Waiter takes an order and presses **"Punch Order"**.
-2. **Database Update**: The system creates an `order` (status: `PENDING`) and `order_items` in Supabase. It updates the table status to `OCCUPIED`.
-3. **Kitchen Sync**: Supabase broadcasts the new order. The **Kitchen Interface** instantly receives the ticket.
-4. **Cooking**: Kitchen staff prepare the food. Once done, they click **"Complete"** on the ticket. The order status changes to `READY`.
-5. **Payment**: The customer is ready to pay. The Cashier selects the table on the **Cashier Interface**, applies any discounts, and clicks **"Bill Out"**.
-6. **Completion**: The system marks all orders for that table as `COMPLETED` and resets the table status back to `EMPTY`, making it available for the next customer.
+1. **Authentication**: Staff log in to a terminal and select their role interface from the Interface Selector.
+2. **Ordering**: A Waiter takes an order and presses **"Punch Order"**.
+3. **Database Update & Inventory**: The system creates an `order` (status: `PENDING`) and `order_items` in Supabase. It automatically deducts the necessary ingredients from stock (based on `recipe_ingredients`) and updates the table status to `OCCUPIED`.
+4. **Kitchen Sync**: Supabase broadcasts the new order. The **Kitchen Interface** instantly receives the ticket.
+5. **Cooking**: Kitchen staff prepare the food. Once done, they click **"Complete"** on the ticket. The order status changes to `READY`.
+6. **Payment**: The customer is ready to pay. The Cashier selects the table on the **Cashier Interface**, applies any discounts, and clicks **"Bill Out"**.
+7. **Completion**: The system marks all orders for that table as `COMPLETED` and resets the table status back to `EMPTY`, making it available for the next customer.
