@@ -834,6 +834,32 @@ export function POSProvider({ children }) {
     [refetchProfiles],
   );
 
+  /** Updates an existing staff profile's details (name, role, status). */
+  const updateProfile = useCallback(
+    async (id, updates) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", id);
+      await refetchProfiles();
+      return { error };
+    },
+    [refetchProfiles],
+  );
+
+  /** Removes a staff profile row from the database. */
+  const deleteProfile = useCallback(
+    async (id) => {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", id);
+      await refetchProfiles();
+      return { error };
+    },
+    [refetchProfiles],
+  );
+
   // ==========================================
   // UTILITY / GETTER FUNCTIONS
   // ==========================================
@@ -1155,6 +1181,8 @@ export function POSProvider({ children }) {
         applyTableDiscount,
         applyItemDiscount,
         addProfile,
+        updateProfile,
+        deleteProfile,
         reserveTable,
         
         // Utility getters
