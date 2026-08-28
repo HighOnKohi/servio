@@ -58,6 +58,8 @@ function Cashier() {
     updateOrderStatus,
     reserveTable,
     applyTableDiscount,
+    splitOrderItemUnit,
+    applyItemDiscount,
     loading,
     formatPrice,
   } = usePOS();
@@ -108,6 +110,10 @@ function Cashier() {
 
   // --- Local State ---
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountTarget, setDiscountTarget] = useState('table');
+  const [discountTargetItem, setDiscountTargetItem] = useState(null);
+  const [discountTargetUnitIndex, setDiscountTargetUnitIndex] = useState(null);
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPunchOrderModal, setShowPunchOrderModal] = useState(false);
   const [showClearOrderModal, setShowClearOrderModal] = useState(false);
@@ -117,6 +123,7 @@ function Cashier() {
   const [showDecreaseModal, setShowDecreaseModal] = useState(false);
   const [pendingTableId, setPendingTableId] = useState(null);
   const [pendingItem, setPendingItem] = useState(null);
+  const [expandedItemIds, setExpandedItemIds] = useState(() => ({}));
   const [receipt, setReceipt] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [reservedTables, setReservedTables] = useState([]);
@@ -166,17 +173,40 @@ function Cashier() {
     return existingOrders.flatMap((o) => getItemsForOrder(o.id));
   }, [existingOrders, getItemsForOrder, orderItems]);
 
+  const groupedExistingItems = useMemo(() => {
+    const groups = new Map();
+    existingItems.forEach((entry) => {
+      const key = `${entry.order_id}-${entry.menu_item_id || entry.item_name}`;
+      const group = groups.get(key) || { ...entry, quantity: 0, rows: [] };
+      group.quantity += Number(entry.quantity) || 0;
+      group.rows.push(entry);
+      groups.set(key, group);
+    });
+    return Array.from(groups.values());
+  }, [existingItems]);
+
   // Local unpunched cart for the selected table
   const cart = carts[selectedId] || [];
 
   // Compute subtotal from existing DB items + local cart items
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const existingDiscountedTotal = existingItems.reduce((sum, item) => {
+    const itemSubtotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+    const reservedRate = (item.pwd_discount ? 20 : 0) + (item.senior_discount ? 15 : 0);
+    const percentRate = Math.min(100 - reservedRate, Math.max(0, Number(item.percent_discount) || 0));
+    const percentAmount = itemSubtotal * ((reservedRate + percentRate) / 100);
+    const afterPercent = Math.max(0, itemSubtotal - percentAmount);
+    return sum + Math.max(0, afterPercent - Math.min(afterPercent, Math.max(0, Number(item.float_discount) || 0)));
+  }, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const subtotal = existingSubtotal + cartSubtotal;
+  const discountSubtotal = discountTarget === 'item' && discountTargetItem
+    ? Number(discountTargetItem.price) || 0
+    : subtotal;
   const percentDiscountCap = Math.max(0, 100 - (pwdDiscount ? 20 : 0) - (seniorDiscount ? 15 : 0));
   const normalizedPercentDiscountValue = Math.min(percentDiscountCap, Math.max(0, Number(percentDiscountValue) || 0));
-  const percentDiscountAmountPreview = subtotal * (((pwdDiscount ? 20 : 0) + (seniorDiscount ? 15 : 0) + normalizedPercentDiscountValue) / 100);
-  const floatDiscountCap = Math.max(0, subtotal - percentDiscountAmountPreview);
+  const percentDiscountAmountPreview = discountSubtotal * (((pwdDiscount ? 20 : 0) + (seniorDiscount ? 15 : 0) + normalizedPercentDiscountValue) / 100);
+  const floatDiscountCap = Math.max(0, discountSubtotal - percentDiscountAmountPreview);
   const normalizedFloatDiscountValue = Math.min(floatDiscountCap, Math.max(0, Number(floatDiscountValue) || 0));
   const selectedDiscounts = selected
     ? [
@@ -188,10 +218,16 @@ function Cashier() {
     : [];
   const discount = selectedDiscounts.reduce((sum, item) => sum + item.amount, 0);
   const displayedTotal = cart.length > 0
-    ? subtotal
-    : selected
-      ? (selected.totalBill ?? selected.currentBill ?? subtotal)
-      : subtotal;
+    ? existingDiscountedTotal + cartSubtotal
+    : existingItems.length > 0
+      ? existingDiscountedTotal
+      : selected
+        ? (() => {
+            const percentTotal = subtotal * (((selected.pwdDiscount ? 20 : 0) + (selected.seniorDiscount ? 15 : 0) + selected.percentDiscount) / 100);
+            const afterPercent = Math.max(0, subtotal - percentTotal);
+            return Math.max(0, afterPercent - selected.floatDiscount);
+          })()
+        : subtotal;
   const total = +Math.max(0, Number.isFinite(displayedTotal) ? displayedTotal : subtotal).toFixed(2);
 
   const tablesPerPage = 12;
@@ -293,8 +329,10 @@ function Cashier() {
     if (cart.length > 0) setShowClearOrderModal(true);
   }
 
-  function openDiscountModal() {
+  function openTableDiscountModal() {
     if (!selected) return;
+    setDiscountTarget('table');
+    setDiscountTargetItem(null);
     setPwdDiscount(selected.pwdDiscount);
     setSeniorDiscount(selected.seniorDiscount);
     setPercentDiscountValue(String(selected.percentDiscount || ''));
@@ -302,8 +340,39 @@ function Cashier() {
     setShowDiscountModal(true);
   }
 
+  function openItemDiscountModal(item, unitIndex = null) {
+    if (!selected) return;
+    setDiscountTarget('item');
+    setDiscountTargetItem(item);
+    setDiscountTargetUnitIndex(unitIndex);
+    const targetItem = item;
+    setPwdDiscount(targetItem.pwd_discount === true);
+    setSeniorDiscount(targetItem.senior_discount === true);
+    setPercentDiscountValue(String(targetItem.percent_discount || ''));
+    setFloatDiscountValue(String(targetItem.float_discount || ''));
+    setExpandedItemIds((previous) => ({ ...previous, [item.id]: true }));
+    setShowDiscountModal(true);
+  }
+
   async function applyDiscount() {
     if (!selected) return;
+    if (discountTarget === 'item') {
+      let targetItemId = discountTargetItem?.id;
+      if (discountTargetUnitIndex !== null && Number(discountTargetItem?.quantity) > 1) {
+        const splitItem = await splitOrderItemUnit(discountTargetItem.id);
+        if (!splitItem) return;
+        targetItemId = splitItem.id;
+      }
+      const result = await applyItemDiscount(targetItemId, {
+        pwdDiscount,
+        seniorDiscount,
+        percentDiscount: normalizedPercentDiscountValue,
+        floatDiscount: normalizedFloatDiscountValue,
+      });
+      if (result !== null) setShowDiscountModal(false);
+      return;
+    }
+
     const result = await applyTableDiscount(selected.table_number, {
       pwdDiscount,
       seniorDiscount,
@@ -313,16 +382,21 @@ function Cashier() {
     if (result !== null) setShowDiscountModal(false);
   }
 
+  function toggleItemExpansion(itemId) {
+    setExpandedItemIds((previous) => ({ ...previous, [itemId]: !previous[itemId] }));
+  }
+
   function requestItemDecrease(item) {
     setPendingItem(item);
     setShowDecreaseModal(true);
   }
 
-  async function confirmItemDecrease() {
+  function confirmItemDecrease() {
     if (!pendingItem) return;
-    await removeOrderItem(pendingItem.id, pendingItem.order_id);
+    const itemToRemove = pendingItem;
     setShowDecreaseModal(false);
     setPendingItem(null);
+    void removeOrderItem(itemToRemove.id, itemToRemove.order_id);
   }
 
   /** Punches the local cart to the database via POSContext. */
@@ -661,23 +735,96 @@ function Cashier() {
 
               <div className="items-list">
                 {/* Show existing punched items from DB */}
-                {existingItems.map((item) => (
-                  <div key={item.id} className="item-row">
-                    <div>
-                      <div className="item-name">{item.item_name} × {item.quantity} <small style={{opacity:0.5}}>✓</small></div>
+                {groupedExistingItems.map((item) => {
+                  const calculateItemTotal = (entry) => {
+                    const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
+                    const entryDiscount = (entry.pwd_discount ? entrySubtotal * 0.2 : 0)
+                      + (entry.senior_discount ? entrySubtotal * 0.15 : 0)
+                      + ((Number(entry.percent_discount) || 0) / 100 * entrySubtotal);
+                    const afterPercent = Math.max(0, entrySubtotal - entryDiscount);
+                    return Math.max(0, afterPercent - Math.min(afterPercent, Number(entry.float_discount) || 0));
+                  };
+                  const itemSubtotal = item.rows.reduce((sum, entry) => sum + (Number(entry.price) || 0) * (Number(entry.quantity) || 0), 0);
+                  const itemTotal = item.rows.reduce((sum, entry) => sum + calculateItemTotal(entry), 0);
+                  const isExpanded = expandedItemIds[item.id] || false;
+                  const unitCount = Math.max(1, Number(item.quantity) || 1);
+                  const itemUnits = item.rows.flatMap((entry) => Array.from({ length: Math.max(1, Number(entry.quantity) || 1) }, (_, index) => ({ entry, index })));
+                  return (
+                    <div key={item.id} className="item-group">
+                      <div className="item-row">
+                        <div className="item-content">
+                          <div className="item-name">
+                            {unitCount > 1 && (
+                              <button className="item-expand-button" onClick={() => toggleItemExpansion(item.id)} title="Show individual items">
+                                {isExpanded ? '▾' : '▸'}
+                              </button>
+                            )}
+                            <span className="item-name-text">{item.item_name} × {item.quantity}</span>
+                            <span className="item-status-pill" aria-label="Saved item" />
+                          </div>
+                        </div>
+                        <div className="item-right">
+                          <div className="item-right-main">
+                            <span>{formatPrice(itemTotal)}</span>
+                            <button className="item-discount-button" onClick={() => openItemDiscountModal(item)} title="Apply item discount">%</button>
+                            <button
+                              className="item-remove"
+                              onClick={() => requestItemDecrease(item)}
+                              title="Decrease quantity"
+                            >
+                              −
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {isExpanded && unitCount > 1 && itemUnits.map(({ entry, index }, unitIndex) => (
+                        <div key={`${entry.id}-unit-${index}`} className="item-row item-unit-row">
+                          {(() => {
+                            const unitEntry = { ...entry, quantity: 1 };
+                            const unitTotal = calculateItemTotal(unitEntry);
+                            const unitSubtotal = Number(entry.price) || 0;
+                            const discountLines = [
+                              entry.pwd_discount && { label: 'PWD discount', value: unitSubtotal * 0.2 },
+                              entry.senior_discount && { label: 'Senior discount', value: unitSubtotal * 0.15 },
+                              Number(entry.percent_discount) > 0 && { label: `${entry.percent_discount}% discount`, value: unitSubtotal * (Number(entry.percent_discount) / 100) },
+                              Number(entry.float_discount) > 0 && { label: 'Fixed discount', value: Number(entry.float_discount) },
+                            ].filter(Boolean);
+                            return (
+                              <>
+                                <div className="item-content">
+                                  <div className="item-name">
+                                    <span className="item-name-text">{item.item_name}</span>
+                                  </div>
+                                  {discountLines.length > 0 && (
+                                    <div className="item-discount-labels">
+                                      {discountLines.map((discount) => (
+                                        <div key={discount.label} className="item-discount-info">{discount.label}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="item-right">
+                                  <div className="item-right-main">
+                                    <span>{formatPrice(unitTotal)}</span>
+                                    <button className="item-discount-button" onClick={() => openItemDiscountModal(entry, unitIndex)} title="Apply discount to this item">%</button>
+                                    <button className="item-remove" onClick={() => requestItemDecrease(entry)} title="Remove this item">−</button>
+                                  </div>
+                                  {discountLines.length > 0 && (
+                                    <div className="item-discount-values">
+                                      {discountLines.map((discount) => (
+                                        <div key={discount.label} className="item-discount-info">-{formatPrice(discount.value)}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ))}
                     </div>
-                    <div className="item-right">
-                      <span>{formatPrice(Number(item.price) * item.quantity)}</span>
-                      <button
-                        className="item-remove"
-                        onClick={() => requestItemDecrease(item)}
-                        title="Decrease quantity"
-                      >
-                        −
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {/* Show current unpunched cart items */}
                 {cart.length === 0 && existingItems.length === 0 ? (
                   <div className="empty-items">No items yet. Add from below.</div>
@@ -734,7 +881,7 @@ function Cashier() {
                     Cancel Order
                   </button>
                 </> : <>
-                  <button className="discount-button" onClick={openDiscountModal}>
+                  <button className="discount-button" onClick={openTableDiscountModal}>
                     <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M856-390 570-104q-12 12-27 18t-30 6q-15 0-30-6t-27-18L103-457q-11-11-17-25.5T80-513v-287q0-33 23.5-56.5T160-880h287q16 0 31 6.5t26 17.5l352 353q12 12 17.5 27t5.5 30q0 15-5.5 29.5T856-390ZM513-160l286-286-353-354H160v286l353 354ZM260-640q25 0 42.5-17.5T320-700q0-25-17.5-42.5T260-760q-25 0-42.5 17.5T200-700q0 25 17.5 42.5T260-640Zm220 160Z"/></svg></span>
                     Discount
                   </button>
@@ -808,7 +955,7 @@ function Cashier() {
               <div><p className="modal-kicker">ORDER ADJUSTMENT</p><h2>Apply discount</h2></div>
               <button className="modal-icon-close" onClick={() => setShowDiscountModal(false)} aria-label="Close">×</button>
             </div>
-            <p className="modal-description">Toggle the discounts to apply for Table #{selected?.label}.</p>
+            <p className="modal-description">Toggle the discounts to apply for {discountTarget === 'item' ? `Item ${discountTargetItem?.item_name}` : `Table #${selected?.label}`}.</p>
             <div className="discount-toggles">
               <label className={`discount-toggle ${pwdDiscount ? 'active' : ''}`}>
                 <input type="checkbox" checked={pwdDiscount} onChange={(e) => setPwdDiscount(e.target.checked)} />

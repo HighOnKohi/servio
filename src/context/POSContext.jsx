@@ -53,6 +53,22 @@ const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
   };
 };
 
+const buildOrderItemDiscountPayload = (itemRow = {}) => {
+  const itemSubtotal = parseFloat(((Number(itemRow.price) || 0) * (Number(itemRow.quantity) || 0)).toFixed(2));
+  const discountState = computeDiscountedTableTotal(itemSubtotal, {
+    pwdDiscount: itemRow.pwd_discount === true,
+    seniorDiscount: itemRow.senior_discount === true,
+    percentDiscount: itemRow.percent_discount,
+    floatDiscount: itemRow.float_discount,
+  });
+
+  return {
+    itemSubtotal,
+    discountAmount: discountState.discountAmount,
+    total: discountState.totalBill,
+  };
+};
+
 const buildTableDiscountPayload = (subtotal, tableRow = {}) => {
   const discountState = computeDiscountedTableTotal(subtotal, {
     pwdDiscount: tableRow.pwd_discount === true,
@@ -655,6 +671,11 @@ export function POSProvider({ children }) {
         return;
       }
 
+      const nextQuantity = Number(item.quantity) - 1;
+      setOrderItems((previous) => nextQuantity > 0
+        ? previous.map((entry) => entry.id === orderItemId ? { ...entry, quantity: nextQuantity } : entry)
+        : previous.filter((entry) => entry.id !== orderItemId));
+
       if (Number(item.quantity) > 1) {
         const { error: updateError } = await supabase
           .from("order_items")
@@ -906,6 +927,149 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
+  const splitOrderItemUnit = useCallback(
+    async (orderItemId) => {
+      const { data: item, error } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("id", orderItemId)
+        .single();
+      if (error || !item || Number(item.quantity) <= 1) return item || null;
+
+      const { data: splitItem, error: insertError } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: item.order_id,
+          menu_item_id: item.menu_item_id,
+          item_name: item.item_name,
+          quantity: 1,
+          price: item.price,
+          modifiers: item.modifiers || [],
+          status: item.status || "PENDING",
+          pwd_discount: false,
+          senior_discount: false,
+          percent_discount: 0,
+          float_discount: 0,
+        })
+        .select()
+        .single();
+      if (insertError || !splitItem) return null;
+
+      const { error: updateError } = await supabase
+        .from("order_items")
+        .update({ quantity: Number(item.quantity) - 1 })
+        .eq("id", item.id);
+      if (updateError) return null;
+
+      const order = orders.find((o) => o.id === item.order_id);
+      if (order && order.table_number) {
+        const { data: remaining } = await supabase
+          .from("order_items")
+          .select("price, quantity, pwd_discount, senior_discount, percent_discount, float_discount")
+          .eq("order_id", item.order_id);
+
+        const rawSubtotal = (remaining || []).reduce(
+          (sum, entry) => sum + (Number(entry.price) || 0) * (Number(entry.quantity) || 0),
+          0,
+        );
+        const discountedTotal = (remaining || []).reduce((sum, entry) => {
+          const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
+          const entryDiscount = computeDiscountedTableTotal(entrySubtotal, {
+            pwdDiscount: entry.pwd_discount === true,
+            seniorDiscount: entry.senior_discount === true,
+            percentDiscount: entry.percent_discount,
+            floatDiscount: entry.float_discount,
+          });
+          return sum + entryDiscount.totalBill;
+        }, 0);
+
+        await supabase
+          .from("restaurant_tables")
+          .update({
+            current_bill: parseFloat(rawSubtotal.toFixed(2)),
+            total_bill: parseFloat(discountedTotal.toFixed(2)),
+          })
+          .eq("table_number", order.table_number);
+      }
+
+      await Promise.all([refetchOrderItems(), refetchTables()]);
+      return splitItem;
+    },
+    [orders, refetchOrderItems, refetchTables],
+  );
+
+  const applyItemDiscount = useCallback(
+    async (orderItemId, discounts = {}) => {
+      const { data: item, error } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("id", orderItemId)
+        .single();
+
+      if (error || !item) {
+        console.error("Error loading order item:", error);
+        return null;
+      }
+
+      const discountState = computeDiscountedTableTotal((Number(item.price) || 0) * (Number(item.quantity) || 0), {
+        pwdDiscount: !!discounts.pwdDiscount,
+        seniorDiscount: !!discounts.seniorDiscount,
+        percentDiscount: discounts.percentDiscount,
+        floatDiscount: discounts.floatDiscount,
+      });
+
+      const { error: updateError } = await supabase
+        .from("order_items")
+        .update({
+          pwd_discount: !!discounts.pwdDiscount,
+          senior_discount: !!discounts.seniorDiscount,
+          percent_discount: discountState.percentDiscount,
+          float_discount: discountState.floatDiscount,
+        })
+        .eq("id", orderItemId);
+
+      if (updateError) {
+        console.error("Error applying item discount:", updateError);
+        return null;
+      }
+
+      const order = orders.find((o) => o.id === item.order_id);
+      if (order && order.table_number) {
+        const { data: remaining } = await supabase
+          .from("order_items")
+          .select("price, quantity, pwd_discount, senior_discount, percent_discount, float_discount")
+          .eq("order_id", item.order_id);
+
+        const rawSubtotal = (remaining || []).reduce(
+          (sum, entry) => sum + (Number(entry.price) || 0) * (Number(entry.quantity) || 0),
+          0,
+        );
+        const discountedTotal = (remaining || []).reduce((sum, entry) => {
+          const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
+          const entryDiscount = computeDiscountedTableTotal(entrySubtotal, {
+            pwdDiscount: entry.pwd_discount === true,
+            seniorDiscount: entry.senior_discount === true,
+            percentDiscount: entry.percent_discount,
+            floatDiscount: entry.float_discount,
+          });
+          return sum + entryDiscount.totalBill;
+        }, 0);
+
+        await supabase
+          .from("restaurant_tables")
+          .update({
+            current_bill: parseFloat(rawSubtotal.toFixed(2)),
+            total_bill: parseFloat(discountedTotal.toFixed(2)),
+          })
+          .eq("table_number", order.table_number);
+      }
+
+      await Promise.all([refetchOrderItems(), refetchTables()]);
+      return discountState.totalBill;
+    },
+    [orders, refetchOrderItems, refetchTables, tables],
+  );
+
   const applyTableDiscount = useCallback(
     async (tableNumber, discounts = {}) => {
       const { data: table, error } = await supabase
@@ -949,7 +1113,6 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
-  // Expose all data and functions via the Provider
   return (
     <POSContext.Provider
       value={{
@@ -988,7 +1151,9 @@ export function POSProvider({ children }) {
         updateOrderStatus,
         updateOrderItemStatus,
         billOutTable,
+        splitOrderItemUnit,
         applyTableDiscount,
+        applyItemDiscount,
         addProfile,
         reserveTable,
         
