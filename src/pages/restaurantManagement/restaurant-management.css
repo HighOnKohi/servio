@@ -132,6 +132,19 @@
 .table-management-summary span { padding:10px 13px; color:#64748b; font-size:12px; white-space:nowrap; }
 .table-management-summary span + span { border-left:1px solid #e2e8f0; }
 .table-management-summary strong { color:#111827; font-size:14px; }
+.table-management-qr-button {
+  width:100%;
+  min-height:40px;
+  padding:0 14px;
+  border:1px solid #d8e1ef;
+  border-radius:10px;
+  background:#ffffff;
+  color:#111827;
+  font:inherit;
+  font-size:13px;
+  font-weight:600;
+  white-space:nowrap;
+}
 .table-management-grid { display:grid; flex:1; min-height:0; grid-template-columns:repeat(4, minmax(130px, 1fr)); grid-template-rows:repeat(3, minmax(0, 1fr)); gap:14px; padding:0 16px; }
 .table-management-card { min-width:0; min-height:0; display:flex; flex-direction:column; padding:18px; border:2px solid #e6e9ec; border-radius:14px; background:#fff; color:#111827; font:inherit; text-align:left; transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; position:relative; overflow:hidden; }
 .table-management-card:hover { transform:translateY(-2px); box-shadow:0 7px 16px rgba(15,23,42,.08); }
@@ -167,6 +180,7 @@
 .table-counter-panel { display:flex; flex-direction:column; min-height:0; overflow:auto; border-left:1px solid #e5e7eb; background:#fff; padding:13px 16px; }
 .table-counter-label { margin:0 0 12px; color:#9ca3af; font-size:.75rem; letter-spacing:1px; text-transform:uppercase; }
 .table-counter-heading { padding:8px; border-bottom:1px solid #f3f4f6; }
+.table-counter-heading-actions { display:flex; justify-content:flex-end; }
 .table-counter-heading h2 { margin:0; color:#111827; font-size:17px; font-weight:700; letter-spacing:-.015em; }
 .table-counter-heading p { margin:4px 0 0; color:#64748b; font-size:12px; }
 .table-counter-control { display:grid; grid-template-columns:42px 1fr 42px; gap:10px; padding:16px 8px; }

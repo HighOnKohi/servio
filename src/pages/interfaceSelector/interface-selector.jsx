@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import ProtocolAssistant from "../../components/ProtocolAssistant";
 import "./interface-selector.css";
 
 const INTERFACES = [
@@ -158,6 +159,10 @@ export default function InterfaceSelector() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="interface-selector-assistant-wrap">
+        <ProtocolAssistant />
       </div>
 
       <footer className="interface-selector-footer">

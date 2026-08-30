@@ -611,6 +611,9 @@ function TableInterface() {
       </main>
 
       <aside className="table-counter-panel">
+        <div className="table-counter-heading table-counter-heading-actions">
+          <button type="button" className="table-management-qr-button">Generate Customer QR Codes</button>
+        </div>
         <div className="table-counter-control">
           <button onClick={() => updateCount(tableCount - 1)} aria-label="Remove table">−</button>
           <input type="number" value={tableCount} onChange={(e) => { const count = parseInt(e.target.value, 10); updateCount(Number.isNaN(count) ? 0 : count); }} min={0} max={100} aria-label="Table count" />

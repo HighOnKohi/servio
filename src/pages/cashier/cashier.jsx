@@ -190,16 +190,38 @@ function Cashier() {
 
   // Compute subtotal from existing DB items + local cart items
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-  const existingDiscountedTotal = existingItems.reduce((sum, item) => {
-    const itemSubtotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
-    const reservedRate = (item.pwd_discount ? 20 : 0) + (item.senior_discount ? 15 : 0);
-    const percentRate = Math.min(100 - reservedRate, Math.max(0, Number(item.percent_discount) || 0));
-    const percentAmount = itemSubtotal * ((reservedRate + percentRate) / 100);
-    const afterPercent = Math.max(0, itemSubtotal - percentAmount);
-    return sum + Math.max(0, afterPercent - Math.min(afterPercent, Math.max(0, Number(item.float_discount) || 0)));
-  }, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const subtotal = existingSubtotal + cartSubtotal;
+  const getItemDiscountBreakdown = (entry) => {
+    const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
+    const tablePwdRate = selected?.pwdDiscount ? 20 : 0;
+    const tableSeniorRate = selected?.seniorDiscount ? 15 : 0;
+    const itemPwdRate = selected?.pwdDiscount ? 0 : (entry.pwd_discount ? 20 : 0);
+    const itemSeniorRate = selected?.seniorDiscount ? 0 : (entry.senior_discount ? 15 : 0);
+    const itemPercentRate = Math.min(100 - tablePwdRate - tableSeniorRate - itemPwdRate - itemSeniorRate, Math.max(0, Number(entry.percent_discount) || 0));
+    const tablePwdAmount = entrySubtotal * (tablePwdRate / 100);
+    const tableSeniorAmount = entrySubtotal * (tableSeniorRate / 100);
+    const itemPwdAmount = entrySubtotal * (itemPwdRate / 100);
+    const itemSeniorAmount = entrySubtotal * (itemSeniorRate / 100);
+    const itemPercentAmount = entrySubtotal * (itemPercentRate / 100);
+    const afterPercent = Math.max(0, entrySubtotal - tablePwdAmount - tableSeniorAmount - itemPwdAmount - itemSeniorAmount - itemPercentAmount);
+    const itemFloatAmount = Math.min(afterPercent, Math.max(0, Number(entry.float_discount) || 0));
+    return {
+      total: Math.max(0, afterPercent - itemFloatAmount),
+      itemOnlyDiscount: itemPwdAmount + itemSeniorAmount + itemPercentAmount + itemFloatAmount,
+      tableCoveredDiscount: tablePwdAmount + tableSeniorAmount,
+    };
+  };
+  const existingDiscountBreakdown = existingItems.reduce((sum, item) => {
+    const breakdown = getItemDiscountBreakdown(item);
+    return {
+      total: sum.total + breakdown.total,
+      itemOnlyDiscount: sum.itemOnlyDiscount + breakdown.itemOnlyDiscount,
+      tableCoveredDiscount: sum.tableCoveredDiscount + breakdown.tableCoveredDiscount,
+    };
+  }, { total: 0, itemOnlyDiscount: 0, tableCoveredDiscount: 0 });
+  const existingDiscountedTotal = existingDiscountBreakdown.total;
+  const individualDiscount = +existingDiscountBreakdown.itemOnlyDiscount.toFixed(2);
   const discountSubtotal = discountTarget === 'item' && discountTargetItem
     ? Number(discountTargetItem.price) || 0
     : subtotal;
@@ -216,19 +238,9 @@ function Cashier() {
         selected.floatDiscount > 0 ? { label: 'Specific Discount', amount: selected.floatDiscount } : null,
       ].filter(Boolean)
     : [];
-  const discount = selectedDiscounts.reduce((sum, item) => sum + item.amount, 0);
-  const displayedTotal = cart.length > 0
-    ? existingDiscountedTotal + cartSubtotal
-    : existingItems.length > 0
-      ? existingDiscountedTotal
-      : selected
-        ? (() => {
-            const percentTotal = subtotal * (((selected.pwdDiscount ? 20 : 0) + (selected.seniorDiscount ? 15 : 0) + selected.percentDiscount) / 100);
-            const afterPercent = Math.max(0, subtotal - percentTotal);
-            return Math.max(0, afterPercent - selected.floatDiscount);
-          })()
-        : subtotal;
-  const total = +Math.max(0, Number.isFinite(displayedTotal) ? displayedTotal : subtotal).toFixed(2);
+  const tableDiscount = +(selectedDiscounts.reduce((sum, item) => sum + item.amount, 0) - existingDiscountBreakdown.tableCoveredDiscount).toFixed(2);
+  const discount = +(individualDiscount + tableDiscount).toFixed(2);
+  const total = +Math.max(0, subtotal - discount).toFixed(2);
 
   const tablesPerPage = 12;
   const totalTablePages = Math.max(1, Math.ceil(tables.length / tablesPerPage));
@@ -527,6 +539,8 @@ function Cashier() {
       table: selected?.label,
       paymentMethod,
       subtotal,
+      individualDiscount,
+      tableDiscount,
       discount,
       total,
       date: `${printedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, ${printedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`,
@@ -791,32 +805,30 @@ function Cashier() {
                             ].filter(Boolean);
                             return (
                               <>
-                                <div className="item-content">
-                                  <div className="item-name">
-                                    <span className="item-name-text">{item.item_name}</span>
+                                <div className="item-unit-main">
+                                  <div className="item-content">
+                                    <div className="item-name">
+                                      <span className="item-name-text">{item.item_name}</span>
+                                    </div>
                                   </div>
-                                  {discountLines.length > 0 && (
+                                  <div className="item-unit-price">{formatPrice(unitTotal)}</div>
+                                  <button className="item-discount-button" onClick={() => openItemDiscountModal(entry, unitIndex)} title="Apply discount to this item">%</button>
+                                  <button className="item-remove" onClick={() => requestItemDecrease(entry)} title="Remove this item">−</button>
+                                </div>
+                                {discountLines.length > 0 && (
+                                  <div className="item-unit-discount-row">
                                     <div className="item-discount-labels">
                                       {discountLines.map((discount) => (
                                         <div key={discount.label} className="item-discount-info">{discount.label}</div>
                                       ))}
                                     </div>
-                                  )}
-                                </div>
-                                <div className="item-right">
-                                  <div className="item-right-main">
-                                    <span>{formatPrice(unitTotal)}</span>
-                                    <button className="item-discount-button" onClick={() => openItemDiscountModal(entry, unitIndex)} title="Apply discount to this item">%</button>
-                                    <button className="item-remove" onClick={() => requestItemDecrease(entry)} title="Remove this item">−</button>
-                                  </div>
-                                  {discountLines.length > 0 && (
                                     <div className="item-discount-values">
                                       {discountLines.map((discount) => (
                                         <div key={discount.label} className="item-discount-info">-{formatPrice(discount.value)}</div>
                                       ))}
                                     </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                               </>
                             );
                           })()}
@@ -854,6 +866,12 @@ function Cashier() {
                   <span>Subtotal</span>
                   <span>{formatPrice(subtotal)}</span>
                 </div>
+                {individualDiscount > 0 && (
+                  <div className="summary-row">
+                    <span>Individual Discounts</span>
+                    <span>-{formatPrice(individualDiscount)}</span>
+                  </div>
+                )}
                 {selectedDiscounts.map((item) => (
                   <div className="summary-row" key={item.label}>
                     <span>{item.label}</span>
@@ -1107,7 +1125,8 @@ function Cashier() {
               <div><span>Date</span><strong>{receipt.date}</strong></div>
               <div><span>Payment</span><strong>{receipt.paymentMethod === 'qr' ? 'QR Code' : receipt.paymentMethod === 'credit' ? 'Credit Card' : 'Cash'}</strong></div>
               <div><span>Subtotal</span><strong>{formatPrice(receipt.subtotal)}</strong></div>
-              {receipt.discount > 0 && <div><span>Discount</span><strong>-{formatPrice(receipt.discount)}</strong></div>}
+              {receipt.individualDiscount > 0 && <div><span>Individual Discounts</span><strong>-{formatPrice(receipt.individualDiscount)}</strong></div>}
+              {receipt.tableDiscount > 0 && <div><span>Discount</span><strong>-{formatPrice(receipt.tableDiscount)}</strong></div>}
               <div className="receipt-total"><span>Total paid</span><strong>{formatPrice(receipt.total)}</strong></div>
             </div>
             <button className="modal-print receipt-done" onClick={() => setReceipt(null)}>Done</button>

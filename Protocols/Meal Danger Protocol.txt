@@ -1,0 +1,12 @@
+Meal Danger Protocol
+
+1. Stop service of the affected dish immediately.
+2. Remove the item from the table and preserve it for management review.
+3. Apologize to the guest and move the conversation to a calm, private tone.
+4. Notify the shift lead or manager at once.
+5. Document what was found, who handled it, and when it happened.
+6. Check whether any other guests may have been served from the same batch.
+7. Isolate related ingredients or prepared food until kitchen review is complete.
+8. Offer replacement, refund, and medical help escalation if needed.
+9. Do not argue, assign blame, or dispose of evidence before management review.
+10. Escalate to ownership and food safety authorities if the situation requires it.
