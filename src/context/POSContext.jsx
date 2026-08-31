@@ -521,10 +521,21 @@ export function POSProvider({ children }) {
         .select()
         .single();
 
-      if (!error) await refetchCustomerRequests();
+      if (!error) {
+        await supabase
+          .from("restaurant_tables")
+          .update({
+            status: "REQUEST",
+            occupied_since: null,
+            reserved_since: null,
+          })
+          .eq("table_number", tableNumber);
+
+        await Promise.all([refetchCustomerRequests(), refetchTables()]);
+      }
       return { data, error };
     },
-    [refetchCustomerRequests],
+    [refetchCustomerRequests, refetchTables],
   );
 
   /**

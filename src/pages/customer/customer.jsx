@@ -13,6 +13,15 @@ function MenuImagePlaceholder() {
   );
 }
 
+function ReturnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}
+
 function useFixedInterfaceCanvas() {
   const [, refreshScale] = useState(0);
 
@@ -166,13 +175,23 @@ export default function Customer() {
           <p className="customer-kicker">Customer Interface</p>
           <h1>Table #{String(selectedTable.table_number).padStart(2, '0')}</h1>
         </div>
-        <div className="customer-topbar-meta">
-          <span>
-            {now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          </span>
-          <span>
-            {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
-          </span>
+        <div className="customer-topbar-actions">
+          <button
+            type="button"
+            className="customer-return-button"
+            onClick={() => navigate('/')}
+            aria-label="Return to interface selector"
+          >
+            <ReturnIcon />
+          </button>
+          <div className="customer-topbar-meta">
+            <span>
+              {now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span>
+              {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -208,9 +227,6 @@ export default function Customer() {
                 <p className="customer-kicker">Current Selection</p>
                 <h2>Your Order</h2>
               </div>
-              <button type="button" className="customer-back-button" onClick={() => navigate(-1)} aria-label="Exit customer interface">
-                ×
-              </button>
             </div>
 
             <div className="customer-cart-list">

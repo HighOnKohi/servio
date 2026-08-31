@@ -2,12 +2,104 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../lib/supabaseClient';
+import QRCode from 'qrcode';
+import { jsPDF } from 'jspdf';
 import './restaurant-management.css';
 
-const STATUSES = ['Available', 'Occupied', 'Reserved'];
-const STATUS_MAP = { EMPTY: 'Available', OCCUPIED: 'Occupied', RESERVED: 'Reserved' };
-const REVERSE_STATUS_MAP = { Available: 'EMPTY', Occupied: 'OCCUPIED', Reserved: 'RESERVED' };
+const STATUSES = ['Available', 'Occupied', 'Reserved', 'Request'];
+const STATUS_MAP = { EMPTY: 'Available', OCCUPIED: 'Occupied', RESERVED: 'Reserved', REQUEST: 'Request' };
+
+function CustomerQrCodeModal({ tables, onClose }) {
+  const [enabledTableNumbers, setEnabledTableNumbers] = useState(() => new Set(tables.map((table) => table.table_number)));
+  const [generating, setGenerating] = useState(false);
+
+  const toggleTable = (tableNumber) => {
+    setEnabledTableNumbers((previous) => {
+      const next = new Set(previous);
+      if (next.has(tableNumber)) next.delete(tableNumber);
+      else next.add(tableNumber);
+      return next;
+    });
+  };
+
+  const generatePdf = async () => {
+    const selectedTables = tables.filter((table) => enabledTableNumbers.has(table.table_number));
+    if (selectedTables.length === 0 || generating) return;
+
+    setGenerating(true);
+    try {
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const cardWidth = 84;
+      const cardHeight = 84;
+      const gap = 10;
+      const startX = (pageWidth - (cardWidth * 2 + gap)) / 2;
+      const startY = 30;
+
+      pdf.setFontSize(18);
+      pdf.text('Customer Table QR Codes', pageWidth / 2, 18, { align: 'center' });
+
+      for (let index = 0; index < selectedTables.length; index += 1) {
+        const table = selectedTables[index];
+        const position = index % 4;
+        if (index > 0 && position === 0) pdf.addPage();
+        const column = position % 2;
+        const row = Math.floor(position / 2);
+        const x = startX + column * (cardWidth + gap);
+        const y = startY + row * (cardHeight + gap);
+        const customerUrl = `${CUSTOMER_INTERFACE_ORIGIN}/customer/${table.table_number}`;
+        const qrDataUrl = await QRCode.toDataURL(customerUrl, { margin: 1, width: 640, errorCorrectionLevel: 'M' });
+
+        pdf.setDrawColor(210, 218, 230);
+        pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3);
+        pdf.addImage(qrDataUrl, 'PNG', x + 12, y + 8, 60, 60);
+        pdf.setFontSize(14);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(`Table ${String(table.table_number).padStart(2, '0')}`, x + cardWidth / 2, y + 75, { align: 'center' });
+      }
+
+      pdf.save('customer-table-qr-codes.pdf');
+      onClose();
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="customer-qr-modal-overlay" onClick={onClose}>
+      <section className="customer-qr-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="customer-qr-modal-title">
+        <div className="customer-qr-modal-header">
+          <div>
+            <p className="customer-qr-modal-kicker">Table setup</p>
+            <h2 id="customer-qr-modal-title">Generate Customer QR Codes</h2>
+            <p>Select the tables to include in the downloadable PDF.</p>
+          </div>
+          <button type="button" className="customer-qr-modal-close" onClick={onClose} aria-label="Close QR code generator">×</button>
+        </div>
+        <div className="customer-qr-table-list">
+          {tables.map((table) => {
+            const enabled = enabledTableNumbers.has(table.table_number);
+            return (
+              <button key={table.id} type="button" className={`customer-qr-table-toggle ${enabled ? 'enabled' : 'disabled'}`} onClick={() => toggleTable(table.table_number)} aria-pressed={enabled}>
+                <span>Table {String(table.table_number).padStart(2, '0')}</span>
+                <small>{enabled ? 'Included' : 'Excluded'}</small>
+              </button>
+            );
+          })}
+        </div>
+        <div className="customer-qr-modal-footer">
+          <span>{enabledTableNumbers.size} of {tables.length} tables selected</span>
+          <button type="button" className="customer-qr-generate-button" onClick={generatePdf} disabled={enabledTableNumbers.size === 0 || generating}>
+            {generating ? 'Generating...' : 'Generate'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 const TABLES_PER_PAGE = 12;
+const CUSTOMER_INTERFACE_ORIGIN = 'https://servio-pos.netlify.app';
 const categorySlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const menuItemSlug = (item) => item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 const menuPath = (category, item = null) => `/restaurant-management/edit-menu?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;
@@ -486,6 +578,7 @@ function TableInterface() {
 
   const [statusFilter, setStatusFilter] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const tables = useMemo(() =>
     dbTables.map((t) => ({
@@ -612,7 +705,7 @@ function TableInterface() {
 
       <aside className="table-counter-panel">
         <div className="table-counter-heading table-counter-heading-actions">
-          <button type="button" className="table-management-qr-button">Generate Customer QR Codes</button>
+          <button type="button" className="table-management-qr-button" onClick={() => setIsQrModalOpen(true)}>Generate Customer QR Codes</button>
         </div>
         <div className="table-counter-control">
           <button onClick={() => updateCount(tableCount - 1)} aria-label="Remove table">−</button>
@@ -632,6 +725,7 @@ function TableInterface() {
           )}
         </div>
       </aside>
+      {isQrModalOpen && <CustomerQrCodeModal tables={dbTables} onClose={() => setIsQrModalOpen(false)} />}
     </div>
   );
 }
