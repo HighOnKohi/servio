@@ -97,7 +97,7 @@ export default function ProtocolAssistant() {
     setError("");
 
     try {
-      const response = await fetch("/api/protocol-assistant", {
+      const response = await fetch("/.netlify/functions/protocol-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
