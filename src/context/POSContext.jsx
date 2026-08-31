@@ -104,6 +104,7 @@ export function POSProvider({ children }) {
   const [profiles, setProfiles] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [recipeIngredients, setRecipeIngredients] = useState([]);
+  const [customerRequests, setCustomerRequests] = useState([]);
   
   // Loading state indicates whether the initial data fetch from Supabase is complete
   const [loading, setLoading] = useState(true);
@@ -157,6 +158,14 @@ export function POSProvider({ children }) {
     if (data) setOrderItems(data);
   }, []);
 
+  const refetchCustomerRequests = useCallback(async () => {
+    const { data } = await supabase
+      .from("customer_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setCustomerRequests(data);
+  }, []);
+
   /** Fetches all staff profiles, ordered alphabetically by full name. */
   const refetchProfiles = useCallback(async () => {
     const { data } = await supabase
@@ -193,6 +202,7 @@ export function POSProvider({ children }) {
         refetchCategories(),
         refetchOrders(),
         refetchOrderItems(),
+        refetchCustomerRequests(),
         refetchProfiles(),
         refetchIngredients(),
         refetchRecipeIngredients(),
@@ -206,6 +216,7 @@ export function POSProvider({ children }) {
     refetchCategories,
     refetchOrders,
     refetchOrderItems,
+    refetchCustomerRequests,
     refetchProfiles,
     refetchIngredients,
     refetchRecipeIngredients,
@@ -243,6 +254,11 @@ export function POSProvider({ children }) {
         { event: "*", schema: "public", table: "ingredients" },
         () => refetchIngredients(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "customer_requests" },
+        () => refetchCustomerRequests(),
+      )
       .subscribe();
       
     // Cleanup function to close the connection when the component unmounts
@@ -255,6 +271,7 @@ export function POSProvider({ children }) {
     refetchTables,
     refetchMenu,
     refetchIngredients,
+    refetchCustomerRequests,
   ]);
 
   // ==========================================
@@ -480,6 +497,36 @@ export function POSProvider({ children }) {
     [refetchRecipeIngredients],
   );
 
+  const createCustomerRequest = useCallback(
+    async (tableNumber, items) => {
+      const normalizedItems = items.map((item) => ({
+        id: item.id || item.menu_item_id || null,
+        name: item.name || item.item_name,
+        price: Number(item.price) || 0,
+        quantity: Number(item.quantity) || 1,
+      }));
+      const subtotal = parseFloat(
+        normalizedItems
+          .reduce((sum, item) => sum + item.price * item.quantity, 0)
+          .toFixed(2),
+      );
+
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .insert({
+          table_number: tableNumber,
+          subtotal,
+          items: normalizedItems,
+        })
+        .select()
+        .single();
+
+      if (!error) await refetchCustomerRequests();
+      return { data, error };
+    },
+    [refetchCustomerRequests],
+  );
+
   /**
    * Punches a brand new order for a table.
    * Calculates taxes, inserts the parent order, inserts all order items,
@@ -657,6 +704,51 @@ export function POSProvider({ children }) {
     ],
   );
 
+  const acceptCustomerRequest = useCallback(
+    async (requestId) => {
+      const request = customerRequests.find((entry) => entry.id === requestId);
+      if (!request) return { error: new Error("Customer request not found") };
+
+      const normalizedItems = Array.isArray(request.items)
+        ? request.items.map((item) => ({
+            id: item.id || item.menu_item_id || null,
+            menu_item_id: item.id || item.menu_item_id || null,
+            name: item.name || item.item_name,
+            item_name: item.name || item.item_name,
+            price: Number(item.price) || 0,
+            quantity: Number(item.quantity) || 1,
+          }))
+        : [];
+
+      const activeOrder = orders.find(
+        (order) =>
+          order.table_number === request.table_number &&
+          order.status !== "COMPLETED" &&
+          order.status !== "CANCELLED",
+      );
+
+      if (activeOrder) {
+        await addItemsToOrder(activeOrder.id, normalizedItems);
+      } else {
+        await createOrder(request.table_number, "Customer", normalizedItems, "DINE-IN");
+      }
+
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({
+          status: "ACCEPTED",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", requestId)
+        .select()
+        .single();
+
+      if (!error) await refetchCustomerRequests();
+      return { data, error };
+    },
+    [customerRequests, orders, addItemsToOrder, createOrder, refetchCustomerRequests],
+  );
+
   /** Removes a single item from an active order and recalculates the bill. */
   const removeOrderItem = useCallback(
     async (orderItemId, orderId) => {
@@ -795,6 +887,11 @@ export function POSProvider({ children }) {
           .neq("status", "COMPLETED")
           .neq("status", "CANCELLED");
       }
+
+      await supabase
+        .from("customer_requests")
+        .delete()
+        .eq("table_number", tableNumber);
         
       // Reset the physical table to make it available for the next guest
       await supabase
@@ -812,12 +909,12 @@ export function POSProvider({ children }) {
         })
         .eq("table_number", tableNumber);
         
-      await Promise.all([refetchOrders(), refetchTables()]);
+      await Promise.all([refetchOrders(), refetchTables(), refetchCustomerRequests()]);
 
       // Return the completed data so the caller (Cashier) can print a receipt
       return { orders: tableOrders, items: tableItems };
     },
-    [refetchOrders, refetchTables, orders, orderItems],
+    [refetchOrders, refetchTables, refetchCustomerRequests, orders, orderItems],
   );
 
   /** Adds a new staff profile to the system. */
@@ -1151,6 +1248,8 @@ export function POSProvider({ children }) {
         profiles,
         ingredients,
         recipeIngredients,
+        customerRequests,
+        reservationData,
         loading,
         
         // Constants
@@ -1171,6 +1270,8 @@ export function POSProvider({ children }) {
         deleteIngredient,
         addRecipeIngredient,
         removeRecipeIngredient,
+        createCustomerRequest,
+        acceptCustomerRequest,
         createOrder,
         addItemsToOrder,
         removeOrderItem,
@@ -1199,6 +1300,7 @@ export function POSProvider({ children }) {
         refetchOrderItems,
         refetchTables,
         refetchIngredients,
+        refetchCustomerRequests,
       }}
     >
       {children}

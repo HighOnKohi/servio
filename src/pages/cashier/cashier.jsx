@@ -42,7 +42,6 @@ function Cashier() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // --- Global State from POSContext (real-time Supabase data) ---
   const {
     tables: dbTables,
     menuItems: dbMenuItems,
@@ -60,19 +59,17 @@ function Cashier() {
     applyTableDiscount,
     splitOrderItemUnit,
     applyItemDiscount,
+    customerRequests,
+    acceptCustomerRequest,
     loading,
     formatPrice,
   } = usePOS();
 
-  // --- Data Mapping ---
-
-  /** Maps raw DB categories into a simplified format for the UI sidebar. */
   const menuCategories = useMemo(() =>
     dbCategories.map((c) => ({ id: c.id, name: c.name })),
     [dbCategories]
   );
 
-  /** Maps raw DB menu items into the format required by the product grid. */
   const menuItems = useMemo(() =>
     dbMenuItems.map((m) => ({
       id: m.id,
@@ -86,7 +83,6 @@ function Cashier() {
 
   const menuItemSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
-  /** Maps raw DB tables into an array with computed status from active orders. */
   const tables = useMemo(() =>
     dbTables.map((t) => ({
       id: t.table_number,
@@ -96,6 +92,7 @@ function Cashier() {
       table_number: t.table_number,
       occupied: t.status === 'OCCUPIED',
       reserved: t.status === 'RESERVED' || t.reserved === true,
+      request: t.status === 'REQUEST',
       occupiedSince: t.occupied_since,
       reservedSince: t.reserved_since,
       pwdDiscount: t.pwd_discount === true,
@@ -108,12 +105,10 @@ function Cashier() {
     [dbTables]
   );
 
-  // --- Local State ---
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountTarget, setDiscountTarget] = useState('table');
   const [discountTargetItem, setDiscountTargetItem] = useState(null);
   const [discountTargetUnitIndex, setDiscountTargetUnitIndex] = useState(null);
-
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPunchOrderModal, setShowPunchOrderModal] = useState(false);
   const [showClearOrderModal, setShowClearOrderModal] = useState(false);
@@ -133,8 +128,6 @@ function Cashier() {
   const [seniorDiscount, setSeniorDiscount] = useState(false);
   const [percentDiscountValue, setPercentDiscountValue] = useState('');
   const [floatDiscountValue, setFloatDiscountValue] = useState('');
-
-  // Local cart for the cashier's menu-ordering (unpunched items), keyed by table ID
   const [carts, setCarts] = useState({});
 
   const routeCategory = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
@@ -145,7 +138,6 @@ function Cashier() {
   const [isMenuSearchOpen, setIsMenuSearchOpen] = useState(false);
   const interfaceCanvas = useFixedInterfaceCanvas();
 
-  // Default to the first category if none is selected
   useEffect(() => {
     if (menuCategories.length > 0 && !selectedCategory) {
       setSelectedCategory(menuCategories[0].id);
@@ -163,7 +155,6 @@ function Cashier() {
     : (tables[0]?.id ?? 1);
   const selected = tables.find((table) => table.id === selectedId);
 
-  // Retrieve existing punched orders and items from DB for the selected table
   const existingOrders = useMemo(() => {
     if (!selected) return [];
     return getOrdersForTable(selected.table_number);
@@ -185,10 +176,14 @@ function Cashier() {
     return Array.from(groups.values());
   }, [existingItems]);
 
-  // Local unpunched cart for the selected table
-  const cart = carts[selectedId] || [];
+  const selectedCustomerRequests = useMemo(
+    () => customerRequests.filter(
+      (request) => request.table_number === selected?.table_number && request.status === 'PENDING',
+    ),
+    [customerRequests, selected],
+  );
 
-  // Compute subtotal from existing DB items + local cart items
+  const cart = carts[selectedId] || [];
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const subtotal = existingSubtotal + cartSubtotal;
@@ -308,7 +303,6 @@ function Cashier() {
     navigate(menuOrderingPath(item.category, item));
   }
 
-  /** Adds a menu item to the local cart for the currently selected table. */
   function addMenuItem(item) {
     setCarts((prev) => {
       const currentCart = prev[selectedId] || [];
@@ -320,7 +314,6 @@ function Cashier() {
     });
   }
 
-  /** Decrements a specific menu item from the local cart. */
   function removeItem(itemId) {
     setCarts((prev) => {
       const currentCart = prev[selectedId] || [];
@@ -411,7 +404,6 @@ function Cashier() {
     void removeOrderItem(itemToRemove.id, itemToRemove.order_id);
   }
 
-  /** Punches the local cart to the database via POSContext. */
   async function punchOrder() {
     if (!selected || cart.length === 0 || punchingOrder) return;
     setPunchingOrder(true);
@@ -502,7 +494,6 @@ function Cashier() {
     navigate('/');
   }
 
-  /** Bills out the table via POSContext - marks orders as COMPLETED and resets table. */
   async function completeBill() {
     if (!selected) return;
     try {
@@ -513,7 +504,6 @@ function Cashier() {
     setShowPaymentModal(false);
   }
 
-  /** Cancels all active orders for the selected table. */
   async function cancelOrder() {
     if (!selected || !hasItems) return;
     for (const order of existingOrders) {
@@ -533,6 +523,13 @@ function Cashier() {
     reserveTable(selected.table_number);
   }
 
+  async function handleAcceptCustomerRequest(requestId) {
+    const { error } = await acceptCustomerRequest(requestId);
+    if (error) {
+      console.error('Error accepting customer request:', error);
+    }
+  }
+
   function printReceipt() {
     const printedAt = new Date();
     setReceipt({
@@ -548,7 +545,6 @@ function Cashier() {
     completeBill();
   }
 
-  // Compute elapsed time for occupied tables
   const getElapsedTime = useCallback((table) => {
     if (!table.occupied && !table.reserved) return '';
     const startedAt = table.occupied ? table.occupiedSince : table.reservedSince;
@@ -560,7 +556,6 @@ function Cashier() {
     return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
   }, [currentTime]);
 
-  // Clock tick for elapsed time
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
@@ -630,9 +625,10 @@ function Cashier() {
 
       {!isMenuOrdering && <div className="action-row">
         <div className="table-summary">
-          <span><strong>{tables.filter((table) => !table.occupied && !reservedTables.includes(table.id)).length}</strong> available</span>
+          <span><strong>{tables.filter((table) => !table.occupied && !table.request && !table.reserved).length}</strong> available</span>
           <span><strong>{tables.filter((table) => table.occupied).length}</strong> occupied</span>
-          <span><strong>{reservedTables.length}</strong> reserved</span>
+          <span><strong>{tables.filter((table) => table.reserved).length}</strong> reserved</span>
+          <span><strong>{tables.filter((table) => table.request).length}</strong> requests</span>
         </div>
       </div>}
 
@@ -704,19 +700,32 @@ function Cashier() {
           <div className="table-grid">
           {visibleTables.map((table) => {
             const isReserved = table.reserved;
+            const isRequest = table.request;
             const elapsed = getElapsedTime(table);
+            const tableStateClass = isRequest
+              ? 'request'
+              : table.occupied
+                ? 'occupied'
+                : isReserved
+                  ? 'reserved'
+                  : 'available';
+            const tableStatusLabel = isRequest
+              ? 'REQUESTS'
+              : table.occupied
+                ? 'OCCUPIED'
+                : isReserved
+                  ? 'RESERVED'
+                  : 'AVAILABLE';
             return (
               <div
                 key={table.id}
-                className={`table-card ${table.id === selectedId ? 'selected' : ''} ${
-                  !table.occupied && !isReserved ? 'available' : ''
-                } ${table.occupied ? 'occupied' : ''} ${isReserved ? 'reserved' : ''}`}
+                className={`table-card ${table.id === selectedId ? 'selected' : ''} ${tableStateClass}`}
                 onClick={() => selectTable(table.id)}
               >
                 <div className="table-card-center">
                   <div className="table-number">{table.label}</div>
-                  <div className="table-status">
-                    {table.occupied ? 'OCCUPIED' : isReserved ? 'RESERVED' : 'AVAILABLE'}
+                  <div className={`table-status ${isRequest ? 'request' : ''}`}>
+                    {tableStatusLabel}
                   </div>
                 </div>
                 <div className="table-card-footer">
@@ -748,7 +757,50 @@ function Cashier() {
               </div>
 
               <div className="items-list">
-                {/* Show existing punched items from DB */}
+                {selectedCustomerRequests.length > 0 && (
+                  <div className="customer-requests-panel">
+                    <div className="customer-requests-header">
+                      <div>
+                        <div className="customer-requests-title">Customer Requests</div>
+                        <div className="customer-requests-subtitle">Pending cashier approval</div>
+                      </div>
+                      <span className="customer-requests-count">{selectedCustomerRequests.length}</span>
+                    </div>
+                    <div className="customer-requests-list">
+                      {selectedCustomerRequests.map((request) => (
+                        <div key={request.id} className="customer-request-card">
+                          <div className="customer-request-card-header">
+                            <div>
+                              <div className="customer-request-label">Table #{String(request.table_number).padStart(2, '0')}</div>
+                              <div className="customer-request-time">
+                                {new Date(request.created_at).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                })}
+                              </div>
+                            </div>
+                            <div className="customer-request-total">{formatPrice(request.subtotal)}</div>
+                          </div>
+                          <div className="customer-request-items">
+                            {(Array.isArray(request.items) ? request.items : []).map((item, index) => (
+                              <div key={`${request.id}-${item.id || item.name || index}`} className="customer-request-item-row">
+                                <span>{item.name || item.item_name} x {Number(item.quantity) || 1}</span>
+                                <strong>{formatPrice((Number(item.price) || 0) * (Number(item.quantity) || 1))}</strong>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            className="customer-request-accept-button"
+                            onClick={() => handleAcceptCustomerRequest(request.id)}
+                          >
+                            Accept Request
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {groupedExistingItems.map((item) => {
                   const calculateItemTotal = (entry) => {
                     const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
@@ -837,7 +889,6 @@ function Cashier() {
                     </div>
                   );
                 })}
-                {/* Show current unpunched cart items */}
                 {cart.length === 0 && existingItems.length === 0 ? (
                   <div className="empty-items">No items yet. Add from below.</div>
                 ) : (

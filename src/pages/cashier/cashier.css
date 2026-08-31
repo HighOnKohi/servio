@@ -99,11 +99,19 @@
 .cashier-app .table-card.occupied:hover { border-color: #caa74a; }
 .cashier-app .table-card.reserved { background: #cfd7ff; border-color: #aab7ff; }
 .cashier-app .table-card.reserved:hover { border-color: #8597f5; }
+.cashier-app .table-card.request { background: #efe3ff; border-color: #c8a5ff; }
+.cashier-app .table-card.request:hover { border-color: #a974f0; }
 .cashier-app .table-card-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 108px; flex: 1; }
 .cashier-app .table-number {
   font-size: 42px; font-weight: 700; color: var(--cashier-ink);
 }
 .cashier-app .table-status { color: var(--cashier-muted); font-size: 11px; font-weight: 700; letter-spacing: .07em; }
+.cashier-app .table-status.request {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.14);
+  color: #6d28d9;
+}
 .cashier-app .table-card-body { display: flex; flex-direction: column; gap: 4px; margin: auto 0 10px; padding-top: 14px; }
 .cashier-app .table-label { color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .cashier-app .table-total { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
@@ -320,6 +328,22 @@
   background: rgba(255, 255, 255, 0.58);
 }
 .cashier-app .empty-items { display: grid; min-height: 145px; place-items: center; color: #94a3b8; font-size: 13px; text-align: center; }
+.cashier-app .customer-requests-panel { margin-bottom: 12px; padding: 12px; border: 1px solid #d7e0ec; border-radius: 14px; background: rgba(255, 255, 255, 0.78); }
+.cashier-app .customer-requests-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.cashier-app .customer-requests-title { color: #0f172a; font-size: 14px; font-weight: 700; }
+.cashier-app .customer-requests-subtitle { margin-top: 3px; color: #64748b; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.cashier-app .customer-requests-count { min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; border-radius: 999px; background: #e2e8f0; color: #0f172a; font-size: 12px; font-weight: 700; }
+.cashier-app .customer-requests-list { display: flex; flex-direction: column; gap: 10px; }
+.cashier-app .customer-request-card { padding: 12px; border: 1px solid #d7e0ec; border-radius: 10px; background: #fff; }
+.cashier-app .customer-request-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cashier-app .customer-request-label { color: #0f172a; font-size: 13px; font-weight: 700; }
+.cashier-app .customer-request-time { margin-top: 3px; color: #64748b; font-size: 12px; }
+.cashier-app .customer-request-total { color: #0f172a; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.cashier-app .customer-request-items { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cashier-app .customer-request-item-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #334155; font-size: 13px; }
+.cashier-app .customer-request-item-row strong { color: #0f172a; font-size: 13px; }
+.cashier-app .customer-request-accept-button { width: 100%; min-height: 40px; margin-top: 12px; border: 1px solid var(--cashier-ink); border-radius: 8px; background: var(--cashier-ink); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cashier-app .customer-request-accept-button:hover { background: #000; }
 .cashier-app .item-group { margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; background: #fff; }
 .cashier-app .item-group .item-row { border-right: 0; }
 .cashier-app .item-group .item-row:last-child { border-bottom: 0; }

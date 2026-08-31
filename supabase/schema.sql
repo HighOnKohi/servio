@@ -12,6 +12,7 @@ CREATE TYPE table_status AS ENUM ('EMPTY', 'OCCUPIED', 'RESERVED');
 CREATE TYPE order_status AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
 CREATE TYPE order_item_status AS ENUM ('PENDING', 'COOKING', 'READY', 'SERVED', 'CANCELLED');
 CREATE TYPE order_type AS ENUM ('DINE-IN', 'TAKEOUT');
+CREATE TYPE customer_request_status AS ENUM ('PENDING', 'ACCEPTED');
 
 -- ---------- PROFILES ----------
 CREATE TABLE profiles (
@@ -83,6 +84,17 @@ CREATE TABLE order_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ---------- CUSTOMER REQUESTS ----------
+CREATE TABLE customer_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  table_number INTEGER NOT NULL REFERENCES restaurant_tables(table_number) ON DELETE CASCADE,
+  status customer_request_status NOT NULL DEFAULT 'PENDING',
+  subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
+  items JSONB NOT NULL DEFAULT '[]'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  accepted_at TIMESTAMPTZ
+);
+
 -- ---------- INGREDIENTS (Inventory) ----------
 CREATE TABLE ingredients (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -112,6 +124,8 @@ CREATE INDEX idx_menu_items_category ON menu_items(category_id);
 CREATE INDEX idx_menu_items_status ON menu_items(status);
 CREATE INDEX idx_recipe_ingredients_menu ON recipe_ingredients(menu_item_id);
 CREATE INDEX idx_recipe_ingredients_ing ON recipe_ingredients(ingredient_id);
+CREATE INDEX idx_customer_requests_table ON customer_requests(table_number);
+CREATE INDEX idx_customer_requests_status ON customer_requests(status);
 
 -- ---------- ROW LEVEL SECURITY ----------
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -120,6 +134,7 @@ ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE restaurant_tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customer_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ingredients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recipe_ingredients ENABLE ROW LEVEL SECURITY;
 
@@ -130,6 +145,7 @@ CREATE POLICY "anon_all" ON menu_items FOR ALL TO anon USING (true) WITH CHECK (
 CREATE POLICY "anon_all" ON restaurant_tables FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON orders FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON order_items FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON customer_requests FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON ingredients FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON recipe_ingredients FOR ALL TO anon USING (true) WITH CHECK (true);
 
@@ -140,6 +156,7 @@ CREATE POLICY "auth_all" ON menu_items FOR ALL TO authenticated USING (true) WIT
 CREATE POLICY "auth_all" ON restaurant_tables FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON order_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_all" ON customer_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON ingredients FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON recipe_ingredients FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -149,6 +166,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE restaurant_tables;
 ALTER PUBLICATION supabase_realtime ADD TABLE menu_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE ingredients;
+ALTER PUBLICATION supabase_realtime ADD TABLE customer_requests;
 
 -- ---------- SEED DATA ----------
 INSERT INTO categories (id, name) VALUES

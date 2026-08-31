@@ -12,6 +12,7 @@ import Waiter from "./pages/waiter/waiter";
 import Kitchen from "./pages/kitchen/kitchen";
 import Admin from "./pages/admin/admin";
 import Inventory from "./pages/inventory/inventory";
+import Customer from "./pages/customer/customer";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Routes>
           {/* Public route — accessible without login */}
           <Route path="/login" element={<Login />} />
+          <Route path="/customer/:tableId" element={<Customer />} />
 
           {/* All other routes are protected — requires authentication */}
           <Route element={<ProtectedRoute />}>

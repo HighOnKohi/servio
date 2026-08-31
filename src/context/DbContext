@@ -151,8 +151,29 @@ create table public.restaurant_tables (
   constraint restaurant_tables_status_check check (
     (
       status = any (
-        array['EMPTY'::text, 'OCCUPIED'::text, 'RESERVED'::text]
+        array[
+          'EMPTY'::text,
+          'OCCUPIED'::text,
+          'RESERVED'::text,
+          'REQUEST'::text
+        ]
       )
     )
   )
 ) TABLESPACE pg_default;
+
+create table public.customer_requests (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  table_number integer not null,
+  status public.customer_request_status not null default 'PENDING'::customer_request_status,
+  subtotal numeric(10, 2) not null default 0,
+  items jsonb not null default '[]'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  accepted_at timestamp with time zone null,
+  constraint customer_requests_pkey primary key (id),
+  constraint customer_requests_table_number_fkey foreign KEY (table_number) references restaurant_tables (table_number) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_customer_requests_table on public.customer_requests using btree (table_number) TABLESPACE pg_default;
+
+create index IF not exists idx_customer_requests_status on public.customer_requests using btree (status) TABLESPACE pg_default;
