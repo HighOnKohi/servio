@@ -563,6 +563,58 @@ function MenuInterface() {
   );
 }
 
+/* Edit Table Form (used inside the Edit Table Modal) */
+function EditTableForm({ table, onSave, onCancel }) {
+  const [capacity, setCapacity] = useState(table.capacity || 4);
+  const [status, setStatus] = useState(table.dbStatus || 'EMPTY');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ capacity: Number(capacity), status });
+    setSaving(false);
+  };
+
+  return (
+    <div className="edit-table-form">
+      <div className="edit-table-form-row">
+        <label htmlFor={`edit-capacity-${table.id}`}>Seating Capacity (Pax)</label>
+        <div className="edit-table-capacity-control">
+          <button type="button" onClick={() => setCapacity((c) => Math.max(1, c - 1))} aria-label="Decrease capacity">−</button>
+          <input
+            id={`edit-capacity-${table.id}`}
+            type="number"
+            value={capacity}
+            min={1}
+            max={30}
+            onChange={(e) => setCapacity(Math.min(30, Math.max(1, Number(e.target.value) || 1)))}
+            aria-label="Seating capacity"
+          />
+          <button type="button" onClick={() => setCapacity((c) => Math.min(30, c + 1))} aria-label="Increase capacity">+</button>
+        </div>
+      </div>
+      <div className="edit-table-form-row">
+        <label htmlFor={`edit-status-${table.id}`}>Table Status</label>
+        <select
+          id={`edit-status-${table.id}`}
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
+          <option value="EMPTY">Available (Empty)</option>
+          <option value="OCCUPIED">Occupied</option>
+          <option value="RESERVED">Reserved</option>
+        </select>
+      </div>
+      <div className="edit-table-form-actions">
+        <button type="button" className="edit-table-btn secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="edit-table-btn primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* Table Interface */
 function TableInterface() {
   const navigate = useNavigate();
@@ -572,6 +624,7 @@ function TableInterface() {
     addTable: posAddTable,
     removeTable: posRemoveTable,
     refetchTables,
+    updateTableDetails,
   } = usePOS();
 
 
@@ -586,9 +639,12 @@ function TableInterface() {
       dbId: t.id,
       status: STATUS_MAP[t.status] || 'Available',
       dbStatus: t.status,
+      capacity: Number(t.capacity) || 4,
     })),
     [dbTables]
   );
+
+  const [editTableTarget, setEditTableTarget] = useState(null); // { table } | null
 
   const tableCount = tables.length;
 
@@ -635,6 +691,26 @@ function TableInterface() {
   return (
     <div className="rmc90 table-management-layout">
 
+      {/* ── Edit Table Modal ── */}
+      {editTableTarget && (
+        <div className="edit-table-modal-overlay" onClick={() => setEditTableTarget(null)}>
+          <div className="edit-table-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="edit-table-title">
+            <div className="edit-table-modal-header">
+              <h2 id="edit-table-title">Edit Table #{editTableTarget.id}</h2>
+              <button type="button" className="edit-table-modal-close" onClick={() => setEditTableTarget(null)} aria-label="Close">×</button>
+            </div>
+            <EditTableForm
+              table={editTableTarget}
+              onSave={async (updates) => {
+                await updateTableDetails(editTableTarget.dbId, updates);
+                setEditTableTarget(null);
+              }}
+              onCancel={() => setEditTableTarget(null)}
+            />
+          </div>
+        </div>
+      )}
+
       <aside className="rmc92">
         <div className="rmc82">
           <div className="rmc86">
@@ -664,10 +740,22 @@ function TableInterface() {
             const normalizedStatus = table.status === 'EMPTY' ? 'AVAILABLE' : table.status;
             const statusClass = normalizedStatus.toLowerCase();
             return (
-              <div key={table.id} className={`table-management-card ${statusClass}`} title={normalizedStatus}>
+              <div
+                key={table.id}
+                className={`table-management-card ${statusClass}`}
+                title={`Table ${table.id} — ${normalizedStatus}`}
+                onClick={() => setEditTableTarget(table)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setEditTableTarget(table)}
+              >
                 <div className="table-management-card-center">
                   <div className="table-management-number">{table.id}</div>
                   <div className="table-management-status-text">{normalizedStatus}</div>
+                  <div className="table-management-pax">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    {table.capacity} pax
+                  </div>
                 </div>
               </div>
             );

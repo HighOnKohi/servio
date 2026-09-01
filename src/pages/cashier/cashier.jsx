@@ -61,6 +61,7 @@ function Cashier() {
     applyItemDiscount,
     customerRequests,
     acceptCustomerRequest,
+    rejectCustomerRequestCashier,
     loading,
     formatPrice,
   } = usePOS();
@@ -101,6 +102,7 @@ function Cashier() {
       floatDiscount: Number(t.float_discount) || 0,
       totalBill: Number(t.total_bill ?? t.current_bill ?? 0),
       currentBill: Number(t.current_bill ?? 0),
+      billOutRequested: t.bill_out_requested === true,
     })),
     [dbTables]
   );
@@ -118,6 +120,8 @@ function Cashier() {
   const [showDecreaseModal, setShowDecreaseModal] = useState(false);
   const [pendingTableId, setPendingTableId] = useState(null);
   const [pendingItem, setPendingItem] = useState(null);
+  // Dismissed alert IDs for cancelled-order notifications
+  const [dismissedAlertIds, setDismissedAlertIds] = useState(() => new Set());
   const [expandedItemIds, setExpandedItemIds] = useState(() => ({}));
   const [receipt, setReceipt] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -178,9 +182,29 @@ function Cashier() {
 
   const selectedCustomerRequests = useMemo(
     () => customerRequests.filter(
-      (request) => request.table_number === selected?.table_number && request.status === 'PENDING',
+      (request) => request.table_number === selected?.table_number && request.status === 'PENDING_CASHIER',
     ),
     [customerRequests, selected],
+  );
+
+  // Customer requests flagged as UNAVAILABLE by kitchen for the selected table
+  const selectedUnavailableRequests = useMemo(
+    () => customerRequests.filter(
+      (request) => request.table_number === selected?.table_number && request.status === 'UNAVAILABLE',
+    ),
+    [customerRequests, selected],
+  );
+
+  // Cancelled orders from Kitchen (across all tables) — show alerts
+  const cancelledOrderAlerts = useMemo(
+    () => orders.filter((o) => o.status === 'CANCELLED' && !dismissedAlertIds.has(o.id)),
+    [orders, dismissedAlertIds],
+  );
+
+  // Tables with bill-out requested
+  const billOutTables = useMemo(
+    () => tables.filter((t) => t.billOutRequested),
+    [tables],
   );
 
   const cart = carts[selectedId] || [];
@@ -643,6 +667,26 @@ function Cashier() {
           <button className="return-button" onClick={goLogin} aria-label="Return to interface selector"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg></button>
         </div>
       </div>
+      {/* ── Kitchen Cancellation Alert Banners ── */}
+      {cancelledOrderAlerts.length > 0 && (
+        <div className="cashier-cancel-alerts" role="alert" aria-live="polite">
+          {cancelledOrderAlerts.slice(0, 3).map((order) => (
+            <div key={order.id} className="cashier-cancel-alert-banner">
+              <span>
+                🚫 <strong>Kitchen cancelled order</strong> for Table #{String(order.table_number).padStart(2, '0')}
+              </span>
+              <button
+                type="button"
+                className="cashier-cancel-alert-dismiss"
+                onClick={() => setDismissedAlertIds((prev) => new Set(prev).add(order.id))}
+                aria-label="Dismiss alert"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <nav className="tab-group" aria-label="Cashier sections">
         <button
           className={`tab ${!isMenuOrdering ? 'active' : ''}`}
@@ -754,9 +798,12 @@ function Cashier() {
             return (
               <div
                 key={table.id}
-                className={`table-card ${table.id === selectedId ? 'selected' : ''} ${tableStateClass}`}
+                className={`table-card ${table.id === selectedId ? 'selected' : ''} ${tableStateClass} ${table.billOutRequested ? 'bill-out-alert' : ''}`}
                 onClick={() => selectTable(table.id)}
               >
+                {table.billOutRequested && (
+                  <div className="table-card-billout-badge" title="Customer requested bill out">🧾</div>
+                )}
                 <div className="table-card-center">
                   <div className="table-number">{table.label}</div>
                   <div className={`table-status ${isRequest ? 'request' : ''}`}>
@@ -802,6 +849,27 @@ function Cashier() {
                       <span className="customer-requests-count">{selectedCustomerRequests.length}</span>
                     </div>
                     <div className="customer-requests-list">
+                      {/* Unavailable requests from kitchen */}
+                      {selectedUnavailableRequests.map((request) => (
+                        <div key={request.id} className="customer-request-card customer-request-card--unavailable">
+                          <div className="customer-request-card-header">
+                            <div>
+                              <div className="customer-request-label">⚠️ Table #{String(request.table_number).padStart(2, '0')} — Items Unavailable</div>
+                              <div className="customer-request-time" style={{ color: '#b91c1c' }}>
+                                Kitchen flagged: {(Array.isArray(request.unavailable_items) ? request.unavailable_items : []).map((i) => i.name || i.item_name).join(', ') || 'some items'}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            className="customer-request-accept-button"
+                            style={{ background: '#dc2626', border: '0' }}
+                            onClick={() => rejectCustomerRequestCashier(request.id, request.table_number)}
+                          >
+                            Notify Customer to Modify Order
+                          </button>
+                        </div>
+                      ))}
+                      {/* Normal pending requests */}
                       {selectedCustomerRequests.map((request) => (
                         <div key={request.id} className="customer-request-card">
                           <div className="customer-request-card-header">
