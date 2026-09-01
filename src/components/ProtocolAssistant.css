@@ -101,12 +101,55 @@
   background: #ffffff;
   color: #1f2937;
   border: 1px solid #e5e7eb;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.protocol-message-bubble.is-speaking {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.protocol-message-text {
+  flex: 1;
 }
 
 .protocol-message.user .protocol-message-bubble {
   background: #111827;
   color: #ffffff;
   border-color: #111827;
+}
+
+/* TTS speaker button on assistant messages */
+.protocol-tts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.protocol-tts-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #374151;
+}
+
+.protocol-tts-btn.active {
+  background: #ede9fe;
+  border-color: #a5b4fc;
+  color: #4f46e5;
 }
 
 .protocol-assistant-error {
@@ -133,6 +176,7 @@
   font-size: 0.84rem;
   line-height: 1.45;
   color: #111827;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .protocol-assistant-form textarea:focus {
@@ -141,7 +185,21 @@
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
 }
 
-.protocol-assistant-form button {
+/* Listening state - textarea gets a subtle blue ring */
+.protocol-assistant-form textarea.listening {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
+
+/* Form actions row: mic + ask side by side */
+.protocol-assistant-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.protocol-assistant-form-actions button[type="submit"] {
+  flex: 1;
   min-height: 40px;
   border: 1px solid #111827;
   border-radius: 10px;
@@ -151,9 +209,69 @@
   font-weight: 600;
 }
 
-.protocol-assistant-form button:disabled {
+.protocol-assistant-form-actions button[type="submit"]:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Microphone button */
+.protocol-mic-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  overflow: visible;
+}
+
+.protocol-mic-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.protocol-mic-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Active / listening state */
+.protocol-mic-btn.is-listening {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+/* Pulsing ring animation while recording */
+.mic-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 13px;
+  border: 2px solid #dc2626;
+  animation: mic-pulse 1.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes mic-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
 }
 
 .interface-selector-actions {
@@ -169,3 +287,4 @@
     height: min(760px, calc(100vh - 120px));
   }
 }
+
