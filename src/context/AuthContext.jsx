@@ -30,12 +30,34 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  // Subscribe to Supabase auth state changes on mount.
-  // This fires immediately with the current session (or null) and
-  // again any time the user logs in or out on any tab.
+  // On mount: eagerly fetch the current session so we have a definitive answer
+  // before rendering any routes. This prevents the race condition where
+  // onAuthStateChange fires asynchronously and authLoading briefly becomes false
+  // with user=null, allowing unauthenticated access to protected routes.
   useEffect(() => {
     let mounted = true;
 
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (session?.user) {
+        setUser(session.user);
+        const profileData = await fetchProfile(session.user.id);
+        if (mounted) setProfile(profileData);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+
+      if (mounted) setAuthLoading(false);
+    };
+
+    init();
+
+    // Also subscribe to ongoing auth changes (login, logout, token refresh,
+    // or changes from another tab) so the UI stays in sync after initial load.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (!mounted) return;
@@ -49,7 +71,8 @@ export function AuthProvider({ children }) {
           setProfile(null);
         }
 
-        if (mounted) setAuthLoading(false);
+        // Do NOT set authLoading here — it was already cleared by init().
+        // Setting it again would cause unnecessary re-renders.
       }
     );
 
