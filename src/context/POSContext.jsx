@@ -822,6 +822,17 @@ export function POSProvider({ children }) {
         .select()
         .single();
 
+      // Mark each rejected item as SOLD OUT globally so every table sees it
+      const itemIdsToMark = unavailableItems
+        .map((item) => item.id)
+        .filter(Boolean);
+      if (!error && itemIdsToMark.length > 0) {
+        await supabase
+          .from("menu_items")
+          .update({ status: "SOLD OUT" })
+          .in("id", itemIdsToMark);
+      }
+
       // Reset the table back to EMPTY so it doesn't stay stuck as REQUEST
       if (!error && request?.table_number) {
         await supabase
@@ -830,10 +841,16 @@ export function POSProvider({ children }) {
           .eq("table_number", request.table_number);
       }
 
-      if (!error) await Promise.all([refetchCustomerRequests(), refetchTables()]);
+      if (!error) {
+        await Promise.all([
+          refetchCustomerRequests(),
+          refetchTables(),
+          refetchMenu(),
+        ]);
+      }
       return { data, error };
     },
-    [customerRequests, refetchCustomerRequests, refetchTables],
+    [customerRequests, refetchCustomerRequests, refetchTables, refetchMenu],
   );
 
   /**

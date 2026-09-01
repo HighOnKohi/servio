@@ -847,11 +847,19 @@ export default function Customer() {
           <button
             className="customer-submit-button"
             onClick={submitRequest}
-            disabled={cart.length === 0 || submitting || hasPendingRequest}
+            disabled={cart.length === 0 || submitting || hasPendingRequest || cartSoldOutIds.size > 0}
             aria-label={submitting ? 'Sending order…' : 'Place order'}
             type="button"
           >
-            {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartCount > 0 ? `✓ Mark Pending (${cartCount})` : 'Select Items to Order'}
+            {submitting
+              ? 'Sending…'
+              : hasPendingRequest
+              ? '⏳ Order Pending…'
+              : cartSoldOutIds.size > 0
+              ? '⚠ Remove Sold-Out Items'
+              : cartCount > 0
+              ? `✓ Mark Pending (${cartCount})`
+              : 'Select Items to Order'}
           </button>
         )}
       </div>
