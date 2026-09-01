@@ -311,7 +311,8 @@ export default function Customer() {
 
   const [cartSoldOutIds, setCartSoldOutIds] = useState(new Set());  // cart items that went sold-out live
   const [soldOutToast, setSoldOutToast] = useState([]);             // [{id, name}] for the toast
-  const alertedSoldOutRef = useRef(new Set());                      // prevent re-alerting same item
+  const alertedSoldOutRef     = useRef(new Set());   // prevent re-alerting same item
+  const prevTableStatusRef    = useRef(null);         // track previous table status for transition detection
   const [submitting, setSubmitting] = useState(false);
   const [billOutRequesting, setBillOutRequesting] = useState(false);
   const [billOutRequested, setBillOutRequested] = useState(() => {
@@ -363,15 +364,20 @@ export default function Customer() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync bill_out_requested from DB; when the table resets to EMPTY (cashier billed out)
-  // clear all stored session state so the next customer starts fresh.
+  // Sync bill_out_requested from DB.
+  // IMPORTANT: dbTable gets a new object reference every time tables is re-fetched (every 8 s
+  // from polling). We must NOT clear the cart simply because dbTable.status is EMPTY — that
+  // would wipe the cart before the customer has even placed their first order.
+  // Only clear when the status TRANSITIONS from a non-EMPTY value to EMPTY (cashier billed out).
   useEffect(() => {
     if (!dbTable) return;
     if (!dbTable.bill_out_requested) {
       setBillOutRequested(false);
     }
-    if (dbTable.status === 'EMPTY') {
-      // Wipe all persisted state for this table
+    const prevStatus = prevTableStatusRef.current;
+    prevTableStatusRef.current = dbTable.status;
+    // prevStatus === null means this is the first render — don’t wipe on initial load.
+    if (dbTable.status === 'EMPTY' && prevStatus !== null && prevStatus !== 'EMPTY') {
       ['cart', 'unavail', 'category', 'billout'].forEach((k) => {
         try { sessionStorage.removeItem(storageKey(k)); } catch {}
       });
@@ -382,12 +388,15 @@ export default function Customer() {
   }, [dbTable]);
 
   // ── Detect when cart items go sold-out while the customer is browsing ──
-  // menuItems updates in real-time via the Supabase subscription in POSContext.
+  // menuItems updates live via the Supabase subscription + polling in POSContext.
+  // Use functional updaters so React bails out (no re-render) when the Set contents
+  // haven’t actually changed — preventing an infinite render loop when polling refreshes
+  // menuItems every 8 s but nothing in the cart has gone sold-out.
   useEffect(() => {
     if (cart.length === 0) {
-      // Cart cleared — reset all tracking
       alertedSoldOutRef.current = new Set();
-      setCartSoldOutIds(new Set());
+      // Bail out if already empty to prevent unnecessary re-render
+      setCartSoldOutIds((prev) => (prev.size === 0 ? prev : new Set()));
       return;
     }
 
@@ -398,18 +407,22 @@ export default function Customer() {
       const liveItem = menuItems.find((m) => m.id === cartItem.id);
       if (liveItem?.soldOut) {
         nowSoldOutSet.add(cartItem.id);
-        // Only alert once per item per session of it being sold-out
         if (!alertedSoldOutRef.current.has(cartItem.id)) {
           newlyGoneSoldOut.push({ id: cartItem.id, name: cartItem.name });
           alertedSoldOutRef.current.add(cartItem.id);
         }
       } else {
-        // Item is back in stock — clear the alert flag so we can re-alert if it goes out again
         alertedSoldOutRef.current.delete(cartItem.id);
       }
     });
 
-    setCartSoldOutIds(nowSoldOutSet);
+    // Only update (and re-render) when the sold-out set has actually changed
+    setCartSoldOutIds((prev) => {
+      if (prev.size === nowSoldOutSet.size && [...nowSoldOutSet].every((id) => prev.has(id))) {
+        return prev; // same contents — bail out
+      }
+      return nowSoldOutSet;
+    });
 
     if (newlyGoneSoldOut.length > 0) {
       setSoldOutToast(newlyGoneSoldOut);

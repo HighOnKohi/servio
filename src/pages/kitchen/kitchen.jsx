@@ -153,7 +153,7 @@ function StockDrawer({ menuItems, categories, onToggle, onClose }) {
         <div className="kitchen-stock-drawer-header">
           <div>
             <h2>Manage Item Stock</h2>
-            <p>Toggle items to mark them as available or sold out in real time.</p>
+            <p>Tap a card to toggle between In Stock and Sold Out.</p>
           </div>
           <button type="button" className="kitchen-stock-drawer-close" onClick={onClose} aria-label="Close">×</button>
         </div>
@@ -170,21 +170,27 @@ function StockDrawer({ menuItems, categories, onToggle, onClose }) {
           {grouped.map(([catName, items]) => (
             <div key={catName} className="kitchen-stock-category">
               <div className="kitchen-stock-category-label">{catName}</div>
-              {items.map((item) => {
-                const isSoldOut = item.status === 'SOLD OUT';
-                return (
-                  <div key={item.id} className={`kitchen-stock-item ${isSoldOut ? 'sold-out' : 'in-stock'}`}>
-                    <span className="kitchen-stock-item-name">{item.name}</span>
+              <div className="kitchen-stock-grid">
+                {items.map((item) => {
+                  const isSoldOut = item.status === 'SOLD OUT';
+                  return (
                     <button
+                      key={item.id}
                       type="button"
-                      className={`kitchen-stock-toggle ${isSoldOut ? 'out' : 'in'}`}
+                      className={`kitchen-stock-card ${isSoldOut ? 'stock-card--out' : 'stock-card--in'}`}
                       onClick={() => onToggle(item.id, item.status)}
+                      aria-pressed={!isSoldOut}
+                      aria-label={`${item.name}: ${isSoldOut ? 'Sold Out, tap to mark in stock' : 'In Stock, tap to mark sold out'}`}
                     >
-                      {isSoldOut ? '✕ Sold Out' : '✓ In Stock'}
+                      <span className="stock-card-status-dot" aria-hidden="true" />
+                      <span className="stock-card-name">{item.name}</span>
+                      <span className="stock-card-badge">
+                        {isSoldOut ? '✕ Sold Out' : '✓ In Stock'}
+                      </span>
                     </button>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           ))}
           {grouped.length === 0 && (
@@ -216,12 +222,17 @@ function Kitchen() {
 
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState('active-orders'); // 'pending-verification' | 'active-orders'
+  const [activeTab, setActiveTab] = useState('active-orders');
   const [showStockDrawer, setShowStockDrawer] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState(null); // ticket to cancel
-  const [unavailableTarget, setUnavailableTarget] = useState(null); // customer_request to flag
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [unavailableTarget, setUnavailableTarget] = useState(null);
   const [processingIds, setProcessingIds] = useState(new Set());
-  const interfaceCanvas = useFixedInterfaceCanvas();
+  // Blink state for tabs when new items arrive
+  const [pendingTabBlink, setPendingTabBlink] = useState(false);
+  const [ordersTabBlink, setOrdersTabBlink]   = useState(false);
+  const prevPendingRef   = useRef(0);
+  const prevOrdersRef    = useRef(0);
+  const interfaceCanvas  = useFixedInterfaceCanvas();
 
   // Sync tab to URL path on mount
   const viewFromPath = location.pathname.split('/').filter(Boolean).at(-1);
@@ -273,6 +284,27 @@ function Kitchen() {
     (Array.isArray(customerRequests) ? customerRequests : []).filter((r) => r.status === 'PENDING_KITCHEN'),
     [customerRequests]
   );
+
+  // ── Blink tabs when their count increases ──
+  useEffect(() => {
+    const prev = prevPendingRef.current;
+    prevPendingRef.current = pendingRequests.length;
+    if (pendingRequests.length > prev && activeTab !== 'pending-verification') {
+      setPendingTabBlink(true);
+      const t = setTimeout(() => setPendingTabBlink(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [pendingRequests.length, activeTab]);
+
+  useEffect(() => {
+    const prev = prevOrdersRef.current;
+    prevOrdersRef.current = visibleTickets.length;
+    if (visibleTickets.length > prev && activeTab !== 'active-orders') {
+      setOrdersTabBlink(true);
+      const t = setTimeout(() => setOrdersTabBlink(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [visibleTickets.length, activeTab]);
 
   // ── Pagination ─────────────────────────────────────────────────────
   const ticketsPerPage = 8;
@@ -370,15 +402,21 @@ function Kitchen() {
       {/* ── Tab Navigation ── */}
       <nav className="kitchen-tab-group" aria-label="Kitchen sections">
         <button
-          className={activeTab === 'pending-verification' ? 'active' : ''}
-          onClick={() => setActiveTab('pending-verification')}
+          className={[
+            activeTab === 'pending-verification' ? 'active' : '',
+            pendingTabBlink ? 'tab-blink' : '',
+          ].join(' ').trim()}
+          onClick={() => { setActiveTab('pending-verification'); setPendingTabBlink(false); }}
         >
           PENDING VERIFICATION
           {pendingRequests.length > 0 && <span className="pending-badge">{pendingRequests.length}</span>}
         </button>
         <button
-          className={activeTab === 'active-orders' ? 'active' : ''}
-          onClick={() => { setActiveTab('active-orders'); navigate('/kitchen/active-orders'); }}
+          className={[
+            activeTab === 'active-orders' ? 'active' : '',
+            ordersTabBlink ? 'tab-blink' : '',
+          ].join(' ').trim()}
+          onClick={() => { setActiveTab('active-orders'); navigate('/kitchen/active-orders'); setOrdersTabBlink(false); }}
         >
           ACTIVE ORDERS <span>{visibleTickets.length}</span>
         </button>
