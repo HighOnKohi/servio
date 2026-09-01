@@ -530,8 +530,35 @@ function Cashier() {
     }
   }
 
-  function printReceipt() {
+  async function printReceipt() {
+    if (!selected) return;
     const printedAt = new Date();
+
+    // Snapshot all order data BEFORE billOutTable deletes it
+    const receiptItems = existingItems.map((entry) => {
+      const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
+      const entryPwdAmt = entry.pwd_discount ? entrySubtotal * 0.2 : 0;
+      const entrySeniorAmt = entry.senior_discount ? entrySubtotal * 0.15 : 0;
+      const entryPercentAmt = (Number(entry.percent_discount) || 0) / 100 * entrySubtotal;
+      const afterPercent = Math.max(0, entrySubtotal - entryPwdAmt - entrySeniorAmt - entryPercentAmt);
+      const entryFloatAmt = Math.min(afterPercent, Math.max(0, Number(entry.float_discount) || 0));
+      const entryTotal = Math.max(0, afterPercent - entryFloatAmt);
+      const discountLabels = [
+        entry.pwd_discount && `PWD -${formatPrice(entryPwdAmt)}`,
+        entry.senior_discount && `Senior -${formatPrice(entrySeniorAmt)}`,
+        Number(entry.percent_discount) > 0 && `${entry.percent_discount}% off -${formatPrice(entryPercentAmt)}`,
+        Number(entry.float_discount) > 0 && `Fixed -${formatPrice(entryFloatAmt)}`,
+      ].filter(Boolean);
+      return {
+        name: entry.item_name,
+        quantity: Number(entry.quantity) || 1,
+        unitPrice: Number(entry.price) || 0,
+        subtotalLine: entrySubtotal,
+        totalLine: entryTotal,
+        discountLabels,
+      };
+    });
+
     setReceipt({
       table: selected?.label,
       paymentMethod,
@@ -540,9 +567,17 @@ function Cashier() {
       tableDiscount,
       discount,
       total,
+      selectedDiscounts,
+      items: receiptItems,
       date: `${printedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, ${printedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`,
     });
-    completeBill();
+
+    // Bill out AFTER capturing snapshot
+    await completeBill();
+  }
+
+  function triggerPrint() {
+    window.print();
   }
 
   const getElapsedTime = useCallback((table) => {
@@ -1166,21 +1201,81 @@ function Cashier() {
       )}
 
       {receipt && (
-        <div className="modal-backdrop" onClick={() => setReceipt(null)}>
-          <div className="modal receipt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="receipt-check" aria-hidden="true">✓</div>
-            <p className="modal-kicker">PAYMENT COMPLETE</p>
-            <h2>Receipt ready</h2>
-            <p className="modal-description">The bill for Table #{receipt.table} has been completed.</p>
-            <div className="receipt-details">
+        <div className="modal-backdrop receipt-backdrop" onClick={() => setReceipt(null)}>
+          <div className="modal receipt-modal" id="receipt-printable" onClick={(e) => e.stopPropagation()}>
+            {/* ── Header ── */}
+            <div className="receipt-header">
+              <div className="receipt-logo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                </svg>
+              </div>
+              <div className="receipt-brand">Servio</div>
+              <div className="receipt-check" aria-hidden="true">✓</div>
+              <p className="receipt-tagline">Payment Complete</p>
+            </div>
+
+            {/* ── Meta ── */}
+            <div className="receipt-meta">
+              <div><span>Table</span><strong>#{receipt.table}</strong></div>
               <div><span>Date</span><strong>{receipt.date}</strong></div>
               <div><span>Payment</span><strong>{receipt.paymentMethod === 'qr' ? 'QR Code' : receipt.paymentMethod === 'credit' ? 'Credit Card' : 'Cash'}</strong></div>
-              <div><span>Subtotal</span><strong>{formatPrice(receipt.subtotal)}</strong></div>
-              {receipt.individualDiscount > 0 && <div><span>Individual Discounts</span><strong>-{formatPrice(receipt.individualDiscount)}</strong></div>}
-              {receipt.tableDiscount > 0 && <div><span>Discount</span><strong>-{formatPrice(receipt.tableDiscount)}</strong></div>}
-              <div className="receipt-total"><span>Total paid</span><strong>{formatPrice(receipt.total)}</strong></div>
             </div>
-            <button className="modal-print receipt-done" onClick={() => setReceipt(null)}>Done</button>
+
+            {/* ── Itemized list ── */}
+            <div className="receipt-items-section">
+              <div className="receipt-items-header">
+                <span>Item</span><span>Qty</span><span>Price</span><span>Total</span>
+              </div>
+              {(receipt.items || []).map((item, i) => (
+                <div key={i} className="receipt-item-block">
+                  <div className="receipt-item-row">
+                    <span className="receipt-item-name">{item.name}</span>
+                    <span className="receipt-item-qty">{item.quantity}</span>
+                    <span className="receipt-item-price">{formatPrice(item.unitPrice)}</span>
+                    <span className="receipt-item-total">{formatPrice(item.subtotalLine)}</span>
+                  </div>
+                  {item.discountLabels.length > 0 && (
+                    <div className="receipt-item-discounts">
+                      {item.discountLabels.map((label, di) => (
+                        <span key={di} className="receipt-item-discount-tag">{label}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── Totals ── */}
+            <div className="receipt-totals">
+              <div className="receipt-totals-row"><span>Subtotal</span><span>{formatPrice(receipt.subtotal)}</span></div>
+              {receipt.individualDiscount > 0 && (
+                <div className="receipt-totals-row receipt-totals-discount"><span>Item Discounts</span><span>-{formatPrice(receipt.individualDiscount)}</span></div>
+              )}
+              {(receipt.selectedDiscounts || []).map((d) => (
+                <div key={d.label} className="receipt-totals-row receipt-totals-discount"><span>{d.label}</span><span>-{formatPrice(d.amount)}</span></div>
+              ))}
+              {receipt.discount > 0 && (
+                <div className="receipt-totals-row receipt-totals-discount"><span>Total Discount</span><span>-{formatPrice(receipt.discount)}</span></div>
+              )}
+              <div className="receipt-totals-row receipt-grand-total"><span>Total Paid</span><span>{formatPrice(receipt.total)}</span></div>
+            </div>
+
+            <p className="receipt-footer-note">Thank you for dining with us!</p>
+
+            {/* ── Actions (hidden on print) ── */}
+            <div className="receipt-actions no-print">
+              <button className="receipt-print-button" onClick={triggerPrint}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M6 9V2h12v7" /><rect x="6" y="14" width="12" height="8" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <circle cx="18" cy="11.5" r=".5" fill="currentColor" />
+                </svg>
+                Print Receipt
+              </button>
+              <button className="receipt-done-button" onClick={() => setReceipt(null)}>Done</button>
+            </div>
           </div>
         </div>
       )}

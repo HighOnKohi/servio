@@ -535,15 +535,131 @@
 .cashier-app .modal-remove { background: #fecaca !important; border-color: #fecaca !important; color: #dc2626 !important; }
 .cashier-app .modal-text-button { width: 100%; margin-top: 12px; border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; text-decoration: underline; }
 .cashier-app .modal-text-button:hover { color: #111827; }
-.cashier-app .receipt-modal { text-align: center; }
-.cashier-app .receipt-check { width: 48px; height: 48px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; color: #15803d; font-size: 25px; font-weight: 700; }
-.cashier-app .receipt-details { margin: 22px 0; padding: 4px 14px; border: 1px solid #e5e7eb; border-radius: 10px; text-align: left; }
-.cashier-app .receipt-details > div { display: flex; justify-content: space-between; gap: 18px; padding: 11px 0; color: #64748b; font-size: 12px; }
-.cashier-app .receipt-details > div + div { border-top: 1px solid #f1f5f9; }
-.cashier-app .receipt-details strong { color: #111827; font-weight: 600; text-align: right; }
-.cashier-app .receipt-details .receipt-total { color: #111827; font-size: 14px; font-weight: 700; }
-.cashier-app .receipt-details .receipt-total strong { font-size: 16px; }
-.cashier-app .receipt-done { width: 100%; min-height: 43px; }
+/* ── Receipt Modal ── */
+.cashier-app .receipt-modal {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: left;
+  padding: 28px 28px 20px;
+}
+
+/* Header */
+.cashier-app .receipt-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed #d1d5db;
+  margin-bottom: 18px;
+}
+.cashier-app .receipt-logo {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 10px; background: #0f172a; color: #fff; margin-bottom: 4px;
+}
+.cashier-app .receipt-logo svg { width: 22px; height: 22px; }
+.cashier-app .receipt-brand { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -.03em; }
+.cashier-app .receipt-check {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; background: #dcfce7; color: #16a34a; font-size: 22px; font-weight: 700;
+  margin-top: 10px;
+}
+.cashier-app .receipt-tagline { margin: 4px 0 0; color: #16a34a; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+
+/* Meta info */
+.cashier-app .receipt-meta {
+  display: flex; flex-direction: column; gap: 0;
+  padding: 0 0 16px; border-bottom: 1px dashed #d1d5db; margin-bottom: 16px;
+}
+.cashier-app .receipt-meta > div {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 7px 0; font-size: 12px; color: #64748b;
+}
+.cashier-app .receipt-meta > div + div { border-top: 1px solid #f1f5f9; }
+.cashier-app .receipt-meta strong { color: #111827; font-weight: 600; text-align: right; }
+
+/* Itemized section */
+.cashier-app .receipt-items-section {
+  padding-bottom: 16px; border-bottom: 1px dashed #d1d5db; margin-bottom: 14px;
+}
+.cashier-app .receipt-items-header {
+  display: grid; grid-template-columns: minmax(0,1fr) 36px 72px 72px;
+  gap: 6px; padding: 0 0 7px; font-size: 10px; font-weight: 700;
+  color: #94a3b8; letter-spacing: .07em; text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb; margin-bottom: 8px;
+}
+.cashier-app .receipt-items-header span:nth-child(3),
+.cashier-app .receipt-items-header span:nth-child(4) { text-align: right; }
+
+.cashier-app .receipt-item-block { margin-bottom: 8px; }
+.cashier-app .receipt-item-row {
+  display: grid; grid-template-columns: minmax(0,1fr) 36px 72px 72px;
+  gap: 6px; align-items: baseline; font-size: 13px;
+}
+.cashier-app .receipt-item-name { color: #111827; font-weight: 500; }
+.cashier-app .receipt-item-qty { color: #64748b; text-align: center; }
+.cashier-app .receipt-item-price { color: #64748b; text-align: right; font-size: 12px; }
+.cashier-app .receipt-item-total { color: #111827; font-weight: 600; text-align: right; }
+.cashier-app .receipt-item-discounts {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; padding-left: 4px;
+}
+.cashier-app .receipt-item-discount-tag {
+  font-size: 11px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 4px; padding: 1px 6px;
+}
+
+/* Totals */
+.cashier-app .receipt-totals {
+  padding-bottom: 14px; border-bottom: 1px dashed #d1d5db; margin-bottom: 14px;
+}
+.cashier-app .receipt-totals-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 5px 0; font-size: 13px; color: #64748b;
+}
+.cashier-app .receipt-totals-discount { color: #b45309; }
+.cashier-app .receipt-grand-total {
+  padding-top: 10px; border-top: 1px solid #e2e8f0; margin-top: 4px;
+  font-size: 16px; font-weight: 800; color: #111827;
+}
+
+/* Footer note */
+.cashier-app .receipt-footer-note {
+  text-align: center; font-size: 12px; color: #9ca3af; margin: 0 0 18px; letter-spacing: .02em;
+}
+
+/* Actions row */
+.cashier-app .receipt-actions {
+  display: flex; gap: 10px;
+}
+.cashier-app .receipt-print-button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 42px; border: 1px solid #0f172a; border-radius: 8px;
+  background: #0f172a; color: #fff; font-size: 13px; font-weight: 650; cursor: pointer;
+  transition: background .18s;
+}
+.cashier-app .receipt-print-button:hover { background: #1e293b; }
+.cashier-app .receipt-print-button svg { width: 16px; height: 16px; }
+.cashier-app .receipt-done-button {
+  flex: 1; min-height: 42px; border: 1px solid #d1d5db; border-radius: 8px;
+  background: #fff; color: #374151; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .18s;
+}
+.cashier-app .receipt-done-button:hover { background: #f9fafb; }
+
+/* ── Print styles ── */
+@media print {
+  body > *:not(#receipt-printable-root) { display: none !important; }
+  .no-print { display: none !important; }
+  .cashier-app .receipt-backdrop {
+    position: static !important; background: none !important; padding: 0 !important;
+    display: block !important;
+  }
+  .cashier-app .receipt-modal {
+    box-shadow: none !important; border: none !important; max-height: none !important;
+    width: 100% !important; padding: 16px !important;
+  }
+}
 
 @container cashier-interface (max-width: 1050px) {
   .cashier-app .main { grid-template-columns: 1fr; }
