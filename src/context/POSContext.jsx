@@ -273,13 +273,15 @@ export function POSProvider({ children }) {
       )
       .subscribe();
 
-    // Polling fallback — syncs the most critical order/table data every 8 seconds
+    // Polling fallback — syncs the most critical data every 8 seconds
     // in case the WebSocket connection is disrupted or a change event is missed.
+    // menu_items is included so sold-out status propagates on devices where WS drops.
     const pollInterval = setInterval(() => {
       refetchOrders();
       refetchOrderItems();
       refetchTables();
       refetchCustomerRequests();
+      refetchMenu();
     }, 8000);
 
     // Cleanup function to close the connection when the component unmounts

@@ -1,7 +1,74 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import './customer.css';
+
+/* ── Order Status Panel ────────────────────────────────────────────── */
+function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
+  // Flatten all items across non-cancelled orders for this table
+  const allItems = useMemo(() => {
+    return tableOrders.flatMap((order) =>
+      orderItems
+        .filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
+        .map((oi) => ({ ...oi, orderStatus: order.status }))
+    );
+  }, [tableOrders, orderItems]);
+
+  if (allItems.length === 0) return null;
+
+  const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
+  const totalCount  = allItems.length;
+  const allServed   = servedCount === totalCount;
+
+  return (
+    <div className="cos-panel" aria-label="Your order status" role="region">
+      <div className="cos-header">
+        <div className="cos-header-left">
+          <span className="cos-icon">{allServed ? '🍽️' : '🍳'}</span>
+          <div>
+            <p className="cos-kicker">Live Tracking</p>
+            <h3 className="cos-title">Order Status</h3>
+          </div>
+        </div>
+        <div className="cos-progress-wrap">
+          <div className="cos-progress-bar">
+            <div
+              className="cos-progress-fill"
+              style={{ width: `${totalCount > 0 ? (servedCount / totalCount) * 100 : 0}%` }}
+            />
+          </div>
+          <span className="cos-progress-label">{servedCount}/{totalCount} ready</span>
+        </div>
+      </div>
+
+      <div className="cos-items" role="list">
+        {allItems.map((item) => {
+          const isServed = item.status === 'SERVED';
+          return (
+            <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
+              <div className="cos-item-left">
+                <span className="cos-item-dot" aria-hidden="true" />
+                <div>
+                  <span className="cos-item-name">{item.item_name}</span>
+                  {item.quantity > 1 && <span className="cos-item-qty"> ×{item.quantity}</span>}
+                </div>
+              </div>
+              <span className={`cos-item-badge ${isServed ? 'cos-badge--ready' : 'cos-badge--preparing'}`}>
+                {isServed ? '✓ Ready' : '🍳 Preparing'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {allServed && (
+        <div className="cos-all-ready" role="status">
+          🎉 All dishes are ready — enjoy your meal!
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MenuImagePlaceholder() {
   return (
@@ -144,6 +211,35 @@ function CustomerUnavailableModal({ request, onModify }) {
   );
 }
 
+/* ── Sold-Out Cart Toast ────────────────────────────────────────────── */
+function SoldOutToast({ items, onDismiss }) {
+  // Auto-dismiss after 7 s
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 7000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div className="csoldout-toast" role="alert" aria-live="assertive">
+      <span className="csoldout-toast-icon">⚠️</span>
+      <div className="csoldout-toast-body">
+        <strong>Item{items.length > 1 ? 's' : ''} sold out!</strong>
+        <span>
+          {items.map((i) => i.name).join(', ')}
+          {items.length === 1 ? ' is' : ' are'} no longer available.
+          Please remove {items.length === 1 ? 'it' : 'them'} from your cart.
+        </span>
+      </div>
+      <button
+        type="button"
+        className="csoldout-toast-close"
+        onClick={onDismiss}
+        aria-label="Dismiss notification"
+      >×</button>
+    </div>
+  );
+}
+
 /* ── Main Customer Component ────────────────────────────────────────── */
 export default function Customer() {
   const navigate = useNavigate();
@@ -151,6 +247,7 @@ export default function Customer() {
   const {
     tables,
     orders,
+    orderItems,
     menuItems: dbMenuItems,
     categories: dbCategories,
     customerRequests,
@@ -160,6 +257,8 @@ export default function Customer() {
     formatPrice,
     loading,
   } = usePOS();
+
+  const safeOrderItems = Array.isArray(orderItems) ? orderItems : [];
 
   const safeTables = Array.isArray(tables) ? tables : [];
   const safeCustomerRequests = Array.isArray(customerRequests) ? customerRequests : [];
@@ -171,13 +270,15 @@ export default function Customer() {
   const selectedTable = safeTables.find((table) => table.table_number === parsedTableId);
   const dbTable = safeTables.find((t) => t.table_number === parsedTableId);
 
-  // Only show ACTIVE items on menu
+  // Show ALL items — SOLD OUT ones appear grayed out / disabled so customers
+  // know the item exists but isn't available right now.
   const menuItems = useMemo(
-    () => safeMenuItems.filter((item) => item.status === 'ACTIVE').map((item) => ({
+    () => safeMenuItems.map((item) => ({
       id: item.id,
       name: item.name,
       price: Number(item.price) || 0,
       category: item.category_id,
+      soldOut: item.status !== 'ACTIVE',
     })),
     [safeMenuItems],
   );
@@ -187,14 +288,69 @@ export default function Customer() {
     [safeCategories],
   );
 
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [unavailableItemIds, setUnavailableItemIds] = useState(new Set()); // IDs flagged as unavailable
+  // ── sessionStorage keys scoped to this table so different tables don't collide ──
+  const storageKey = (key) => `customer_t${parsedTableId}_${key}`;
+
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    try { return sessionStorage.getItem(storageKey('category')) || null; } catch { return null; }
+  });
+
+  const [cart, setCart] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey('cart'));
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+
+  const [unavailableItemIds, setUnavailableItemIds] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey('unavail'));
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const [cartSoldOutIds, setCartSoldOutIds] = useState(new Set());  // cart items that went sold-out live
+  const [soldOutToast, setSoldOutToast] = useState([]);             // [{id, name}] for the toast
+  const alertedSoldOutRef = useRef(new Set());                      // prevent re-alerting same item
   const [submitting, setSubmitting] = useState(false);
   const [billOutRequesting, setBillOutRequesting] = useState(false);
-  const [billOutRequested, setBillOutRequested] = useState(false);
+  const [billOutRequested, setBillOutRequested] = useState(() => {
+    try { return sessionStorage.getItem(storageKey('billout')) === 'true'; } catch { return false; }
+  });
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [showMobileCart, setShowMobileCart] = useState(false);
+
+  // ── Persist state to sessionStorage whenever it changes ──
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKey('cart'), JSON.stringify(cart)); } catch {}
+  }, [cart, parsedTableId]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKey('unavail'), JSON.stringify([...unavailableItemIds])); } catch {}
+  }, [unavailableItemIds, parsedTableId]);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      try { sessionStorage.setItem(storageKey('category'), selectedCategory); } catch {}
+    }
+  }, [selectedCategory, parsedTableId]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKey('billout'), String(billOutRequested)); } catch {}
+  }, [billOutRequested, parsedTableId]);
+
+  // Clear the stored cart once the request is ACCEPTED (kitchen is cooking — cart locked)
+  useEffect(() => {
+    const accepted = safeCustomerRequests.some(
+      (r) => r.table_number === parsedTableId && r.status === 'ACCEPTED',
+    );
+    if (accepted) {
+      try {
+        sessionStorage.removeItem(storageKey('cart'));
+        sessionStorage.removeItem(storageKey('unavail'));
+      } catch {}
+    }
+  }, [safeCustomerRequests, parsedTableId]);
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory) {
@@ -207,12 +363,58 @@ export default function Customer() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync bill_out_requested from DB in case cashier resets it
+  // Sync bill_out_requested from DB; when the table resets to EMPTY (cashier billed out)
+  // clear all stored session state so the next customer starts fresh.
   useEffect(() => {
-    if (dbTable && !dbTable.bill_out_requested) {
+    if (!dbTable) return;
+    if (!dbTable.bill_out_requested) {
+      setBillOutRequested(false);
+    }
+    if (dbTable.status === 'EMPTY') {
+      // Wipe all persisted state for this table
+      ['cart', 'unavail', 'category', 'billout'].forEach((k) => {
+        try { sessionStorage.removeItem(storageKey(k)); } catch {}
+      });
+      setCart([]);
+      setUnavailableItemIds(new Set());
       setBillOutRequested(false);
     }
   }, [dbTable]);
+
+  // ── Detect when cart items go sold-out while the customer is browsing ──
+  // menuItems updates in real-time via the Supabase subscription in POSContext.
+  useEffect(() => {
+    if (cart.length === 0) {
+      // Cart cleared — reset all tracking
+      alertedSoldOutRef.current = new Set();
+      setCartSoldOutIds(new Set());
+      return;
+    }
+
+    const nowSoldOutSet = new Set();
+    const newlyGoneSoldOut = [];
+
+    cart.forEach((cartItem) => {
+      const liveItem = menuItems.find((m) => m.id === cartItem.id);
+      if (liveItem?.soldOut) {
+        nowSoldOutSet.add(cartItem.id);
+        // Only alert once per item per session of it being sold-out
+        if (!alertedSoldOutRef.current.has(cartItem.id)) {
+          newlyGoneSoldOut.push({ id: cartItem.id, name: cartItem.name });
+          alertedSoldOutRef.current.add(cartItem.id);
+        }
+      } else {
+        // Item is back in stock — clear the alert flag so we can re-alert if it goes out again
+        alertedSoldOutRef.current.delete(cartItem.id);
+      }
+    });
+
+    setCartSoldOutIds(nowSoldOutSet);
+
+    if (newlyGoneSoldOut.length > 0) {
+      setSoldOutToast(newlyGoneSoldOut);
+    }
+  }, [menuItems, cart]);
 
   const activeCategory = selectedCategory || categories[0]?.id;
   const visibleItems = menuItems.filter((item) => item.category === activeCategory);
@@ -361,16 +563,23 @@ export default function Customer() {
         ) : (
           cart.map((item) => {
             const isUnavailable = unavailableItemIds.has(item.id) || unavailableItemIds.has(item.name);
+            const isCartSoldOut  = cartSoldOutIds.has(item.id);
+            const isProblematic  = isUnavailable || isCartSoldOut;
             return (
               <div
                 key={item.id}
                 className="customer-cart-item"
-                style={isUnavailable ? { border: '1.5px solid #fecaca', background: '#fef2f2', borderRadius: 8 } : {}}
+                style={isProblematic ? { border: '1.5px solid #fecaca', background: '#fef2f2', borderRadius: 8 } : {}}
               >
                 <div className="customer-cart-item-info">
                   <span className="customer-cart-item-name">
                     {item.name}
-                    {isUnavailable && (
+                    {isCartSoldOut && (
+                      <span style={{ marginLeft: 6, fontSize: '.72rem', color: '#dc2626', fontWeight: 700 }}>
+                        SOLD OUT
+                      </span>
+                    )}
+                    {!isCartSoldOut && isUnavailable && (
                       <span style={{ marginLeft: 6, fontSize: '.72rem', color: '#dc2626', fontWeight: 700 }}>
                         UNAVAILABLE
                       </span>
@@ -381,7 +590,7 @@ export default function Customer() {
                 <div className="customer-cart-controls" role="group" aria-label={`Quantity for ${item.name}`}>
                   <button onClick={() => removeItem(item.id)} aria-label={`Remove one ${item.name}`} type="button">−</button>
                   <span className="qty-display" aria-label={`${item.qty} of ${item.name}`}>{item.qty}</span>
-                  <button onClick={() => addItem(item)} aria-label={`Add one more ${item.name}`} type="button">+</button>
+                  <button onClick={() => addItem(item)} aria-label={`Add one more ${item.name}`} type="button" disabled={isCartSoldOut}>+</button>
                 </div>
               </div>
             );
@@ -432,11 +641,11 @@ export default function Customer() {
         <button
           className={`customer-submit-button ${isInline ? 'customer-submit-button-inline' : ''}`}
           onClick={submitRequest}
-          disabled={cart.length === 0 || submitting || hasPendingRequest}
+          disabled={cart.length === 0 || submitting || hasPendingRequest || cartSoldOutIds.size > 0}
           aria-label={submitting ? 'Sending order…' : 'Place order'}
           type="button"
         >
-          {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : '✓ Mark Pending'}
+          {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartSoldOutIds.size > 0 ? '⚠ Remove Sold-Out Items' : '✓ Mark Pending'}
         </button>
       )}
     </div>
@@ -444,6 +653,14 @@ export default function Customer() {
 
   return (
     <div className="customer-app" aria-label={`Customer ordering interface for Table ${selectedTable.table_number}`}>
+
+      {/* ── Sold-Out Toast Notification ── */}
+      {soldOutToast.length > 0 && (
+        <SoldOutToast
+          items={soldOutToast}
+          onDismiss={() => setSoldOutToast([])}
+        />
+      )}
 
       {/* ── Pending Verification Modal (blocks screen) ── */}
       {hasPendingRequest && <CustomerPendingModal request={activeRequest} />}
@@ -512,14 +729,16 @@ export default function Customer() {
             aria-label={`Menu items in ${categories.find(c => c.id === activeCategory)?.name || 'selected category'}`}
           >
             {visibleItems.map((item) => {
-              const isUnavailable = unavailableItemIds.has(item.id) || unavailableItemIds.has(item.name);
+              const isSoldOut   = item.soldOut;
+              const isUnavail   = unavailableItemIds.has(item.id) || unavailableItemIds.has(item.name);
+              const isDisabled  = isSoldOut || isUnavail;
               return (
                 <article
                   key={item.id}
                   className="customer-menu-card"
                   role="listitem"
-                  aria-label={`${item.name}, ${formatPrice(item.price)}`}
-                  style={isUnavailable ? { opacity: .5 } : {}}
+                  aria-label={`${item.name}, ${formatPrice(item.price)}${isDisabled ? ', unavailable' : ''}`}
+                  style={isDisabled ? { opacity: .5 } : {}}
                 >
                   <span className="customer-menu-image" aria-hidden="true">
                     <MenuImagePlaceholder />
@@ -527,7 +746,12 @@ export default function Customer() {
                   <div className="customer-menu-body">
                     <span className="customer-menu-name">
                       {item.name}
-                      {isUnavailable && (
+                      {isSoldOut && (
+                        <span style={{ display: 'block', fontSize: '.7rem', color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                          Sold Out
+                        </span>
+                      )}
+                      {!isSoldOut && isUnavail && (
                         <span style={{ display: 'block', fontSize: '.7rem', color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
                           Unavailable
                         </span>
@@ -541,7 +765,7 @@ export default function Customer() {
                       onClick={() => addItem(item)}
                       aria-label={`Add ${item.name} to order`}
                       type="button"
-                      disabled={isUnavailable}
+                      disabled={isDisabled}
                     >
                       <PlusIcon /> Add to Order
                     </button>
@@ -561,8 +785,24 @@ export default function Customer() {
         {/* ── Desktop Sidebar ── */}
         <aside className="customer-sidebar">
           <CartPanel isInline />
+          <OrderStatusPanel
+            tableOrders={tableOrders}
+            orderItems={safeOrderItems}
+            formatPrice={formatPrice}
+          />
         </aside>
       </main>
+
+      {/* ── Mobile Order Status (shown between menu and sticky bar) ── */}
+      {tableOrders.length > 0 && (
+        <div className="customer-mobile-order-status">
+          <OrderStatusPanel
+            tableOrders={tableOrders}
+            orderItems={safeOrderItems}
+            formatPrice={formatPrice}
+          />
+        </div>
+      )}
 
       {/* ── Mobile Sticky Bottom Bar ── */}
       <div className="customer-mobile-bar" role="region" aria-label="Order summary and checkout">
