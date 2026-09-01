@@ -854,7 +854,7 @@ export function POSProvider({ children }) {
       const nextStatus = currentStatus === "ACTIVE" ? "SOLD OUT" : "ACTIVE";
       const { error } = await supabase
         .from("menu_items")
-        .update({ status: nextStatus, updated_at: new Date().toISOString() })
+        .update({ status: nextStatus })
         .eq("id", itemId);
       if (error) console.error("Failed to toggle menu item stock:", error);
       await refetchMenu();
@@ -972,7 +972,7 @@ export function POSProvider({ children }) {
       );
       const { error } = await supabase
         .from("orders")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status })
         .eq("id", orderId);
       if (error) console.error("Failed to update order status:", error);
 
