@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
@@ -28,6 +28,36 @@ const secondarySupabase = createClient(
 
 const ROLES = ["ADMIN", "CASHIER", "WAITER", "KITCHEN"];
 const STATUS_OPTIONS = ["Active", "Inactive"];
+const REVENUE_FILTER_OPTIONS = ["today", "week", "all"];
+const REVENUE_FILTER_LABELS = { today: "Today", week: "This Week", all: "All-Time" };
+const LS_RESET_KEY = "servio_revenue_reset_ts";
+
+// ─── Revenue helpers ──────────────────────────────────────────────────────────
+/**
+ * Returns a YYYY-MM-DD string in LOCAL time for a given Date or ISO string.
+ * This prevents UTC-vs-local-midnight mismatches.
+ */
+function toLocalDateString(dateOrStr) {
+  const d = dateOrStr instanceof Date ? dateOrStr : new Date(dateOrStr);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getStartOfLocalDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getStartOfLocalWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun
+  d.setDate(d.getDate() - day);
+  return d;
+}
 
 // ─── Shared modal styles ──────────────────────────────────────────────────────
 const modalOverlayStyle = {
@@ -256,6 +286,46 @@ function DeleteConfirmModal({ profile, onClose, onConfirm }) {
   );
 }
 
+// ─── Reset Revenue Confirm Modal ──────────────────────────────────────────────
+function ResetRevenueConfirmModal({ onClose, onConfirm }) {
+  return (
+    <div style={modalOverlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...modalBoxStyle, width: 400 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#111827" }}>
+            Reset Shift Revenue?
+          </h2>
+        </div>
+        <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "0 0 6px" }}>
+          This will set a new <strong>shift baseline</strong> to right now. The revenue counter
+          will restart from <strong>₱0.00</strong>.
+        </p>
+        <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "0 0 22px" }}>
+          All historical orders remain saved — this only changes what is counted in the
+          revenue display. The reset is stored locally and will persist through page refreshes.
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={onClose}
+            style={{ flex: 1, padding: "9px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", cursor: "pointer", fontSize: "0.85rem" }}>
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm}
+            style={{ flex: 1, padding: "9px", border: "none", borderRadius: 8, background: "#d97706", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }}>
+            Reset Shift
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── useFixedInterfaceCanvas ──────────────────────────────────────────────────
 function useFixedInterfaceCanvas() {
   const [, refreshScale] = useState(0);
@@ -294,7 +364,15 @@ const Admin = () => {
   const [editingProfile, setEditingProfile] = useState(null);
   const [deletingProfile, setDeletingProfile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showResetRevenueModal, setShowResetRevenueModal] = useState(false);
   const [toast, setToast] = useState("");
+
+  // ── Revenue filter & reset state ──────────────────────────────────────────
+  const [revenueFilter, setRevenueFilter] = useState("today"); // "today" | "week" | "all"
+  const [revenueResetTimestamp, setRevenueResetTimestamp] = useState(() => {
+    const saved = localStorage.getItem(LS_RESET_KEY);
+    return saved ? Number(saved) : null;
+  });
 
   useEffect(() => {
     const id = setInterval(() => setCurrentDateTime(new Date()), 1000);
@@ -338,18 +416,73 @@ const Admin = () => {
     }
   }, [deleteProfile, showToast]);
 
+  const handleRevenueReset = useCallback(() => {
+    const now = Date.now();
+    setRevenueResetTimestamp(now);
+    localStorage.setItem(LS_RESET_KEY, String(now));
+    setShowResetRevenueModal(false);
+    showToast("✓ Shift revenue reset. Counter starts from ₱0.00.");
+  }, [showToast]);
+
+  const handleClearRevenueReset = useCallback(() => {
+    setRevenueResetTimestamp(null);
+    localStorage.removeItem(LS_RESET_KEY);
+    showToast("✓ Shift baseline cleared. Showing full period revenue.");
+  }, [showToast]);
+
   const time = currentDateTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
   const date = currentDateTime.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
+  // ── Computed stats ──────────────────────────────────────────────────────────
   const totalOrders = orders.length;
   const completedOrders = orders.filter((o) => o.status === "COMPLETED").length;
   const activeOrders = orders.filter((o) => o.status === "PENDING" || o.status === "IN_PROGRESS").length;
   const cancelledOrders = orders.filter((o) => o.status === "CANCELLED").length;
   const occupiedTables = tables.filter((t) => t.status === "OCCUPIED").length;
   const lowStock = getLowStockIngredients();
-  const todayRevenue = orders
-    .filter((o) => o.status === "COMPLETED" && new Date(o.created_at).toDateString() === new Date().toDateString())
-    .reduce((sum, o) => sum + Number(o.total), 0);
+
+  // Revenue calculation — uses updated_at (accurate completion time) instead of
+  // created_at, and compares local date strings to avoid UTC/local-time mismatches.
+  const todayRevenue = useMemo(() => {
+    const now = new Date();
+    const todayStr = toLocalDateString(now);
+    const weekStart = getStartOfLocalWeek(now);
+    const dayStart = getStartOfLocalDay(now);
+
+    return orders
+      .filter((o) => {
+        if (o.status !== "COMPLETED") return false;
+
+        // Use updated_at as the completion timestamp; fall back to created_at if missing.
+        const completedAt = new Date(o.updated_at || o.created_at);
+
+        // Apply shift reset baseline — only count orders completed after the reset.
+        if (revenueResetTimestamp && completedAt.getTime() < revenueResetTimestamp) {
+          return false;
+        }
+
+        if (revenueFilter === "today") {
+          return toLocalDateString(completedAt) === todayStr;
+        }
+        if (revenueFilter === "week") {
+          return completedAt >= weekStart;
+        }
+        // "all" — no date restriction
+        return true;
+      })
+      .reduce((sum, o) => sum + Number(o.total), 0);
+  }, [orders, revenueFilter, revenueResetTimestamp]);
+
+  // Label shown under revenue amount
+  const revenuePeriodLabel = useMemo(() => {
+    if (revenueResetTimestamp) {
+      const resetDate = new Date(revenueResetTimestamp);
+      const timeStr = resetDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      const dateStr = toLocalDateString(resetDate) === toLocalDateString(new Date()) ? "Today" : resetDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return `Since ${dateStr}, ${timeStr}`;
+    }
+    return REVENUE_FILTER_LABELS[revenueFilter];
+  }, [revenueResetTimestamp, revenueFilter]);
 
   if (loading) {
     return (
@@ -368,6 +501,17 @@ const Admin = () => {
 
   const roleColor = { ADMIN: "#7c3aed", CASHIER: "#2563eb", WAITER: "#0891b2", KITCHEN: "#b45309" };
   const statusColor = { Active: "#16a34a", Inactive: "#9ca3af" };
+
+  // Revenue filter pill style helper
+  const filterPillStyle = (key) => ({
+    padding: "3px 10px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 600,
+    border: "1px solid",
+    cursor: "pointer",
+    transition: "all 0.15s",
+    background: revenueFilter === key && !revenueResetTimestamp ? "#0f172a" : "transparent",
+    color: revenueFilter === key && !revenueResetTimestamp ? "#fff" : "#64748b",
+    borderColor: revenueFilter === key && !revenueResetTimestamp ? "#0f172a" : "#e2e8f0",
+  });
 
   return (
     <div
@@ -410,12 +554,62 @@ const Admin = () => {
         </div>
       )}
 
-      {/* ── Stats Row 1 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, padding: "20px 24px", flexShrink: 0 }}>
-        <div style={cardStyle}>
-          <div style={labelStyle}>Today&apos;s Revenue</div>
-          <div style={{ ...valueStyle, color: "#16a34a" }}>P{todayRevenue.toFixed(2)}</div>
+      {/* ── Revenue filter + reset bar ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 4 }}>Revenue Period:</span>
+          {REVENUE_FILTER_OPTIONS.map((key) => (
+            <button
+              key={key}
+              onClick={() => { setRevenueFilter(key); if (revenueResetTimestamp) handleClearRevenueReset(); }}
+              style={filterPillStyle(key)}
+              aria-pressed={revenueFilter === key && !revenueResetTimestamp}
+            >
+              {REVENUE_FILTER_LABELS[key]}
+            </button>
+          ))}
         </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {revenueResetTimestamp && (
+            <button
+              onClick={handleClearRevenueReset}
+              style={{ padding: "3px 10px", fontSize: "0.72rem", fontWeight: 600, border: "1px solid #bfdbfe", borderRadius: 20, background: "#eff6ff", color: "#2563eb", cursor: "pointer" }}
+              aria-label="Clear shift reset baseline"
+            >
+              Clear Reset
+            </button>
+          )}
+          <button
+            onClick={() => setShowResetRevenueModal(true)}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 12px 3px 8px", fontSize: "0.72rem", fontWeight: 600, border: "1px solid #fde68a", borderRadius: 20, background: "#fffbeb", color: "#d97706", cursor: "pointer" }}
+            aria-label="Reset shift revenue baseline"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            Reset Shift
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats Row 1 ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, padding: "12px 24px 0", flexShrink: 0 }}>
+        {/* Revenue card */}
+        <div style={{ ...cardStyle, borderColor: revenueResetTimestamp ? "#fde68a" : "#e2e8f0", background: revenueResetTimestamp ? "#fffbeb" : "#ffffff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={labelStyle}>Today&apos;s Revenue</div>
+            {revenueResetTimestamp && (
+              <span style={{ fontSize: "0.62rem", fontWeight: 600, color: "#d97706", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 20, padding: "1px 7px", whiteSpace: "nowrap" }}>
+                Shift Reset
+              </span>
+            )}
+          </div>
+          <div style={{ ...valueStyle, color: "#16a34a" }}>₱{todayRevenue.toFixed(2)}</div>
+          <div style={mutedStyle}>{revenuePeriodLabel}</div>
+        </div>
+
         <div style={cardStyle}>
           <div style={labelStyle}>Total Orders</div>
           <div style={valueStyle}>{totalOrders}</div>
@@ -434,7 +628,7 @@ const Admin = () => {
       </div>
 
       {/* ── Stats Row 2 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, padding: "0 24px 20px", flexShrink: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, padding: "16px 24px 20px", flexShrink: 0 }}>
         <div style={{ ...cardStyle, background: lowStock.length > 0 ? "#fff7ed" : "#ffffff", borderColor: lowStock.length > 0 ? "#fdba74" : "#e2e8f0" }}>
           <div style={labelStyle}>Low Stock Alerts</div>
           <div style={{ ...valueStyle, color: lowStock.length > 0 ? "#c2410c" : "#16a34a" }}>{lowStock.length}</div>
@@ -479,7 +673,7 @@ const Admin = () => {
                     <td style={{ padding: "8px 10px", fontWeight: 500 }}>#{order.id.slice(0, 6)}</td>
                     <td style={{ padding: "8px 10px", color: "#64748b" }}>{order.table_number || "-"}</td>
                     <td style={{ padding: "8px 10px", color: "#64748b" }}>{order.server_name || "-"}</td>
-                    <td style={{ padding: "8px 10px" }}>P{Number(order.total).toFixed(2)}</td>
+                    <td style={{ padding: "8px 10px" }}>₱{Number(order.total).toFixed(2)}</td>
                     <td style={{ padding: "8px 10px" }}>
                       <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 600, color: sc, background: `${sc}18` }}>
                         {order.status}
@@ -589,6 +783,12 @@ const Admin = () => {
         <ProtocolUploadModal
           onClose={() => setShowUploadModal(false)}
           onSuccess={handleUploadSuccess}
+        />
+      )}
+      {showResetRevenueModal && (
+        <ResetRevenueConfirmModal
+          onClose={() => setShowResetRevenueModal(false)}
+          onConfirm={handleRevenueReset}
         />
       )}
     </div>

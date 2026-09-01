@@ -22,27 +22,12 @@ function ReturnIcon() {
   );
 }
 
-function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
-
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener('resize', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
-    return () => {
-      window.removeEventListener('resize', updateScale);
-      window.visualViewport?.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  if (typeof window === 'undefined') return { scale: 1, width: '100%', height: '100vh' };
-
-  const pixelRatio = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pixelRatio,
-    width: `${Math.round(window.innerWidth * pixelRatio)}px`,
-    height: `${Math.round(window.innerHeight * pixelRatio)}px`,
-  };
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
 }
 
 export default function Customer() {
@@ -65,6 +50,7 @@ export default function Customer() {
 
   const parsedTableId = Number(String(tableId || '').replace(/[^0-9]/g, ''));
   const selectedTable = safeTables.find((table) => table.table_number === parsedTableId);
+
   const menuItems = useMemo(
     () => safeMenuItems.filter((item) => item.status === 'ACTIVE').map((item) => ({
       id: item.id,
@@ -74,6 +60,7 @@ export default function Customer() {
     })),
     [safeMenuItems],
   );
+
   const categories = useMemo(
     () => safeCategories.map((category) => ({ id: category.id, name: category.name })),
     [safeCategories],
@@ -83,6 +70,8 @@ export default function Customer() {
   const [cart, setCart] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  // Controls mobile cart panel visibility (cart slides up on mobile)
+  const [showMobileCart, setShowMobileCart] = useState(false);
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory) {
@@ -95,13 +84,13 @@ export default function Customer() {
     return () => clearInterval(timer);
   }, []);
 
-  const interfaceCanvas = useFixedInterfaceCanvas();
   const activeCategory = selectedCategory || categories[0]?.id;
   const visibleItems = menuItems.filter((item) => item.category === activeCategory);
   const hasPendingRequest = safeCustomerRequests.some(
     (request) => request.table_number === parsedTableId && request.status === 'PENDING',
   );
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const now = new Date(currentTime);
 
   function addItem(item) {
@@ -139,6 +128,7 @@ export default function Customer() {
 
     if (!error) {
       setCart([]);
+      setShowMobileCart(false);
     } else {
       console.error('Error creating customer request:', error);
     }
@@ -146,30 +136,104 @@ export default function Customer() {
   }
 
   if (loading) {
-    return <div className="customer-app customer-loading">Loading...</div>;
+    return <div className="customer-app customer-loading" role="status" aria-live="polite">Loading menu…</div>;
   }
 
   if (!selectedTable) {
     return (
       <div className="customer-app customer-loading">
-        <div className="customer-invalid-card">
+        <div className="customer-invalid-card" role="alert">
           <h1>Table not found</h1>
-          <p>This QR code is not linked to an active restaurant table.</p>
+          <p>This QR code is not linked to an active restaurant table. Please scan again or ask a staff member for help.</p>
         </div>
       </div>
     );
   }
 
+  // ── Cart panel (shared between desktop sidebar and mobile bottom panel) ──────
+  const CartPanel = ({ isInline = false }) => (
+    <div className="customer-sidebar-card" role="complementary" aria-label="Your order">
+      <div className="customer-sidebar-heading">
+        <div>
+          <p className="customer-kicker">Current Selection</p>
+          <h2>Your Order</h2>
+        </div>
+        {cartCount > 0 && (
+          <span style={{
+            minWidth: 28, height: 28, background: '#0f172a', color: '#fff',
+            borderRadius: 28, display: 'inline-flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: '0.82rem', fontWeight: 800, padding: '0 8px',
+          }} aria-label={`${cartCount} items in cart`}>
+            {cartCount}
+          </span>
+        )}
+      </div>
+
+      <div className="customer-cart-list" aria-label="Cart items" aria-live="polite">
+        {cart.length === 0 ? (
+          <div className="customer-empty-state" aria-label="Cart is empty">
+            Select items from the menu to start your order.
+          </div>
+        ) : (
+          cart.map((item) => (
+            <div key={item.id} className="customer-cart-item">
+              <div className="customer-cart-item-info">
+                <span className="customer-cart-item-name">{item.name}</span>
+                <span className="customer-cart-item-price">{formatPrice(item.price)} each</span>
+              </div>
+              <div className="customer-cart-controls" role="group" aria-label={`Quantity for ${item.name}`}>
+                <button
+                  onClick={() => removeItem(item.id)}
+                  aria-label={`Remove one ${item.name}`}
+                  type="button"
+                >
+                  −
+                </button>
+                <span className="qty-display" aria-label={`${item.qty} of ${item.name}`}>
+                  {item.qty}
+                </span>
+                <button
+                  onClick={() => addItem(item)}
+                  aria-label={`Add one more ${item.name}`}
+                  type="button"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="customer-summary" aria-label="Order summary">
+        <div className="customer-summary-row">
+          <span className="customer-summary-label">Subtotal</span>
+          <span className="customer-summary-value">{formatPrice(subtotal)}</span>
+        </div>
+      </div>
+
+      {hasPendingRequest && (
+        <div className="customer-request-banner" role="status" aria-live="polite">
+          ⏳ A request for this table is already waiting for cashier approval.
+        </div>
+      )}
+
+      <button
+        className={`customer-submit-button ${isInline ? 'customer-submit-button-inline' : ''}`}
+        onClick={submitRequest}
+        disabled={cart.length === 0 || submitting || hasPendingRequest}
+        aria-label={submitting ? 'Sending order…' : 'Place order'}
+        type="button"
+      >
+        {submitting ? 'Sending…' : '✓ Complete Order'}
+      </button>
+    </div>
+  );
+
   return (
-    <div
-      className="customer-app"
-      style={{
-        '--customer-scale': interfaceCanvas.scale,
-        width: interfaceCanvas.width,
-        height: interfaceCanvas.height,
-        minHeight: interfaceCanvas.height,
-      }}
-    >
+    <div className="customer-app" aria-label={`Customer ordering interface for Table ${selectedTable.table_number}`}>
+
+      {/* ── Header ── */}
       <header className="customer-topbar">
         <div>
           <p className="customer-kicker">Customer Interface</p>
@@ -184,7 +248,7 @@ export default function Customer() {
           >
             <ReturnIcon />
           </button>
-          <div className="customer-topbar-meta">
+          <div className="customer-topbar-meta" aria-label="Current date and time">
             <span>
               {now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
@@ -195,83 +259,92 @@ export default function Customer() {
         </div>
       </header>
 
+      {/* ── Main Content ── */}
       <main className="customer-main">
-        <section className="customer-menu-panel">
-          <div className="customer-category-row">
+
+        {/* ── Menu Panel ── */}
+        <section className="customer-menu-panel" aria-label="Menu">
+
+          {/* Category selector */}
+          <nav className="customer-category-row" aria-label="Menu categories" role="tablist">
             {categories.map((category) => (
               <button
                 key={category.id}
                 className={`customer-category-button ${activeCategory === category.id ? 'active' : ''}`}
                 onClick={() => setSelectedCategory(category.id)}
+                role="tab"
+                aria-selected={activeCategory === category.id}
+                aria-label={`Category: ${category.name}`}
+                type="button"
               >
                 {category.name}
               </button>
             ))}
-          </div>
+          </nav>
 
-          <div className="customer-menu-grid">
+          {/* Menu grid */}
+          <div
+            className="customer-menu-grid"
+            role="list"
+            aria-label={`Menu items in ${categories.find(c => c.id === activeCategory)?.name || 'selected category'}`}
+          >
             {visibleItems.map((item) => (
-              <button key={item.id} className="customer-menu-card" onClick={() => addItem(item)}>
-                <span className="customer-menu-image"><MenuImagePlaceholder /></span>
-                <span className="customer-menu-name">{item.name}</span>
-                <span className="customer-menu-price">{formatPrice(item.price)}</span>
-              </button>
+              <article key={item.id} className="customer-menu-card" role="listitem" aria-label={`${item.name}, ${formatPrice(item.price)}`}>
+                <span className="customer-menu-image" aria-hidden="true">
+                  <MenuImagePlaceholder />
+                </span>
+                <div className="customer-menu-body">
+                  <span className="customer-menu-name">{item.name}</span>
+                  <span className="customer-menu-price" aria-label={`Price: ${formatPrice(item.price)}`}>
+                    {formatPrice(item.price)}
+                  </span>
+                  <button
+                    className="customer-menu-add-btn"
+                    onClick={() => addItem(item)}
+                    aria-label={`Add ${item.name} to order`}
+                    type="button"
+                  >
+                    <PlusIcon /> Add to Order
+                  </button>
+                </div>
+              </article>
             ))}
+
+            {visibleItems.length === 0 && (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: '40px 20px' }}>
+                No items in this category yet.
+              </div>
+            )}
           </div>
         </section>
 
+        {/* ── Desktop Sidebar ── */}
         <aside className="customer-sidebar">
-          <div className="customer-sidebar-card">
-            <div className="customer-sidebar-heading">
-              <div>
-                <p className="customer-kicker">Current Selection</p>
-                <h2>Your Order</h2>
-              </div>
-            </div>
-
-            <div className="customer-cart-list">
-              {cart.length === 0 ? (
-                <div className="customer-empty-state">Select items from the menu.</div>
-              ) : (
-                cart.map((item) => (
-                  <div key={item.id} className="customer-cart-item">
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>{formatPrice(item.price)} each</span>
-                    </div>
-                    <div className="customer-cart-controls">
-                      <button onClick={() => removeItem(item.id)} aria-label={`Decrease ${item.name}`}>−</button>
-                      <span>{item.qty}</span>
-                      <button onClick={() => addItem(item)} aria-label={`Increase ${item.name}`}>+</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="customer-summary">
-              <div>
-                <span>Subtotal</span>
-                <strong>{formatPrice(subtotal)}</strong>
-              </div>
-            </div>
-
-            {hasPendingRequest && (
-              <div className="customer-request-banner">
-                A request for this table is already waiting for cashier approval.
-              </div>
-            )}
-
-            <button
-              className="customer-submit-button"
-              onClick={submitRequest}
-              disabled={cart.length === 0 || submitting || hasPendingRequest}
-            >
-              {submitting ? 'Sending...' : 'Complete Order'}
-            </button>
-          </div>
+          <CartPanel isInline />
         </aside>
       </main>
+
+      {/* ── Mobile Sticky Bottom Bar ── */}
+      <div className="customer-mobile-bar" role="region" aria-label="Order summary and checkout">
+        <div className="customer-mobile-bar-summary">
+          <span>{cartCount > 0 ? `${cartCount} item${cartCount !== 1 ? 's' : ''} in order` : 'No items yet'}</span>
+          <span className="customer-mobile-bar-total">{formatPrice(subtotal)}</span>
+        </div>
+        {hasPendingRequest && (
+          <div className="customer-request-banner" role="status" aria-live="polite" style={{ fontSize: '0.82rem' }}>
+            ⏳ A request for this table is awaiting cashier approval.
+          </div>
+        )}
+        <button
+          className="customer-submit-button"
+          onClick={submitRequest}
+          disabled={cart.length === 0 || submitting || hasPendingRequest}
+          aria-label={submitting ? 'Sending order…' : 'Place order'}
+          type="button"
+        >
+          {submitting ? 'Sending…' : cartCount > 0 ? `✓ Place Order (${cartCount})` : 'Select Items to Order'}
+        </button>
+      </div>
     </div>
   );
 }
