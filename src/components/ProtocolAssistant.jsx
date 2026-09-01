@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./ProtocolAssistant.css";
+import { supabase } from "../lib/supabaseClient";
 
 const protocolModules = import.meta.glob("../../Protocols/*.txt", {
   query: "?raw",
@@ -247,8 +248,16 @@ export default function ProtocolAssistant() {
   const [messages, setMessages] = useState(starterMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [remoteProtocols, setRemoteProtocols] = useState([]);
 
-  const protocolCount = useMemo(() => protocolLibrary.length, []);
+  // Merge local txt protocols + remote Supabase protocols (deduplicated by title)
+  const allProtocols = useMemo(() => {
+    const localTitles = new Set(protocolLibrary.map((p) => p.title.toLowerCase()));
+    const remote = remoteProtocols.filter((p) => !localTitles.has(p.title.toLowerCase()));
+    return [...protocolLibrary, ...remote];
+  }, [remoteProtocols]);
+
+  const protocolCount = allProtocols.length;
 
   const { speakingId, speak, cancel: cancelSpeech, hasTTS } = useSpeechSynthesis();
 
@@ -273,6 +282,19 @@ export default function ProtocolAssistant() {
     onTranscript: handleTranscript,
     onError: handleSpeechError,
   });
+
+  // Fetch remote protocols from Supabase on first open
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("protocols")
+      .select("title, content")
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setRemoteProtocols(data.map((row) => ({ id: row.title, title: row.title, content: row.content || "" })));
+        }
+      });
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -302,7 +324,7 @@ export default function ProtocolAssistant() {
       const response = await fetch("/.netlify/functions/protocol-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, protocols: protocolLibrary }),
+        body: JSON.stringify({ question, protocols: allProtocols }),
       });
 
       if (!response.ok) {

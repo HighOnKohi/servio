@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { usePOS } from "../../context/POSContext";
 import { useAuth } from "../../context/AuthContext";
+import ProtocolUploadModal from "../../components/ProtocolUploadModal";
+import ProtocolManagementPanel from "../../components/ProtocolManagementPanel";
 import "./admin.css";
 
 // ─── Secondary Supabase client for registration ───────────────────────────────
@@ -291,6 +293,7 @@ const Admin = () => {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
   const [deletingProfile, setDeletingProfile] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -313,6 +316,10 @@ const Admin = () => {
     refetchProfiles();
     showToast(`✓ ${name} has been registered successfully.`);
   }, [refetchProfiles, showToast]);
+
+  const handleUploadSuccess = useCallback((count) => {
+    showToast(`✓ ${count} protocol${count !== 1 ? "s" : ""} uploaded successfully.`);
+  }, [showToast]);
 
   const handleEditSave = useCallback(async (id, updates) => {
     const { error } = await updateProfile(id, updates);
@@ -449,7 +456,7 @@ const Admin = () => {
       </div>
 
       {/* ── Main Grid ── */}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, padding: "0 24px 24px", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr", gap: 16, padding: "0 24px 24px", overflow: "hidden" }}>
 
         {/* Recent Orders */}
         <div style={sectionStyle}>
@@ -534,14 +541,14 @@ const Admin = () => {
                       title="Edit"
                       style={{ background: "none", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: "0.75rem", color: "#374151" }}
                     >
-                      ✏️
+                    <span className="ms" style={{ fontSize: 16 }}>edit</span>
                     </button>
                     <button
                       onClick={() => setDeletingProfile(p)}
                       title="Remove"
                       style={{ background: "none", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: "0.75rem", color: "#dc2626" }}
                     >
-                      🗑️
+                      <span className="ms" style={{ fontSize: 16 }}>delete</span>
                     </button>
                   </div>
                 </div>
@@ -549,6 +556,12 @@ const Admin = () => {
             </div>
           )}
         </div>
+
+        {/* Protocol Management */}
+        <ProtocolManagementPanel
+          onShowUpload={() => setShowUploadModal(true)}
+          showToast={showToast}
+        />
       </div>
 
       {/* ── Modals ── */}
@@ -570,6 +583,12 @@ const Admin = () => {
           profile={deletingProfile}
           onClose={() => setDeletingProfile(null)}
           onConfirm={handleDeleteConfirm}
+        />
+      )}
+      {showUploadModal && (
+        <ProtocolUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={handleUploadSuccess}
         />
       )}
     </div>

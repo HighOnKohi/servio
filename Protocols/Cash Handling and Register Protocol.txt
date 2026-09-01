@@ -1,0 +1,15 @@
+Cash Handling and Register Protocol
+
+1. Only authorized staff with register access credentials may open or operate the register.
+2. Count and verify the opening till amount at the beginning of every shift. Report any discrepancy to the manager before service begins.
+3. Never leave the register open and unattended.
+4. Process each transaction fully before beginning the next. Do not rush or skip confirmation steps.
+5. For cash payments, state the amount tendered and the change aloud before handing it back: "That's $20 out of $23.50, and $3.50 is your change."
+6. Place large bills (over $20) on the register ledge until the transaction is complete before placing them in the drawer.
+7. Do not keep large amounts of cash in the register drawer. Perform safe drops whenever the drawer exceeds the authorized float amount.
+8. Never share register access codes or passwords with other staff. Each user must log in with their own credentials.
+9. Report any suspected payment fraud, counterfeit bills, or suspicious behavior to the manager immediately.
+10. Count and reconcile the register at the end of every shift. Document the closing balance and sign off.
+11. Discrepancies above the tolerance threshold must be reported to management and documented before the register report is submitted.
+12. Do not accept personal checks unless explicitly authorized by management policy.
+13. Treat all cash handling situations as observable: assume transactions may be reviewed on camera.

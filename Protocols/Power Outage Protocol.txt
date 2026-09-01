@@ -1,0 +1,15 @@
+Power Outage Protocol
+
+1. Stay calm and reassure guests immediately: "We apologize for the inconvenience. We are addressing this right now."
+2. Activate emergency lighting if available. Use flashlights or candles if permitted by local fire code.
+3. Notify the manager or shift lead immediately.
+4. Do not open refrigerators or freezers unnecessarily. A closed refrigerator maintains safe temperature for approximately 4 hours.
+5. Halt all food preparation and service. Do not serve food that cannot be confirmed as safely stored.
+6. If the outage is prolonged (over 2 hours), begin logging food temperatures and assess what must be discarded.
+7. Contact the power utility company to report the outage and get an estimated restoration time.
+8. If the outage is within the restaurant's control (tripped breaker, internal fault), notify the maintenance team.
+9. Offer guests the option to wait if restoration is expected soon, or assist them in canceling their order and paying for what they have received.
+10. Do not operate gas appliances if you suspect a gas leak or if gas-powered ventilation is impaired.
+11. Keep all exterior exits clear and unlocked for guest safety.
+12. Once power is restored, verify all equipment (refrigerators, ovens, POS systems) before resuming full service.
+13. Document the outage duration, food affected, guest impact, and corrective actions taken.

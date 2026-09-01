@@ -1,0 +1,14 @@
+Food Contamination Protocol
+
+1. Remove the suspected dish from the guest's table immediately and apologize sincerely without assigning blame.
+2. Do not discard the food. Seal it in a container and label it with the time, table number, and item name.
+3. Pull the same batch or prep lot from service immediately until the kitchen can inspect it.
+4. Notify the kitchen manager and shift lead at once.
+5. Check whether any other guests have been served from the same batch or source ingredient.
+6. If a guest reports illness symptoms, treat it as a medical situation and follow the Guest Medical Emergency Protocol.
+7. Inspect the source ingredients for signs of spoilage, improper storage temperature, or cross-contamination.
+8. Document the discovery: who found it, when, what was observed (foreign object, odor, color, texture), and what action was taken.
+9. Do not allow kitchen staff to continue using any ingredient until it is cleared by the kitchen manager.
+10. Conduct a full temperature log and storage review for that shift.
+11. If the contamination may affect public health, notify the local food safety authority as required by law.
+12. Complete a full incident report and submit it to management and ownership.
