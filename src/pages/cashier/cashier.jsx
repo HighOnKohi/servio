@@ -120,8 +120,16 @@ function Cashier() {
   const [showDecreaseModal, setShowDecreaseModal] = useState(false);
   const [pendingTableId, setPendingTableId] = useState(null);
   const [pendingItem, setPendingItem] = useState(null);
-  // Dismissed alert IDs for cancelled-order notifications
-  const [dismissedAlertIds, setDismissedAlertIds] = useState(() => new Set());
+  // Dismissed alert IDs for cancelled-order notifications — persisted to
+  // sessionStorage so they don't reappear when the cashier page is refreshed.
+  const [dismissedAlertIds, setDismissedAlertIds] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('cashier_dismissed_alerts');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [expandedItemIds, setExpandedItemIds] = useState(() => ({}));
   const [receipt, setReceipt] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -678,7 +686,11 @@ function Cashier() {
               <button
                 type="button"
                 className="cashier-cancel-alert-dismiss"
-                onClick={() => setDismissedAlertIds((prev) => new Set(prev).add(order.id))}
+                onClick={() => setDismissedAlertIds((prev) => {
+                  const next = new Set(prev).add(order.id);
+                  try { sessionStorage.setItem('cashier_dismissed_alerts', JSON.stringify([...next])); } catch {}
+                  return next;
+                })}
                 aria-label="Dismiss alert"
               >
                 ×

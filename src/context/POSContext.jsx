@@ -806,6 +806,9 @@ export function POSProvider({ children }) {
    */
   const rejectCustomerRequestKitchen = useCallback(
     async (requestId, unavailableItems = [], reason = "") => {
+      // Fetch the request so we know which table to reset
+      const request = customerRequests.find((r) => r.id === requestId);
+
       const { data, error } = await supabase
         .from("customer_requests")
         .update({
@@ -813,6 +816,33 @@ export function POSProvider({ children }) {
           unavailable_items: unavailableItems,
           rejection_reason: reason,
         })
+        .eq("id", requestId)
+        .select()
+        .single();
+
+      // Reset the table back to EMPTY so it doesn't stay stuck as REQUEST
+      if (!error && request?.table_number) {
+        await supabase
+          .from("restaurant_tables")
+          .update({ status: "EMPTY" })
+          .eq("table_number", request.table_number);
+      }
+
+      if (!error) await Promise.all([refetchCustomerRequests(), refetchTables()]);
+      return { data, error };
+    },
+    [customerRequests, refetchCustomerRequests, refetchTables],
+  );
+
+  /**
+   * Customer cancels an UNAVAILABLE request so they can freely modify and resubmit.
+   * Called when the customer clicks "Modify My Order" on the unavailable alert.
+   */
+  const cancelCustomerRequest = useCallback(
+    async (requestId) => {
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({ status: "CANCELLED" })
         .eq("id", requestId)
         .select()
         .single();
@@ -976,16 +1006,10 @@ export function POSProvider({ children }) {
         .eq("id", orderId);
       if (error) console.error("Failed to update order status:", error);
 
-      // When food is served, clear any bill_out_requested flag on the table
-      // and update all order_items to SERVED status
+      // When food is served, update all order_items to SERVED status.
+      // NOTE: Do NOT reset bill_out_requested here — that is only cleared
+      // by billOutTable when the cashier actually processes payment.
       if (status === "SERVED" || status === "COMPLETED") {
-        const order = orders.find((o) => o.id === orderId);
-        if (order && order.table_number) {
-          await supabase
-            .from("restaurant_tables")
-            .update({ bill_out_requested: false })
-            .eq("table_number", order.table_number);
-        }
         await supabase
           .from("order_items")
           .update({ status: "SERVED" })
@@ -993,9 +1017,49 @@ export function POSProvider({ children }) {
           .neq("status", "CANCELLED");
       }
 
+      // When an order is cancelled, check if any other active orders remain for the table.
+      // If not, reset the table back to EMPTY and cancel any lingering customer requests.
+      if (status === "CANCELLED") {
+        const order = orders.find((o) => o.id === orderId);
+        if (order && order.table_number) {
+          const siblingsActive = orders.some(
+            (o) =>
+              o.id !== orderId &&
+              o.table_number === order.table_number &&
+              o.status !== "COMPLETED" &&
+              o.status !== "CANCELLED",
+          );
+          if (!siblingsActive) {
+            await supabase
+              .from("restaurant_tables")
+              .update({
+                status: "EMPTY",
+                current_bill: 0,
+                total_bill: 0,
+                pwd_discount: false,
+                senior_discount: false,
+                percent_discount: 0,
+                float_discount: 0,
+                occupied_since: null,
+                reserved_since: null,
+                bill_out_requested: false,
+              })
+              .eq("table_number", order.table_number);
+            // Also cancel any pending customer requests for this table
+            await supabase
+              .from("customer_requests")
+              .update({ status: "CANCELLED" })
+              .eq("table_number", order.table_number)
+              .not("status", "in", '("ACCEPTED","CANCELLED","COMPLETED")');
+            await refetchCustomerRequests();
+          }
+        }
+        await refetchTables();
+      }
+
       await refetchOrders();
     },
-    [refetchOrders, orders],
+    [refetchOrders, refetchTables, refetchCustomerRequests, orders],
   );
 
   /** Updates the lifecycle status of a specific item within an order. */
@@ -1064,6 +1128,7 @@ export function POSProvider({ children }) {
           float_discount: 0,
           occupied_since: null,
           reserved_since: null,
+          bill_out_requested: false,
         })
         .eq("table_number", tableNumber);
         
@@ -1429,6 +1494,7 @@ export function POSProvider({ children }) {
         addRecipeIngredient,
         removeRecipeIngredient,
         createCustomerRequest,
+        cancelCustomerRequest,
         acceptCustomerRequest,
         forwardCustomerRequestToCashier,
         rejectCustomerRequestKitchen,

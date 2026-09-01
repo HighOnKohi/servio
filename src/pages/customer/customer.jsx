@@ -155,6 +155,7 @@ export default function Customer() {
     categories: dbCategories,
     customerRequests,
     createCustomerRequest,
+    cancelCustomerRequest,
     requestTableBillOut,
     formatPrice,
     loading,
@@ -230,8 +231,9 @@ export default function Customer() {
   const hasUnavailableRequest = !!activeRequest && activeRequest.status === 'UNAVAILABLE';
 
   // ── Check if food is served (table has orders in SERVED/COMPLETED state) ──
+  // Only consider non-cancelled orders; a stale CANCELLED row must not block the button.
   const tableOrders = safeOrders.filter(
-    (o) => o.table_number === parsedTableId,
+    (o) => o.table_number === parsedTableId && o.status !== 'CANCELLED',
   );
   const hasServedOrders = tableOrders.length > 0 && tableOrders.every(
     (o) => o.status === 'SERVED' || o.status === 'COMPLETED',
@@ -260,8 +262,9 @@ export default function Customer() {
   }
 
   // When customer modifies order after unavailable alert:
-  // remove the flagged items from cart and clear the unavailable set
-  function handleModifyAfterUnavailable() {
+  // cancel the UNAVAILABLE request in DB (which hides the modal),
+  // restore the available items into the cart, and mark unavailable ones.
+  async function handleModifyAfterUnavailable() {
     if (!activeRequest) return;
     const unavailableIds = new Set(
       (Array.isArray(activeRequest.unavailable_items) ? activeRequest.unavailable_items : []).map(
@@ -281,6 +284,8 @@ export default function Customer() {
       }));
     setCart(restoredCart);
     setUnavailableItemIds(unavailableIds);
+    // Cancel the UNAVAILABLE request in DB so the modal dismisses
+    await cancelCustomerRequest(activeRequest.id);
   }
 
   async function submitRequest() {
