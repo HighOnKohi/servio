@@ -99,7 +99,7 @@ function CustomerQrCodeModal({ tables, onClose }) {
 }
 
 const TABLES_PER_PAGE = 12;
-const CUSTOMER_INTERFACE_ORIGIN = 'https://servio-pos.netlify.app';
+const CUSTOMER_INTERFACE_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 const categorySlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const menuItemSlug = (item) => item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 const menuPath = (category, item = null) => `/restaurant-management/edit-menu?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;

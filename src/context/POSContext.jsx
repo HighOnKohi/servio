@@ -224,11 +224,13 @@ export function POSProvider({ children }) {
 
   // --- Real-time Subscriptions ---
   // This useEffect sets up WebSocket connections to Supabase.
-  // Whenever data in these tables changes (e.g., from another device), 
+  // A unique channel name per session prevents conflicts when multiple tabs are open.
+  // Whenever data in these tables changes (e.g., from another device),
   // the corresponding refetch function is called to update the local state instantly.
   useEffect(() => {
+    const channelId = `pos-realtime-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel("pos-realtime")
+      .channel(channelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
@@ -251,8 +253,18 @@ export function POSProvider({ children }) {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "categories" },
+        () => refetchCategories(),
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "ingredients" },
         () => refetchIngredients(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "recipe_ingredients" },
+        () => refetchRecipeIngredients(),
       )
       .on(
         "postgres_changes",
@@ -260,17 +272,29 @@ export function POSProvider({ children }) {
         () => refetchCustomerRequests(),
       )
       .subscribe();
-      
+
+    // Polling fallback — syncs the most critical order/table data every 8 seconds
+    // in case the WebSocket connection is disrupted or a change event is missed.
+    const pollInterval = setInterval(() => {
+      refetchOrders();
+      refetchOrderItems();
+      refetchTables();
+      refetchCustomerRequests();
+    }, 8000);
+
     // Cleanup function to close the connection when the component unmounts
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [
     refetchOrders,
     refetchOrderItems,
     refetchTables,
     refetchMenu,
+    refetchCategories,
     refetchIngredients,
+    refetchRecipeIngredients,
     refetchCustomerRequests,
   ]);
 
