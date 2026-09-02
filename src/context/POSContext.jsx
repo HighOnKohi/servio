@@ -53,19 +53,6 @@ const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
   };
 };
 
-// Example inside Cashier when applying discount
-const applyDiscount = async (orderId, discountValue) => {
-  const { error } = await supabase
-    .from('orders')
-    .update({ discount: discountValue })
-    .eq('id', orderId);
-
-  if (!error) {
-    // Crucial: Refresh orders globally so Waiter gets updated instantly
-    await fetchOrders();
-  }
-};
-
 const buildOrderItemDiscountPayload = (itemRow = {}) => {
   const itemSubtotal = parseFloat(((Number(itemRow.price) || 0) * (Number(itemRow.quantity) || 0)).toFixed(2));
   const discountState = computeDiscountedTableTotal(itemSubtotal, {
