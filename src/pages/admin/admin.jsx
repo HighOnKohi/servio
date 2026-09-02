@@ -624,76 +624,175 @@ const Admin = () => {
           <div style={labelStyle}>Menu Items</div>
           <div style={valueStyle}>{menuItems.length}</div>
           <div style={mutedStyle}>{categories.length} categories</div>
-        </nav>
-
-        {/* Bottom */}
-        <div style={{ padding: "12px 10px", borderTop: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 4 }}>
-          <button onClick={() => setShowRegisterModal(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: 10, border: "none", background: "#059669", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", marginBottom: 6 }}>
-            + Register Staff
-          </button>
-          <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 10, border: "none", background: "transparent", color: "#94a3b8", fontSize: "0.82rem", fontWeight: 500, cursor: "pointer", width: "100%" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg>
-            Back to Hub
-          </button>
-          <button onClick={handleLogout} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 10, border: "none", background: "transparent", color: "#ef4444", fontSize: "0.82rem", fontWeight: 500, cursor: "pointer", width: "100%" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
-            Logout
-          </button>
         </div>
-      </aside>
+      </div>
 
-      {/* ── Main Content ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, background: "#f8fafc" }}>
+      {/* ── Stats Row 2 ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, padding: "16px 24px 20px", flexShrink: 0 }}>
+        <div style={{ ...cardStyle, background: lowStock.length > 0 ? "#fff7ed" : "#ffffff", borderColor: lowStock.length > 0 ? "#fdba74" : "#e2e8f0" }}>
+          <div style={labelStyle}>Low Stock Alerts</div>
+          <div style={{ ...valueStyle, color: lowStock.length > 0 ? "#c2410c" : "#16a34a" }}>{lowStock.length}</div>
+          {lowStock.length > 0 && (
+            <div style={{ ...mutedStyle, color: "#9a3412" }}>
+              {lowStock.slice(0, 3).map((i) => i.name).join(", ")}
+              {lowStock.length > 3 ? ` +${lowStock.length - 3} more` : ""}
+            </div>
+          )}
+        </div>
+        <div style={cardStyle}>
+          <div style={labelStyle}>Ingredients</div>
+          <div style={valueStyle}>{ingredients.length}</div>
+        </div>
+        <div style={cardStyle}>
+          <div style={labelStyle}>Staff Profiles</div>
+          <div style={valueStyle}>{profiles.length}</div>
+        </div>
+      </div>
 
-        {/* Top Bar */}
-        <header style={{ height: 60, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", background: "#fff", borderBottom: "1px solid #e2e8f0", gap: 16 }}>
-          <div style={{ flex: 1, maxWidth: 360, position: "relative" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            <input type="text" placeholder="Search orders, tables, staff…" style={{ width: "100%", height: 38, paddingLeft: 36, paddingRight: 14, border: "1px solid #e2e8f0", borderRadius: 999, background: "#f8fafc", fontSize: "0.82rem", color: "#0f172a", outline: "none" }} />
+      {/* ── Main Grid ── */}
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr", gap: 16, padding: "0 24px 24px", overflow: "hidden" }}>
+
+        {/* Recent Orders */}
+        <div style={sectionStyle}>
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: "0 0 12px", color: "#111827" }}>Recent Orders</h2>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                <th style={tableHeadingStyle}>Order</th>
+                <th style={tableHeadingStyle}>Table</th>
+                <th style={tableHeadingStyle}>Server</th>
+                <th style={tableHeadingStyle}>Total</th>
+                <th style={tableHeadingStyle}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.slice(0, 15).map((order) => {
+                const sc = { COMPLETED: "#16a34a", CANCELLED: "#dc2626", PENDING: "#ca8a04", IN_PROGRESS: "#2563eb", READY: "#7c3aed" }[order.status] || "#475569";
+                return (
+                  <tr key={order.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "8px 10px", fontWeight: 500 }}>#{order.id.slice(0, 6)}</td>
+                    <td style={{ padding: "8px 10px", color: "#64748b" }}>{order.table_number || "-"}</td>
+                    <td style={{ padding: "8px 10px", color: "#64748b" }}>{order.server_name || "-"}</td>
+                    <td style={{ padding: "8px 10px" }}>₱{Number(order.total).toFixed(2)}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 600, color: sc, background: `${sc}18` }}>
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {orders.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>No orders yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Staff Profiles */}
+        <div style={{ ...sectionStyle, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: 0, color: "#111827" }}>Staff Profiles</h2>
+            <button
+              onClick={() => setShowRegisterModal(true)}
+              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}
+            >
+              + Register Staff
+            </button>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: "0.75rem", color: "#94a3b8", marginRight: 4 }}>{date}, {time}</span>
-            {[
-              { icon: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>, dot: true },
-              showToast = { showToast }
-              />
+
+          {profiles.length === 0 ? (
+            <p style={{ color: "#94a3b8", fontSize: "0.85rem" }}>No profiles found.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", flex: 1 }}>
+              {profiles.map((p) => (
+                <div
+                  key={p.id}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10 }}
+                >
+                  {/* Avatar */}
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: roleColor[p.role] || "#e2e8f0", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.82rem", flexShrink: 0 }}>
+                    {(p.full_name || "?")[0].toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, fontSize: "0.84rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.full_name}</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: roleColor[p.role] || "#64748b", background: `${roleColor[p.role] || "#64748b"}18`, padding: "1px 6px", borderRadius: 20 }}>
+                        {p.role}
+                      </span>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: statusColor[p.status] || "#64748b", background: `${statusColor[p.status] || "#64748b"}18`, padding: "1px 6px", borderRadius: 20 }}>
+                        {p.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <button
+                      onClick={() => setEditingProfile(p)}
+                      title="Edit"
+                      style={{ background: "none", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: "0.75rem", color: "#374151" }}
+                    >
+                      <span className="ms" style={{ fontSize: 16 }}>edit</span>
+                    </button>
+                    <button
+                      onClick={() => setDeletingProfile(p)}
+                      title="Remove"
+                      style={{ background: "none", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: "0.75rem", color: "#dc2626" }}
+                    >
+                      <span className="ms" style={{ fontSize: 16 }}>delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Protocol Management */}
+        <ProtocolManagementPanel
+          onShowUpload={() => setShowUploadModal(true)}
+          showToast={showToast}
+        />
       </div>
 
-          {/* ── Modals ── */}
-          {showRegisterModal && (
-            <RegisterStaffModal
-              onClose={() => setShowRegisterModal(false)}
-              onSuccess={handleRegistrationSuccess}
-            />
-          )}
-          {editingProfile && (
-            <EditStaffModal
-              profile={editingProfile}
-              onClose={() => setEditingProfile(null)}
-              onSave={handleEditSave}
-            />
-          )}
-          {deletingProfile && (
-            <DeleteConfirmModal
-              profile={deletingProfile}
-              onClose={() => setDeletingProfile(null)}
-              onConfirm={handleDeleteConfirm}
-            />
-          )}
-          {showUploadModal && (
-            <ProtocolUploadModal
-              onClose={() => setShowUploadModal(false)}
-              onSuccess={handleUploadSuccess}
-            />
-          )}
-          {showResetRevenueModal && (
-            <ResetRevenueConfirmModal
-              onClose={() => setShowResetRevenueModal(false)}
-              onConfirm={handleRevenueReset}
-            />
-          )}
-      </div>
-      );
+      {/* ── Modals ── */}
+      {showRegisterModal && (
+        <RegisterStaffModal
+          onClose={() => setShowRegisterModal(false)}
+          onSuccess={handleRegistrationSuccess}
+        />
+      )}
+      {editingProfile && (
+        <EditStaffModal
+          profile={editingProfile}
+          onClose={() => setEditingProfile(null)}
+          onSave={handleEditSave}
+        />
+      )}
+      {deletingProfile && (
+        <DeleteConfirmModal
+          profile={deletingProfile}
+          onClose={() => setDeletingProfile(null)}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
+      {showUploadModal && (
+        <ProtocolUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
+      {showResetRevenueModal && (
+        <ResetRevenueConfirmModal
+          onClose={() => setShowResetRevenueModal(false)}
+          onConfirm={handleRevenueReset}
+        />
+      )}
+    </div>
+  );
 };
 
-      export default Admin;
+export default Admin;
