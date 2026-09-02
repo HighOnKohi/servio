@@ -1,3 +1,11 @@
+.waiter-app {
+    --cashier-ink: #0f172a;
+    --cashier-muted: #5f6f86;
+    --cashier-line: #d6deea;
+    --cashier-soft: #eef2f7;
+    --cashier-panel: #f8fbff;
+}
+
 .waiter-app .tab-group {
     padding-left: 16px;
 }
@@ -26,12 +34,176 @@
     background: var(--cashier-soft);
 }
 
+.waiter-app .menu-category-sidebar {
+    width: 220px;
+    flex: 0 0 220px;
+    margin-left: 0;
+    padding: 40px 16px 20px;
+    border-right: 1px solid var(--cashier-line);
+    background: #e7edf4;
+}
+
+.waiter-app .menu-category-label {
+    margin: 0 0 12px;
+    color: #9ca3af;
+    font-size: .75rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.waiter-app .menu-category-button {
+    width: 100%;
+    display: block;
+    border: 0;
+    border-radius: 8px;
+    padding: 12px;
+    background: transparent;
+    color: #374151;
+    font: inherit;
+    font-size: 1rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.waiter-app .menu-category-button:hover {
+    background: #f8fafc;
+}
+
+.waiter-app .menu-category-button.active {
+    background: var(--cashier-ink);
+    color: #fff;
+    font-weight: 600;
+}
+
 .waiter-app .menu-catalog {
     min-width: 0;
     min-height: 0;
     flex: 1;
     display: flex;
     flex-direction: column;
+}
+
+.waiter-app .menu-search-row {
+    display: flex;
+    align-items: center;
+    padding: 18px;
+    background: var(--cashier-panel);
+    border-bottom: 1px solid var(--cashier-line);
+    flex-shrink: 0;
+}
+
+.waiter-app .menu-search-field {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.waiter-app .menu-search-input {
+    width: 100%;
+    height: 55px;
+    padding: 14px 18px;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    background: #f8fafb;
+    color: var(--cashier-ink);
+    font: inherit;
+    font-size: 1rem;
+}
+
+.waiter-app .menu-search-input::placeholder {
+    color: #64748b;
+    opacity: 1;
+}
+
+.waiter-app .menu-search-input:focus {
+    outline: none;
+    border-color: #94a3b8;
+}
+
+.waiter-app .menu-keyword-dropdown {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+}
+
+.waiter-app .menu-keyword-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    text-align: left;
+    cursor: pointer;
+}
+
+.waiter-app .menu-keyword-option:hover {
+    background: #f8fafc;
+}
+
+.waiter-app .menu-keyword-image {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #94a3b8;
+}
+
+.waiter-app .menu-keyword-image svg {
+    width: 25px;
+    height: 25px;
+}
+
+.waiter-app .menu-keyword-details {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.waiter-app .menu-keyword-details strong {
+    overflow: hidden;
+    font-size: .95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.waiter-app .menu-keyword-details small {
+    color: #64748b;
+    font-size: .82rem;
+}
+
+.waiter-app .menu-catalog-heading {
+    padding: 22px 16px 20px;
+}
+
+.waiter-app .menu-catalog-heading h1 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.waiter-app .menu-catalog-heading p {
+    margin: 4px 0 0;
+    color: #9ca3af;
+    font-size: .9rem;
 }
 
 .waiter-app .menu-item-grid {
@@ -43,6 +215,150 @@
     grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: 18px 16px;
     padding: 0 16px 12px;
+}
+
+.waiter-app .menu-item-card {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--cashier-line);
+    overflow: hidden;
+    border-radius: 10px;
+    padding: 0;
+    background: #fff;
+    color: var(--cashier-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.waiter-app .menu-item-card:hover {
+    transform: translateY(-2px);
+    border-color: #94a3b8;
+    box-shadow: 0 7px 16px rgba(15, 23, 42, .08);
+}
+
+.waiter-app .menu-item-image {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    border-radius: 0;
+    background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+    color: #94a3b8;
+}
+
+.waiter-app .menu-item-image svg {
+    width: 45px;
+    height: 45px;
+}
+
+.waiter-app .menu-item-name {
+    flex: 0 0 auto;
+    margin: 14px 14px 0;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -.015em;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.waiter-app .menu-item-bottom {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 6px 14px 14px;
+}
+
+.waiter-app .menu-item-price {
+    color: #334155;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+}
+
+.waiter-app .menu-item-add {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 50%;
+    background: #111827;
+    color: transparent;
+    font-size: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .2);
+    align-items: center;
+    justify-content: center;
+}
+
+.waiter-app .menu-item-add::before,
+.waiter-app .menu-item-add::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 2px;
+    border-radius: 1px;
+    background: #fff;
+    content: '';
+    transform: translate(-50%, -50%);
+}
+
+.waiter-app .menu-item-add::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.waiter-app .menu-item-card:hover .menu-item-add {
+    background: #000;
+}
+
+.waiter-app .menu-pagination {
+    height: 67px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0;
+    padding: 12px 16px;
+    border-top: 1px solid #f3f4f6;
+    background: #fff;
+    color: #94a3b8;
+    font-size: .9rem;
+}
+
+.waiter-app .pagination-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.waiter-app .pagination-actions button {
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    cursor: pointer;
+}
+
+.waiter-app .pagination-actions button:disabled {
+    color: #cbd5e1;
+    opacity: .55;
+    cursor: default;
+}
+
+.waiter-app .pagination-actions>span {
+    padding: 0 6px;
 }
 
 /* ── Right Sidebar Alignment ── */
@@ -62,4 +378,398 @@
     background: #e7edf4;
     box-shadow: none;
     padding: 16px;
+}
+
+.waiter-app .sidebar-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #d7e0ec;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.waiter-app .bill-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -.015em;
+}
+
+.waiter-app .bill-subtitle {
+    margin-top: 4px;
+    color: var(--cashier-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.waiter-app .bill-selection-controls {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.waiter-app .table-switcher {
+    position: relative;
+}
+
+.waiter-app .table-switcher-button {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--cashier-line);
+    border-radius: 7px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+}
+
+.waiter-app .table-switcher-button:hover,
+.waiter-app .table-switcher-button[aria-expanded="true"] {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #111827;
+}
+
+.waiter-app .table-switcher-button svg {
+    width: 15px;
+    height: 15px;
+}
+
+.waiter-app .table-switcher-dropdown {
+    position: absolute;
+    z-index: 25;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 280px;
+    overflow: hidden;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+}
+
+.waiter-app .table-switcher-dropdown>p {
+    margin: 0;
+    padding: 10px 12px 7px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.waiter-app .table-switcher-options {
+    max-height: 235px;
+    overflow-y: auto;
+    padding: 0 5px 5px;
+}
+
+.waiter-app .table-switcher-options button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-radius: 6px;
+    padding: 9px 8px;
+    background: #fff;
+    color: #111827;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.waiter-app .table-switcher-options button:hover {
+    background: #f8fafc;
+}
+
+.waiter-app .table-switcher-options button.selected {
+    background: #eef2ff;
+    color: #1e3a8a;
+}
+
+.waiter-app .table-switcher-options small {
+    color: #64748b;
+    font-size: 10px;
+}
+
+.waiter-app .items-list {
+    flex: 1;
+    min-height: 180px;
+    overflow: auto;
+    margin-top: 12px;
+    padding: 8px;
+    border: 1px solid #d7e0ec;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.58);
+}
+
+.waiter-app .empty-items {
+    display: grid;
+    min-height: 145px;
+    place-items: center;
+    color: #94a3b8;
+    font-size: 13px;
+    text-align: center;
+}
+
+.waiter-app .item-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.waiter-app .item-row.pending {
+    margin-bottom: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.waiter-app .item-row.pending:last-child {
+    margin-bottom: 0;
+}
+
+.waiter-app .item-content {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.waiter-app .item-name {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 12px;
+    align-items: center;
+    column-gap: 6px;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.waiter-app .item-note {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.waiter-app .item-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
+.waiter-app .item-remove {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--cashier-line);
+    border-radius: 6px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.waiter-app .item-remove:hover {
+    border-color: #fecaca;
+    background: #fff1f2;
+    color: #dc2626;
+}
+
+.waiter-app .summary {
+    margin: 12px 0 0;
+    padding: 14px 12px;
+    border: 1px solid #d7e0ec;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.waiter-app .summary-row,
+.waiter-app .summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.waiter-app .summary-row {
+    margin-bottom: 9px;
+    color: var(--cashier-muted);
+    font-size: 13px;
+}
+
+.waiter-app .summary-total {
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 16px;
+    font-weight: 750;
+    color: #111827;
+}
+
+.waiter-app .sidebar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 0 0;
+}
+
+.waiter-app .sidebar-actions button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.waiter-app .clear-button {
+    border: 1px solid var(--cashier-line);
+    background: #fff;
+    color: var(--cashier-ink);
+}
+
+.waiter-app .punch-order-button {
+    border: 1px solid var(--cashier-ink);
+    background: var(--cashier-ink);
+    color: #fff;
+}
+
+.waiter-app .sidebar-actions button:hover {
+    filter: brightness(.96);
+}
+
+.waiter-app .sidebar-actions button:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+    filter: none;
+}
+
+.waiter-app .button-icon {
+    display: inline-flex;
+}
+
+.waiter-app .button-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.waiter-app .clear-button .button-icon svg {
+    fill: currentColor;
+}
+
+.waiter-app .punch-order-button .button-icon svg {
+    fill: currentColor;
+}
+
+/* ── Modal Styling ── */
+
+.waiter-app .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .42);
+}
+
+.waiter-app .modal {
+    width: min(440px, 100%);
+    padding: 24px;
+    border: 1px solid var(--cashier-line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+
+.waiter-app .modal-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.waiter-app .modal-kicker {
+    margin: 0 0 6px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .09em;
+}
+
+.waiter-app .modal h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 20px;
+    letter-spacing: -.02em;
+}
+
+.waiter-app .modal-description {
+    margin: 10px 0 20px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.waiter-app .modal-description strong {
+    color: #111827;
+}
+
+.waiter-app .modal-icon-close {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 7px;
+    background: #f8fafc;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 21px;
+    line-height: 1;
+}
+
+.waiter-app .modal-icon-close:hover {
+    background: #e2e8f0;
+    color: #111827;
+}
+
+.waiter-app .modal-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.waiter-app .modal-actions button {
+    flex: 1;
+    border: 1px solid var(--cashier-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--cashier-ink);
+    padding: 11px 13px;
+    cursor: pointer;
+}
+
+.waiter-app .modal-print {
+    background: var(--cashier-ink) !important;
+    border-color: var(--cashier-ink) !important;
+    color: #fff !important;
 }
