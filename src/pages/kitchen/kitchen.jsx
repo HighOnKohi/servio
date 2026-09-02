@@ -229,10 +229,10 @@ function Kitchen() {
   const [processingIds, setProcessingIds] = useState(new Set());
   // Blink state for tabs when new items arrive
   const [pendingTabBlink, setPendingTabBlink] = useState(false);
-  const [ordersTabBlink, setOrdersTabBlink]   = useState(false);
-  const prevPendingRef   = useRef(0);
-  const prevOrdersRef    = useRef(0);
-  const interfaceCanvas  = useFixedInterfaceCanvas();
+  const [ordersTabBlink, setOrdersTabBlink] = useState(false);
+  const prevPendingRef = useRef(0);
+  const prevOrdersRef = useRef(0);
+  const interfaceCanvas = useFixedInterfaceCanvas();
 
   // Sync tab to URL path on mount
   const viewFromPath = location.pathname.split('/').filter(Boolean).at(-1);
@@ -345,9 +345,9 @@ function Kitchen() {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0e131f', color: '#fff', fontSize: '1.2rem', fontFamily: "'Inter', sans-serif" }}>Loading…</div>;
   }
 
-  const newTickets       = pagedTickets.filter((t) => t.status === 'ACTIVE' && Math.floor((currentTime - new Date(t.createdAt).getTime()) / 60000) < 5);
+  const newTickets = pagedTickets.filter((t) => t.status === 'ACTIVE' && Math.floor((currentTime - new Date(t.createdAt).getTime()) / 60000) < 5);
   const preparingTickets = pagedTickets.filter((t) => t.status === 'ACTIVE' && Math.floor((currentTime - new Date(t.createdAt).getTime()) / 60000) >= 5);
-  const readyTickets     = pagedTickets.filter((t) => t.status === 'COMPLETED');
+  const readyTickets = pagedTickets.filter((t) => t.status === 'COMPLETED');
 
   return (
     <div className="kitchen-app" style={{ '--kitchen-scale': interfaceCanvas.scale, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height, display: 'flex', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -361,7 +361,7 @@ function Kitchen() {
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 18px 16px', borderBottom: '1px solid #1f2937' }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
           </div>
           <div>
             <strong style={{ display: 'block', fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>BistroAdmin</strong>
@@ -371,14 +371,14 @@ function Kitchen() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {[
-            { label: 'Dashboard',    active: false, icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
-            { label: 'Live Orders',  active: true,  icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
-            { label: 'Table Map',    active: false, icon: 'M2 3h20v5H2zM2 10h20v5H2zM2 17h20v5H2z' },
-            { label: 'Menu Editor',  active: false, icon: 'M3 11l19-9-9 19-2-8-8-2z' },
-            { label: 'Staff',        active: false, icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
+            { label: 'Dashboard', active: false, icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+            { label: 'Live Orders', active: true, icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
+            { label: 'Table Map', active: false, icon: 'M2 3h20v5H2zM2 10h20v5H2zM2 17h20v5H2z' },
+            { label: 'Menu Editor', active: false, icon: 'M3 11l19-9-9 19-2-8-8-2z' },
+            { label: 'Staff', active: false, icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
           ].map((item) => (
             <button key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: 'none', background: item.active ? '#059669' : 'transparent', color: item.active ? '#fff' : '#94a3b8', fontSize: '0.875rem', fontWeight: item.active ? 600 : 500, cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path d={item.icon}/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path d={item.icon} /></svg>
               {item.label}
               {item.label === 'Live Orders' && visibleTickets.length > 0 && <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 999 }}>{visibleTickets.length}</span>}
             </button>
@@ -390,7 +390,7 @@ function Kitchen() {
             Manage Stock
           </button>
           <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '0.82rem', cursor: 'pointer', width: '100%' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg>
             Switch Station
           </button>
         </div>
@@ -404,8 +404,8 @@ function Kitchen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Sub-tabs */}
             {[
-              { key: 'active-orders',        label: 'Orders',      count: visibleTickets.length },
-              { key: 'pending-verification', label: 'Pending',     count: pendingRequests.length },
+              { key: 'active-orders', label: 'Orders', count: visibleTickets.length },
+              { key: 'pending-verification', label: 'Pending', count: pendingRequests.length },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -422,7 +422,7 @@ function Kitchen() {
               {new Date(currentTime).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}, {new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
             </span>
             <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', height: 36, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg>
               Back to Hub
             </button>
           </div>
@@ -440,7 +440,7 @@ function Kitchen() {
                 <button key={f.label} style={{ padding: '5px 14px', borderRadius: 999, border: '1px solid', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', background: f.active ? '#0f172a' : 'transparent', color: f.active ? '#fff' : '#64748b', borderColor: f.active ? '#0f172a' : '#e2e8f0' }}>{f.label}</button>
               ))}
               <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', height: 34, borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 New Order
               </button>
             </div>
@@ -482,11 +482,11 @@ function Kitchen() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '10px 12px', borderTop: '1px solid #fde68a', background: '#fffbeb' }}>
                         <button onClick={() => setUnavailableTarget(request)} disabled={isProcessing} style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8"/><circle cx="12" cy="12" r="9"/></svg>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>
                           Item Unavailable
                         </button>
                         <button onClick={() => handleForwardToCashier(request.id)} disabled={isProcessing} style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, border: '1px solid #111827', background: '#111827', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6"/></svg>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
                           {isProcessing ? 'Forwarding…' : 'Confirm & Forward'}
                         </button>
                       </div>
@@ -540,11 +540,11 @@ function Kitchen() {
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '8px 10px', borderTop: '1px solid #f1f5f9' }}>
                             <button onClick={() => setCancelTarget(ticket)} disabled={isProcessing} style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 7, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8"/><circle cx="12" cy="12" r="9"/></svg>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>
                               Cancel
                             </button>
                             <button onClick={() => handleComplete(ticket.id)} disabled={isProcessing} style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 7, border: 'none', background: '#0f172a', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6"/></svg>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
                               {isProcessing ? 'Saving…' : 'Complete'}
                             </button>
                           </div>
@@ -593,11 +593,11 @@ function Kitchen() {
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '8px 10px', borderTop: '1px solid #f1f5f9' }}>
                             <button onClick={() => setCancelTarget(ticket)} disabled={isProcessing} style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 7, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8"/><circle cx="12" cy="12" r="9"/></svg>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>
                               Cancel
                             </button>
                             <button onClick={() => handleComplete(ticket.id)} disabled={isProcessing} style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 7, border: 'none', background: '#0f172a', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6"/></svg>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
                               {isProcessing ? 'Saving…' : 'Complete'}
                             </button>
                           </div>
