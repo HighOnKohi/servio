@@ -423,3 +423,179 @@
   .rmc51, .rmc52 { width: 32px; height: 32px; font-size: 18px; }
   .rmc81 { border: 0; background: transparent; font-size: 1rem; }
 }
+
+/* ─── Table Management Card — Pax Badge ──────────────────────────────────── */
+.table-management-pax {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .7rem;
+  font-weight: 600;
+  color: #475569;
+  margin-top: 4px;
+  opacity: .85;
+}
+
+.table-management-card {
+  cursor: pointer;
+  transition: transform .14s, box-shadow .14s;
+}
+
+.table-management-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15,23,42,.12);
+}
+
+/* ─── Edit Table Modal ───────────────────────────────────────────────────── */
+.edit-table-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.edit-table-modal {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.22);
+  overflow: hidden;
+  animation: etm-in .22s ease;
+}
+
+@keyframes etm-in {
+  from { opacity:0; transform:scale(.93) translateY(12px); }
+  to   { opacity:1; transform:none; }
+}
+
+.edit-table-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.edit-table-modal-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.edit-table-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 0;
+  background: #f1f5f9;
+  color: #374151;
+  font-size: 1.15rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.edit-table-form {
+  padding: 18px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.edit-table-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-table-form-row label {
+  font-size: .78rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.edit-table-form-row select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: .9rem;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+
+.edit-table-form-row select:focus { border-color: #0f172a; }
+
+.edit-table-capacity-control {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.edit-table-capacity-control button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: #f8fafc;
+  color: #374151;
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.edit-table-capacity-control button:hover { background: #e2e8f0; }
+
+.edit-table-capacity-control input {
+  flex: 1;
+  border: 0;
+  text-align: center;
+  font-size: .95rem;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+.edit-table-form-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.edit-table-btn {
+  flex: 1;
+  height: 42px;
+  border-radius: 8px;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-table-btn.secondary {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #374151;
+}
+
+.edit-table-btn.primary {
+  border: 0;
+  background: #0f172a;
+  color: #fff;
+}
+
+.edit-table-btn:disabled { opacity: .55; cursor: default; }
+

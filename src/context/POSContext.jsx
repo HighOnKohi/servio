@@ -273,13 +273,15 @@ export function POSProvider({ children }) {
       )
       .subscribe();
 
-    // Polling fallback — syncs the most critical order/table data every 8 seconds
+    // Polling fallback — syncs the most critical data every 8 seconds
     // in case the WebSocket connection is disrupted or a change event is missed.
+    // menu_items is included so sold-out status propagates on devices where WS drops.
     const pollInterval = setInterval(() => {
       refetchOrders();
       refetchOrderItems();
       refetchTables();
       refetchCustomerRequests();
+      refetchMenu();
     }, 8000);
 
     // Cleanup function to close the connection when the component unmounts
@@ -539,6 +541,7 @@ export function POSProvider({ children }) {
         .from("customer_requests")
         .insert({
           table_number: tableNumber,
+          status: "PENDING_KITCHEN",
           subtotal,
           items: normalizedItems,
         })
@@ -784,6 +787,157 @@ export function POSProvider({ children }) {
     [customerRequests, orders, addItemsToOrder, createOrder, refetchCustomerRequests],
   );
 
+  /** Kitchen confirms stock is available and forwards the customer request to the cashier. */
+  const forwardCustomerRequestToCashier = useCallback(
+    async (requestId) => {
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({ status: "PENDING_CASHIER" })
+        .eq("id", requestId)
+        .select()
+        .single();
+      if (!error) await refetchCustomerRequests();
+      return { data, error };
+    },
+    [refetchCustomerRequests],
+  );
+
+  /**
+   * Kitchen marks items as unavailable and rejects the customer request.
+   * Sets unavailable_items and rejection_reason so the customer is informed.
+   */
+  const rejectCustomerRequestKitchen = useCallback(
+    async (requestId, unavailableItems = [], reason = "") => {
+      // Fetch the request so we know which table to reset
+      const request = customerRequests.find((r) => r.id === requestId);
+
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({
+          status: "UNAVAILABLE",
+          unavailable_items: unavailableItems,
+          rejection_reason: reason,
+        })
+        .eq("id", requestId)
+        .select()
+        .single();
+
+      // Mark each rejected item as SOLD OUT globally so every table sees it
+      const itemIdsToMark = unavailableItems
+        .map((item) => item.id)
+        .filter(Boolean);
+      if (!error && itemIdsToMark.length > 0) {
+        await supabase
+          .from("menu_items")
+          .update({ status: "SOLD OUT" })
+          .in("id", itemIdsToMark);
+      }
+
+      // Reset the table back to EMPTY so it doesn't stay stuck as REQUEST
+      if (!error && request?.table_number) {
+        await supabase
+          .from("restaurant_tables")
+          .update({ status: "EMPTY" })
+          .eq("table_number", request.table_number);
+      }
+
+      if (!error) {
+        await Promise.all([
+          refetchCustomerRequests(),
+          refetchTables(),
+          refetchMenu(),
+        ]);
+      }
+      return { data, error };
+    },
+    [customerRequests, refetchCustomerRequests, refetchTables, refetchMenu],
+  );
+
+  /**
+   * Customer cancels an UNAVAILABLE request so they can freely modify and resubmit.
+   * Called when the customer clicks "Modify My Order" on the unavailable alert.
+   */
+  const cancelCustomerRequest = useCallback(
+    async (requestId) => {
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({ status: "CANCELLED" })
+        .eq("id", requestId)
+        .select()
+        .single();
+      if (!error) await refetchCustomerRequests();
+      return { data, error };
+    },
+    [refetchCustomerRequests],
+  );
+
+  /**
+   * Cashier rejects a request (e.g. after Kitchen flagged items).
+   * Marks the request as REJECTED so the customer can modify and resubmit.
+   */
+  const rejectCustomerRequestCashier = useCallback(
+    async (requestId, tableNumber) => {
+      const { data, error } = await supabase
+        .from("customer_requests")
+        .update({ status: "REJECTED" })
+        .eq("id", requestId)
+        .select()
+        .single();
+
+      // Reset table to EMPTY so customer can resubmit
+      if (!error && tableNumber) {
+        await supabase
+          .from("restaurant_tables")
+          .update({ status: "EMPTY" })
+          .eq("table_number", tableNumber);
+      }
+      if (!error) await Promise.all([refetchCustomerRequests(), refetchTables()]);
+      return { data, error };
+    },
+    [refetchCustomerRequests, refetchTables],
+  );
+
+  /** Kitchen toggles a menu item between ACTIVE and SOLD OUT. */
+  const toggleMenuItemStock = useCallback(
+    async (itemId, currentStatus) => {
+      const nextStatus = currentStatus === "ACTIVE" ? "SOLD OUT" : "ACTIVE";
+      const { error } = await supabase
+        .from("menu_items")
+        .update({ status: nextStatus })
+        .eq("id", itemId);
+      if (error) console.error("Failed to toggle menu item stock:", error);
+      await refetchMenu();
+    },
+    [refetchMenu],
+  );
+
+  /** Customer requests the bill for their table after food is served. */
+  const requestTableBillOut = useCallback(
+    async (tableNumber) => {
+      const { error } = await supabase
+        .from("restaurant_tables")
+        .update({ bill_out_requested: true })
+        .eq("table_number", tableNumber);
+      if (error) console.error("Failed to set bill out request:", error);
+      await refetchTables();
+    },
+    [refetchTables],
+  );
+
+  /** Updates table details (capacity, status) from Restaurant Management. */
+  const updateTableDetails = useCallback(
+    async (tableId, updates) => {
+      const { error } = await supabase
+        .from("restaurant_tables")
+        .update(updates)
+        .eq("id", tableId);
+      if (error) console.error("Failed to update table details:", error);
+      await refetchTables();
+      return { error };
+    },
+    [refetchTables],
+  );
+
   /** Removes a single item from an active order and recalculates the bill. */
   const removeOrderItem = useCallback(
     async (orderItemId, orderId) => {
@@ -858,7 +1012,7 @@ export function POSProvider({ children }) {
     [refetchOrders, refetchOrderItems, refetchTables, orders, tables],
   );
 
-  /** Updates the lifecycle status of an entire order (e.g., PENDING -> READY). */
+  /** Updates the lifecycle status of an entire order (e.g., PENDING -> SERVED). */
   const updateOrderStatus = useCallback(
     async (orderId, status) => {
       // Optimistic local update so the UI responds immediately without waiting for the network
@@ -870,9 +1024,61 @@ export function POSProvider({ children }) {
         .update({ status })
         .eq("id", orderId);
       if (error) console.error("Failed to update order status:", error);
+
+      // When food is served, update all order_items to SERVED status.
+      // NOTE: Do NOT reset bill_out_requested here — that is only cleared
+      // by billOutTable when the cashier actually processes payment.
+      if (status === "SERVED" || status === "COMPLETED") {
+        await supabase
+          .from("order_items")
+          .update({ status: "SERVED" })
+          .eq("order_id", orderId)
+          .neq("status", "CANCELLED");
+      }
+
+      // When an order is cancelled, check if any other active orders remain for the table.
+      // If not, reset the table back to EMPTY and cancel any lingering customer requests.
+      if (status === "CANCELLED") {
+        const order = orders.find((o) => o.id === orderId);
+        if (order && order.table_number) {
+          const siblingsActive = orders.some(
+            (o) =>
+              o.id !== orderId &&
+              o.table_number === order.table_number &&
+              o.status !== "COMPLETED" &&
+              o.status !== "CANCELLED",
+          );
+          if (!siblingsActive) {
+            await supabase
+              .from("restaurant_tables")
+              .update({
+                status: "EMPTY",
+                current_bill: 0,
+                total_bill: 0,
+                pwd_discount: false,
+                senior_discount: false,
+                percent_discount: 0,
+                float_discount: 0,
+                occupied_since: null,
+                reserved_since: null,
+                bill_out_requested: false,
+              })
+              .eq("table_number", order.table_number);
+            // Also cancel any pending customer requests for this table
+            await supabase
+              .from("customer_requests")
+              .update({ status: "CANCELLED" })
+              .eq("table_number", order.table_number)
+              .not("status", "in", '("ACCEPTED","CANCELLED","COMPLETED")');
+            await refetchCustomerRequests();
+          }
+        }
+        await refetchTables();
+      }
+
       await refetchOrders();
     },
-    [refetchOrders],
+    [refetchOrders, refetchTables, refetchCustomerRequests, orders],
   );
 
   /** Updates the lifecycle status of a specific item within an order. */
@@ -941,6 +1147,7 @@ export function POSProvider({ children }) {
           float_discount: 0,
           occupied_since: null,
           reserved_since: null,
+          bill_out_requested: false,
         })
         .eq("table_number", tableNumber);
         
@@ -1306,7 +1513,14 @@ export function POSProvider({ children }) {
         addRecipeIngredient,
         removeRecipeIngredient,
         createCustomerRequest,
+        cancelCustomerRequest,
         acceptCustomerRequest,
+        forwardCustomerRequestToCashier,
+        rejectCustomerRequestKitchen,
+        rejectCustomerRequestCashier,
+        toggleMenuItemStock,
+        requestTableBillOut,
+        updateTableDetails,
         createOrder,
         addItemsToOrder,
         removeOrderItem,
