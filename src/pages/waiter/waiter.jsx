@@ -151,10 +151,23 @@ export default function Waiter() {
   const cartItemsTotal = cart.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
   const subtotal = existingItemsTotal + cartItemsTotal;
 
-  // Extract total discounts applied to orders or individual order items
+  // Extract total discounts applied to orders or individual order items with full fallbacks
   const discountAmount = useMemo(() => {
     const orderDiscounts = existingOrders.reduce((sum, order) => {
-      return sum + Number(order.discount ?? order.discount_amount ?? order.total_discount ?? 0);
+      // 1. Direct fixed discount amount on order
+      const fixedDiscount = Number(
+        order.discount ??
+        order.discount_amount ??
+        order.total_discount ??
+        order.discount_val ??
+        0
+      );
+
+      // 2. Percentage-based discount calculation on order
+      const percentRate = Number(order.discount_percentage ?? order.discount_percent ?? order.discount_rate ?? 0);
+      const calculatedPercentDiscount = percentRate > 0 ? (existingItemsTotal * (percentRate / 100)) : 0;
+
+      return sum + fixedDiscount + calculatedPercentDiscount;
     }, 0);
 
     const itemDiscounts = existingItems.reduce((sum, item) => {
@@ -162,7 +175,7 @@ export default function Waiter() {
     }, 0);
 
     return orderDiscounts + itemDiscounts;
-  }, [existingOrders, existingItems]);
+  }, [existingOrders, existingItems, existingItemsTotal]);
 
   const finalTotal = Math.max(0, subtotal - discountAmount);
 

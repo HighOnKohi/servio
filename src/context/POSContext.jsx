@@ -53,6 +53,19 @@ const computeDiscountedTableTotal = (subtotal, discounts = {}) => {
   };
 };
 
+// Example inside Cashier when applying discount
+const applyDiscount = async (orderId, discountValue) => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ discount: discountValue })
+    .eq('id', orderId);
+
+  if (!error) {
+    // Crucial: Refresh orders globally so Waiter gets updated instantly
+    await fetchOrders();
+  }
+};
+
 const buildOrderItemDiscountPayload = (itemRow = {}) => {
   const itemSubtotal = parseFloat(((Number(itemRow.price) || 0) * (Number(itemRow.quantity) || 0)).toFixed(2));
   const discountState = computeDiscountedTableTotal(itemSubtotal, {
@@ -105,7 +118,7 @@ export function POSProvider({ children }) {
   const [ingredients, setIngredients] = useState([]);
   const [recipeIngredients, setRecipeIngredients] = useState([]);
   const [customerRequests, setCustomerRequests] = useState([]);
-  
+
   // Loading state indicates whether the initial data fetch from Supabase is complete
   const [loading, setLoading] = useState(true);
 
@@ -314,17 +327,17 @@ export function POSProvider({ children }) {
       for (const item of cartItems) {
         const menuItemId = item.id || item.menu_item_id;
         if (!menuItemId) continue;
-        
+
         // Find all recipe rows associated with this menu item
         const recipes = recipeIngredients.filter(
           (ri) => ri.menu_item_id === menuItemId,
         );
-        
+
         // Loop through each ingredient required by the recipe
         for (const recipe of recipes) {
           const qty = recipe.quantity_needed * (item.quantity || 1);
           const ing = ingredients.find((i) => i.id === recipe.ingredient_id);
-          
+
           if (ing) {
             // Calculate new stock, ensuring it doesn't drop below 0
             const newStock = Math.max(0, Number(ing.stock) - qty);
@@ -611,7 +624,7 @@ export function POSProvider({ children }) {
           modifiers: i.modifiers || [],
           status: "PENDING",
         }));
-        
+
         const { error: itemErr } = await supabase
           .from("order_items")
           .insert(rows);
@@ -701,7 +714,7 @@ export function POSProvider({ children }) {
         .from("order_items")
         .select("*")
         .eq("order_id", orderId);
-        
+
       if (allItems) {
         const subtotal = allItems.reduce(
           (sum, oi) => sum + Number(oi.price) * oi.quantity,
@@ -710,7 +723,7 @@ export function POSProvider({ children }) {
         const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
         const currentBill = parseFloat(subtotal.toFixed(2));
         const total = parseFloat((subtotal + tax).toFixed(2));
-        
+
         await supabase
           .from("orders")
           .update({ subtotal, tax, total })
@@ -720,9 +733,9 @@ export function POSProvider({ children }) {
         if (order && order.table_number) {
           const tableRow = tables.find((t) => t.table_number === order.table_number) || {};
           await supabase
-          .from("restaurant_tables")
-          .update(buildTableDiscountPayload(currentBill, tableRow))
-          .eq("table_number", order.table_number);
+            .from("restaurant_tables")
+            .update(buildTableDiscountPayload(currentBill, tableRow))
+            .eq("table_number", order.table_number);
         }
       }
 
@@ -749,13 +762,13 @@ export function POSProvider({ children }) {
 
       const normalizedItems = Array.isArray(request.items)
         ? request.items.map((item) => ({
-            id: item.id || item.menu_item_id || null,
-            menu_item_id: item.id || item.menu_item_id || null,
-            name: item.name || item.item_name,
-            item_name: item.name || item.item_name,
-            price: Number(item.price) || 0,
-            quantity: Number(item.quantity) || 1,
-          }))
+          id: item.id || item.menu_item_id || null,
+          menu_item_id: item.id || item.menu_item_id || null,
+          name: item.name || item.item_name,
+          item_name: item.name || item.item_name,
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 1,
+        }))
         : [];
 
       const activeOrder = orders.find(
@@ -1119,7 +1132,7 @@ export function POSProvider({ children }) {
       if (tableOrders.length > 0) {
         const orderIds = tableOrders.map((o) => o.id);
         await supabase.from("order_items").delete().in("order_id", orderIds);
-        
+
         // Then delete the parent orders
         await supabase
           .from("orders")
@@ -1133,7 +1146,7 @@ export function POSProvider({ children }) {
         .from("customer_requests")
         .delete()
         .eq("table_number", tableNumber);
-        
+
       // Reset the physical table to make it available for the next guest
       await supabase
         .from("restaurant_tables")
@@ -1150,7 +1163,7 @@ export function POSProvider({ children }) {
           bill_out_requested: false,
         })
         .eq("table_number", tableNumber);
-        
+
       await Promise.all([refetchOrders(), refetchTables(), refetchCustomerRequests()]);
 
       // Return the completed data so the caller (Cashier) can print a receipt
@@ -1493,11 +1506,11 @@ export function POSProvider({ children }) {
         customerRequests,
         reservationData,
         loading,
-        
+
         // Constants
         CURRENCY,
         TAX_RATE,
-        
+
         // Operations
         addTable,
         removeTable,
@@ -1534,7 +1547,7 @@ export function POSProvider({ children }) {
         updateProfile,
         deleteProfile,
         reserveTable,
-        
+
         // Utility getters
         getOrdersForTable,
         getItemsForOrder,
@@ -1543,7 +1556,7 @@ export function POSProvider({ children }) {
         getLowStockIngredients,
         calculateBill,
         formatPrice,
-        
+
         // Manual refetch triggers
         refetchOrders,
         refetchOrderItems,
