@@ -140,7 +140,21 @@ export default function Waiter() {
 
   // Retrieve the local, unpunched cart for the currently selected table
   const cart = carts[selectedId] || [];
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  // Retrieve orders that have already been punched to the DB for this table.
+  const existingOrders = useMemo(() => {
+    if (!selected) return [];
+    return getOrdersForTable(selected.table_number);
+  }, [selected, getOrdersForTable, orders]);
+
+  const existingItems = useMemo(() => {
+    return existingOrders.flatMap((o) => getItemsForOrder(o.id));
+  }, [existingOrders, getItemsForOrder, orderItems]);
+
+  // Combined Subtotal Calculation (Includes both existing DB items and unpunched cart items)
+  const existingItemsTotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const cartItemsTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const subtotal = existingItemsTotal + cartItemsTotal;
 
   // Filter menu items for the product grid based on category and search query
   const visibleItems = menuItemsMapped.filter(
@@ -154,19 +168,6 @@ export default function Waiter() {
 
   const now = new Date(currentTime);
   const interfaceCanvas = useFixedInterfaceCanvas();
-
-  /** 
-   * Retrieve orders that have already been punched to the DB for this table.
-   * This allows the waiter to see what the table has already ordered.
-   */
-  const existingOrders = useMemo(() => {
-    if (!selected) return [];
-    return getOrdersForTable(selected.table_number);
-  }, [selected, getOrdersForTable, orders]);
-
-  const existingItems = useMemo(() => {
-    return existingOrders.flatMap((o) => getItemsForOrder(o.id));
-  }, [existingOrders, getItemsForOrder, orderItems]);
 
   const isTableOccupied = selected?.status === 'OCCUPIED' || cart.length > 0;
 
