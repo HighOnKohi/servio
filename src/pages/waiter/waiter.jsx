@@ -141,7 +141,7 @@ export default function Waiter() {
     return existingOrders.flatMap((o) => getItemsForOrder(o.id));
   }, [existingOrders, getItemsForOrder, orderItems]);
 
-  // --- Total Calculations ---
+  // --- Total & Discount Calculations ---
   const existingItemsTotal = existingItems.reduce((sum, item) => {
     const price = Number(item.price ?? item.unit_price ?? item.item_price ?? 0);
     const qty = Number(item.quantity ?? item.qty ?? 1);
@@ -150,6 +150,21 @@ export default function Waiter() {
 
   const cartItemsTotal = cart.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
   const subtotal = existingItemsTotal + cartItemsTotal;
+
+  // Extract total discounts applied to orders or individual order items
+  const discountAmount = useMemo(() => {
+    const orderDiscounts = existingOrders.reduce((sum, order) => {
+      return sum + Number(order.discount ?? order.discount_amount ?? order.total_discount ?? 0);
+    }, 0);
+
+    const itemDiscounts = existingItems.reduce((sum, item) => {
+      return sum + Number(item.discount ?? item.discount_amount ?? 0);
+    }, 0);
+
+    return orderDiscounts + itemDiscounts;
+  }, [existingOrders, existingItems]);
+
+  const finalTotal = Math.max(0, subtotal - discountAmount);
 
   // --- Filtering & Formatting ---
   const visibleItems = menuItemsMapped.filter(
@@ -482,11 +497,11 @@ export default function Waiter() {
             </div>
             <div className="summary-row">
               <span>Discount</span>
-              <span>-₱0.00</span>
+              <span>-{formatPrice(discountAmount)}</span>
             </div>
             <div className="summary-total">
               <span>Total</span>
-              <span>{formatPrice(subtotal)}</span>
+              <span>{formatPrice(finalTotal)}</span>
             </div>
           </div>
 
