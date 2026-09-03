@@ -70,13 +70,39 @@ function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
   );
 }
 
-function MenuImagePlaceholder() {
+function MenuImagePlaceholderSVG() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <circle cx="8.5" cy="8.5" r="1.5" />
       <path d="m4 18 5-5 3 3 3-4 5 6" />
     </svg>
+  );
+}
+
+/* ── Menu Image Display — real photo with shimmer skeleton + fallback ────── */
+function MenuImageDisplay({ src, alt }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!src || error) {
+    return (
+      <span className="customer-menu-image" aria-hidden="true">
+        <MenuImagePlaceholderSVG />
+      </span>
+    );
+  }
+
+  return (
+    <span className={`customer-menu-image customer-menu-image--photo${loaded ? ' loaded' : ''}`}>
+      <img
+        src={src}
+        alt={alt}
+        className="customer-menu-img"
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+      />
+    </span>
   );
 }
 
@@ -94,6 +120,93 @@ function PlusIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
     </svg>
+  );
+}
+
+/* ── Item Detail Modal ────────────────────────────────────────────────────── */
+function ItemDetailModal({ item, formatPrice, onClose, onAdd }) {
+  const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState('');
+
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const total = item.price * qty;
+
+  return (
+    <div className="cdetail-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} details`}>
+      <div className="cdetail-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Hero image */}
+        <div className="cdetail-hero">
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt={item.name} className="cdetail-hero-img" />
+          ) : (
+            <div className="cdetail-hero-placeholder" aria-hidden="true">
+              <MenuImagePlaceholderSVG />
+            </div>
+          )}
+          <button className="cdetail-close" onClick={onClose} aria-label="Close" type="button">×</button>
+        </div>
+
+        {/* Body */}
+        <div className="cdetail-body">
+          <div className="cdetail-meta">
+            <h2 className="cdetail-name">{item.name}</h2>
+            <span className="cdetail-price">{formatPrice(item.price)}</span>
+          </div>
+
+          {item.description && (
+            <p className="cdetail-desc">{item.description}</p>
+          )}
+
+          {/* Quantity stepper */}
+          <div className="cdetail-qty-row" role="group" aria-label="Quantity selector">
+            <button
+              className="cdetail-qty-btn"
+              onClick={() => setQty((q) => Math.max(1, q - 1))}
+              aria-label="Decrease quantity"
+              type="button"
+            >−</button>
+            <span className="cdetail-qty-val" aria-label={`Quantity: ${qty}`}>{qty}</span>
+            <button
+              className="cdetail-qty-btn"
+              onClick={() => setQty((q) => q + 1)}
+              aria-label="Increase quantity"
+              type="button"
+            >+</button>
+          </div>
+
+          {/* Kitchen notes */}
+          <label className="cdetail-notes-label" htmlFor="cdetail-notes-input">
+            Special Instructions <span className="cdetail-notes-hint">(optional)</span>
+          </label>
+          <textarea
+            id="cdetail-notes-input"
+            className="cdetail-notes"
+            placeholder="e.g. No onions, extra sauce on the side…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            maxLength={200}
+          />
+
+          {/* Add to order */}
+          <button
+            className="cdetail-add-btn"
+            onClick={() => onAdd(item, qty, notes.trim())}
+            type="button"
+            aria-label={`Add ${qty} ${item.name} to order`}
+          >
+            <PlusIcon />
+            Add {qty > 1 ? `${qty} × ` : ''}to Order — {formatPrice(total)}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -277,6 +390,8 @@ export default function Customer() {
       id: item.id,
       name: item.name,
       price: Number(item.price) || 0,
+      description: item.description || '',
+      imageUrl: item.image_url || null,
       category: item.category_id,
       soldOut: item.status !== 'ACTIVE',
     })),
@@ -322,6 +437,9 @@ export default function Customer() {
   const [menuSearch, setMenuSearch] = useState('');
   const [activeOrderTab, setActiveOrderTab] = useState('order');
   const [showMobileCart, setShowMobileCart] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);        // item open in detail modal
+  const [cartBadgePop, setCartBadgePop] = useState(false);   // triggers cart badge pop
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // debounced menu search text
 
   // ── Persist state to sessionStorage whenever it changes ──
   useEffect(() => {
@@ -365,6 +483,12 @@ export default function Customer() {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // ── Debounce menu search (150 ms) to avoid excessive re-renders ──
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(menuSearch.trim().toLowerCase()), 150);
+    return () => clearTimeout(t);
+  }, [menuSearch]);
 
   // Sync bill_out_requested from DB.
   // IMPORTANT: dbTable gets a new object reference every time tables is re-fetched (every 8 s
@@ -432,7 +556,7 @@ export default function Customer() {
   }, [menuItems, cart]);
 
   const activeCategory = selectedCategory || categories[0]?.id;
-  const normalizedMenuSearch = menuSearch.trim().toLowerCase();
+  const normalizedMenuSearch = debouncedSearch;
   const visibleItems = menuItems.filter((item) =>
     item.category === activeCategory &&
     (!normalizedMenuSearch || item.name.toLowerCase().includes(normalizedMenuSearch))
@@ -462,15 +586,20 @@ export default function Customer() {
   // Only show bill out if food is served and there are actually served orders
   const showBillOut = hasServedOrders && tableOrders.length > 0;
 
-  function addItem(item) {
+  function addItem(item, qty = 1, notes = '') {
+    // Trigger cart badge pop animation
+    setCartBadgePop(false);
+    requestAnimationFrame(() => setCartBadgePop(true));
     setCart((previous) => {
       const existing = previous.find((entry) => entry.id === item.id);
       if (existing) {
         return previous.map((entry) =>
-          entry.id === item.id ? { ...entry, qty: entry.qty + 1 } : entry,
+          entry.id === item.id
+            ? { ...entry, qty: entry.qty + qty, notes: notes || entry.notes || '' }
+            : entry,
         );
       }
-      return [...previous, { ...item, qty: 1 }];
+      return [...previous, { ...item, qty, notes }];
     });
   }
 
@@ -519,6 +648,7 @@ export default function Customer() {
         name: item.name,
         price: item.price,
         quantity: item.qty,
+        ...(item.notes ? { notes: item.notes } : {}),
       })),
     );
 
@@ -538,6 +668,19 @@ export default function Customer() {
     await requestTableBillOut(selectedTable.table_number);
     setBillOutRequested(true);
     setBillOutRequesting(false);
+  }
+
+  function openDetailModal(item) {
+    if (!item.soldOut) setDetailItem(item);
+  }
+
+  function closeDetailModal() {
+    setDetailItem(null);
+  }
+
+  function addFromDetailModal(item, qty, notes) {
+    addItem(item, qty, notes);
+    closeDetailModal();
   }
 
   if (loading) {
@@ -569,11 +712,11 @@ export default function Customer() {
           <h2>Your Order</h2>
         </div>
         {cartCount > 0 && (
-          <span style={{
-            minWidth: 28, height: 28, background: '#0f172a', color: '#fff',
-            borderRadius: 28, display: 'inline-flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: '0.82rem', fontWeight: 800, padding: '0 8px',
-          }} aria-label={`${cartCount} items in cart`}>
+          <span
+            key={cartCount}
+            className={`customer-cart-count-badge${cartBadgePop ? ' badge-pop' : ''}`}
+            aria-label={`${cartCount} items in cart`}
+          >
             {cartCount}
           </span>
         )}
@@ -610,6 +753,9 @@ export default function Customer() {
                     )}
                   </span>
                   <span className="customer-cart-item-price">{formatPrice(item.price)} each</span>
+                  {item.notes && (
+                    <span className="customer-cart-item-notes" title={item.notes}>📝 {item.notes}</span>
+                  )}
                 </div>
                 <div className="customer-cart-controls" role="group" aria-label={`Quantity for ${item.name}`}>
                   <button onClick={() => removeItem(item.id)} aria-label={`Remove one ${item.name}`} type="button">−</button>
@@ -704,6 +850,16 @@ export default function Customer() {
         />
       )}
 
+      {/* ── Item Detail Modal ── */}
+      {detailItem && (
+        <ItemDetailModal
+          item={detailItem}
+          formatPrice={formatPrice}
+          onClose={closeDetailModal}
+          onAdd={addFromDetailModal}
+        />
+      )}
+
       {/* ── Header ── */}
       <header className="customer-topbar">
         <div>
@@ -775,17 +931,15 @@ export default function Customer() {
               const isUnavail   = unavailableItemIds.has(item.id) || unavailableItemIds.has(item.name);
               const isDisabled  = isSoldOut || isUnavail;
               return (
-                <article
+              <article
                   key={item.id}
                   className="customer-menu-card"
-                  onClick={() => !isDisabled && addItem(item)}
+                  onClick={() => !isDisabled && openDetailModal(item)}
                   role="listitem"
                   aria-label={`${item.name}, ${formatPrice(item.price)}${isDisabled ? ', unavailable' : ''}`}
                   style={isDisabled ? { opacity: .5 } : {}}
                 >
-                  <span className="customer-menu-image" aria-hidden="true">
-                    <MenuImagePlaceholder />
-                  </span>
+                  <MenuImageDisplay src={item.imageUrl} alt={item.name} />
                   <div className="customer-menu-body">
                     <span className="customer-menu-name">
                       {item.name}
