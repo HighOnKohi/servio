@@ -12,6 +12,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -106,8 +107,10 @@ export function POSProvider({ children }) {
   const [recipeIngredients, setRecipeIngredients] = useState([]);
   const [customerRequests, setCustomerRequests] = useState([]);
 
-  // Loading state indicates whether the initial data fetch from Supabase is complete
   const [loading, setLoading] = useState(true);
+
+  // Shared WebSocket channel ref for instant peer-to-peer broadcast across tabs
+  const realtimeChannelRef = useRef(null);
 
   // --- Refetch Helpers ---
   // These functions query the Supabase database and update the local state.
@@ -222,19 +225,61 @@ export function POSProvider({ children }) {
     refetchRecipeIngredients,
   ]);
 
-  // --- Real-time Subscriptions ---
-  // This useEffect sets up WebSocket connections to Supabase.
-  // A unique channel name per session prevents conflicts when multiple tabs are open.
-  // Whenever data in these tables changes (e.g., from another device),
-  // the corresponding refetch function is called to update the local state instantly.
+  // --- Real-time Subscriptions & Shared Broadcast ---
+  // Connects all active tabs (Customer, Kitchen, Cashier) to a unified real-time bus.
+  // When Kitchen marks an item ready, a broadcast event is pushed to all listening tabs
+  // in < 50ms, while postgres_changes and polling act as resilient fallbacks.
   useEffect(() => {
-    const channelId = `pos-realtime-${Math.random().toString(36).slice(2)}`;
+    const SHARED_CHANNEL = "servio-pos-realtime";
     const channel = supabase
-      .channel(channelId)
+      .channel(SHARED_CHANNEL, {
+        config: {
+          broadcast: { ack: false, self: false },
+        },
+      })
+      .on("broadcast", { event: "order-item-status-changed" }, ({ payload }) => {
+        if (payload?.orderItemId && payload?.status) {
+          setOrderItems((prev) =>
+            prev.map((oi) =>
+              oi.id === payload.orderItemId ? { ...oi, status: payload.status } : oi
+            )
+          );
+        }
+        refetchOrderItems();
+      })
+      .on("broadcast", { event: "order-status-changed" }, ({ payload }) => {
+        if (payload?.orderId && payload?.status) {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === payload.orderId ? { ...o, status: payload.status } : o))
+          );
+          if (payload.status === "SERVED" || payload.status === "COMPLETED") {
+            setOrderItems((prev) =>
+              prev.map((oi) =>
+                oi.order_id === payload.orderId && oi.status !== "CANCELLED"
+                  ? { ...oi, status: "SERVED" }
+                  : oi
+              )
+            );
+          }
+        }
+        refetchOrders();
+        refetchOrderItems();
+      })
+      .on("broadcast", { event: "orders-changed" }, () => {
+        refetchOrders();
+        refetchOrderItems();
+        refetchTables();
+      })
+      .on("broadcast", { event: "requests-changed" }, () => {
+        refetchCustomerRequests();
+      })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        () => refetchOrders(),
+        () => {
+          refetchOrders();
+          refetchOrderItems();
+        },
       )
       .on(
         "postgres_changes",
@@ -271,21 +316,24 @@ export function POSProvider({ children }) {
         { event: "*", schema: "public", table: "customer_requests" },
         () => refetchCustomerRequests(),
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.warn("Supabase Realtime subscription warning:", err);
+      });
 
-    // Polling fallback — syncs the most critical data every 8 seconds
-    // in case the WebSocket connection is disrupted or a change event is missed.
-    // menu_items is included so sold-out status propagates on devices where WS drops.
+    realtimeChannelRef.current = channel;
+
+    // Fast polling fallback — syncs critical data every 3 seconds
     const pollInterval = setInterval(() => {
       refetchOrders();
       refetchOrderItems();
       refetchTables();
       refetchCustomerRequests();
       refetchMenu();
-    }, 8000);
+    }, 3000);
 
     // Cleanup function to close the connection when the component unmounts
     return () => {
+      realtimeChannelRef.current = null;
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
     };
@@ -1145,15 +1193,35 @@ export function POSProvider({ children }) {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
       );
+
+      // When food is served, update all order_items to SERVED status.
+      // NOTE: Do NOT reset bill_out_requested here — that is only cleared
+      // by billOutTable when the cashier actually processes payment.
+      if (status === "SERVED" || status === "COMPLETED") {
+        setOrderItems((prev) =>
+          prev.map((oi) =>
+            oi.order_id === orderId && oi.status !== "CANCELLED"
+              ? { ...oi, status: "SERVED" }
+              : oi
+          )
+        );
+      }
+
+      // Broadcast immediately across all connected tabs (e.g. customer screen, cashier)
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "order-status-changed",
+          payload: { orderId, status },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
       const { error } = await supabase
         .from("orders")
         .update({ status })
         .eq("id", orderId);
       if (error) console.error("Failed to update order status:", error);
 
-      // When food is served, update all order_items to SERVED status.
-      // NOTE: Do NOT reset bill_out_requested here — that is only cleared
-      // by billOutTable when the cashier actually processes payment.
       if (status === "SERVED" || status === "COMPLETED") {
         await supabase
           .from("order_items")
@@ -1214,6 +1282,16 @@ export function POSProvider({ children }) {
       setOrderItems((prev) =>
         prev.map((oi) => (oi.id === orderItemId ? { ...oi, status } : oi)),
       );
+
+      // Instant broadcast to all connected tabs/devices (e.g. customer live tracking)
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "order-item-status-changed",
+          payload: { orderItemId, status },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
       const { error } = await supabase
         .from("order_items")
         .update({ status })

@@ -24,9 +24,11 @@ function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
 
   if (allItems.length === 0) return null;
 
-  const servedCount = allItems.filter((i) => i.status === 'SERVED' || i.status === 'READY').length;
+  const servedCount = allItems.filter(
+    (i) => String(i.status || '').toUpperCase() === 'SERVED' || String(i.status || '').toUpperCase() === 'READY'
+  ).length;
   const totalCount  = allItems.length;
-  const allServed   = servedCount === totalCount;
+  const allServed   = totalCount > 0 && servedCount === totalCount;
 
   return (
     <div
@@ -55,7 +57,8 @@ function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
 
       <div className="cos-items" role="list">
         {allItems.map((item) => {
-          const isServed = item.status === 'SERVED' || item.status === 'READY';
+          const statusUpper = String(item.status || '').toUpperCase();
+          const isServed = statusUpper === 'SERVED' || statusUpper === 'READY';
           return (
             <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
               <div className="cos-item-left">
@@ -425,6 +428,9 @@ export default function Customer() {
   const parsedTableId = Number(String(tableId || '').replace(/[^0-9]/g, ''));
   const selectedTable = safeTables.find((table) => table.table_number === parsedTableId);
   const dbTable = safeTables.find((t) => t.table_number === parsedTableId);
+  const tableOrders = safeOrders.filter(
+    (o) => o.table_number === parsedTableId && o.status !== 'CANCELLED',
+  );
 
   // Show ALL items — SOLD OUT ones appear grayed out / disabled so customers
   // know the item exists but isn't available right now.
@@ -479,7 +485,6 @@ export default function Customer() {
   });
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [menuSearch, setMenuSearch] = useState('');
-  const [activeOrderTab, setActiveOrderTab] = useState('order');
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [detailItem, setDetailItem] = useState(null);        // item open in detail modal
   const [cartBadgePop, setCartBadgePop] = useState(false);   // triggers cart badge pop
@@ -629,9 +634,6 @@ export default function Customer() {
 
   // ── Check if food is served (table has orders in SERVED/COMPLETED state) ──
   // Only consider non-cancelled orders; a stale CANCELLED row must not block the button.
-  const tableOrders = safeOrders.filter(
-    (o) => o.table_number === parsedTableId && o.status !== 'CANCELLED',
-  );
   const hasServedOrders = tableOrders.length > 0 && tableOrders.every(
     (o) => o.status === 'SERVED' || o.status === 'COMPLETED',
   );
@@ -753,11 +755,6 @@ export default function Customer() {
   // ── Cart panel (shared between desktop sidebar and mobile bottom panel) ──
   const CartPanel = ({ isInline = false }) => (
     <div className="customer-sidebar-card" role="complementary" aria-label="Your order">
-      <div className="customer-order-tabs" role="tablist" aria-label="Order sidebar sections">
-        <button type="button" className={`customer-order-tab ${activeOrderTab === 'order' ? 'active' : ''}`} onClick={() => setActiveOrderTab('order')} role="tab" aria-selected={activeOrderTab === 'order'}>Order</button>
-        <button type="button" className={`customer-order-tab ${activeOrderTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveOrderTab('tracking')} role="tab" aria-selected={activeOrderTab === 'tracking'}>Order Tracking</button>
-      </div>
-      {activeOrderTab === 'order' ? <>
       <div className="customer-sidebar-heading">
         <div>
           <p className="customer-kicker">Current Selection</p>
@@ -868,18 +865,11 @@ export default function Customer() {
       >
         {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartSoldOutIds.size > 0 ? '⚠ Remove Sold-Out Items' : '✓ Mark Pending'}
       </button>
-      </> : (
-        <div className="customer-tracking-view">
-          <p className="customer-kicker">Live Tracking</p>
-          <h2>Order Tracking</h2>
-          <OrderStatusPanel tableOrders={tableOrders} orderItems={safeOrderItems} formatPrice={formatPrice} />
-        </div>
-      )}
     </div>
   );
 
   return (
-    <div className="customer-app" aria-label={`Customer ordering interface for Table ${selectedTable.table_number}`}>
+    <div className="customer-app" aria-label={`Customer ordering interface for Table ${selectedTable?.table_number || parsedTableId}`}>
 
       {/* ── Sold-Out Toast Notification ── */}
       {soldOutToast.length > 0 && (
@@ -1039,6 +1029,15 @@ export default function Customer() {
 
         {/* ── Desktop Sidebar ── */}
         <aside className="customer-sidebar">
+          {tableOrders.length > 0 && (
+            <div className="customer-sidebar-order-status" style={{ marginBottom: 16 }}>
+              <OrderStatusPanel
+                tableOrders={tableOrders}
+                orderItems={safeOrderItems}
+                formatPrice={formatPrice}
+              />
+            </div>
+          )}
           <CartPanel isInline />
         </aside>
       </main>
