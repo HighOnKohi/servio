@@ -1182,7 +1182,15 @@
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
   overflow: hidden;
-  animation: cos-in .35s cubic-bezier(.34,1.2,.64,1);
+  /* No unconditional animation — entry is controlled by .cos-panel--entered */
+  opacity: 0;
+  transform: translateY(10px);
+  transition: none;
+}
+
+/* Applied once on mount via useState/useEffect — never replays on re-render */
+.customer-sidebar .cos-panel.cos-panel--entered {
+  animation: cos-in .35s cubic-bezier(.34,1.2,.64,1) forwards;
 }
 
 @keyframes cos-in {
@@ -1368,7 +1376,9 @@
   font-weight: 700;
   color: #15803d;
   text-align: center;
-  animation: cos-in .4s cubic-bezier(.34,1.2,.64,1);
+  /* Entry animation only fires once when the banner first appears */
+  animation: cos-in .4s cubic-bezier(.34,1.2,.64,1) both;
+  animation-iteration-count: 1;
 }
 
 /* ── Responsive ── */
@@ -1388,6 +1398,13 @@
     border-radius: var(--customer-radius);
     background: rgba(255, 255, 255, 0.95);
     overflow: hidden;
+    /* Mobile panel slides in from below just like desktop */
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .customer-mobile-order-status .cos-panel.cos-panel--entered {
+    animation: cos-in .35s cubic-bezier(.34,1.2,.64,1) forwards;
   }
 }
 
@@ -1892,4 +1909,264 @@
 @media (min-width: 520px) {
   .customer-app .cdetail-modal { border-radius: 12px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE-FIRST RESPONSIVE FIXES
+   The management canvas override block (above, no media query) forces a
+   desktop-only layout. These rules — placed LAST in the file — restore
+   correct mobile/tablet behaviour via the cascade (same specificity, later
+   position wins).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Menu card stagger animation (triggered by key={activeCategory}) ─────── */
+@keyframes fadeInCard {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.customer-menu-grid .customer-menu-card {
+  animation: fadeInCard 0.2s ease both;
+  will-change: transform, opacity;
+}
+
+.customer-menu-grid .customer-menu-card:nth-child(1)  { animation-delay: 0.00s; }
+.customer-menu-grid .customer-menu-card:nth-child(2)  { animation-delay: 0.04s; }
+.customer-menu-grid .customer-menu-card:nth-child(3)  { animation-delay: 0.07s; }
+.customer-menu-grid .customer-menu-card:nth-child(4)  { animation-delay: 0.10s; }
+.customer-menu-grid .customer-menu-card:nth-child(5)  { animation-delay: 0.13s; }
+.customer-menu-grid .customer-menu-card:nth-child(6)  { animation-delay: 0.16s; }
+.customer-menu-grid .customer-menu-card:nth-child(7)  { animation-delay: 0.18s; }
+.customer-menu-grid .customer-menu-card:nth-child(n+8){ animation-delay: 0.20s; }
+
+/* ── Tablet (≤900px): collapse right sidebar below menu ─────────────────── */
+@media (max-width: 900px) {
+  .customer-app {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .customer-main {
+    /* Override management-canvas: no right sidebar column */
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    flex: none;
+    height: auto;
+  }
+
+  .customer-menu-panel {
+    /* Switch from 2-col grid to flex-column */
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    min-height: auto;
+    background: none;
+    background-image: none;
+    flex: none;
+  }
+
+  .customer-category-row {
+    /* Switch from vertical left column to horizontal pill strip */
+    grid-column: auto;
+    grid-row: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 20px;
+    background: #fff;
+    border-right: 0;
+    border-bottom: 1px solid #cfd8e3;
+    overflow-x: auto;
+    gap: 8px;
+    position: sticky;
+    top: 67px;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(31, 48, 68, 0.06);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+
+  .customer-category-row::-webkit-scrollbar { display: none; }
+  .customer-category-row::before { content: none; display: none; }
+
+  /* Horizontal pill style for category buttons */
+  .customer-category-row .customer-category-button {
+    width: auto;
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 0 18px;
+    border: 1.5px solid #cfd8e3;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: center;
+    background: #f4f6fb;
+    color: #374151;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+  }
+
+  .customer-category-button.active {
+    background: #1f3044;
+    border-color: #1f3044;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(31, 48, 68, 0.22);
+  }
+
+  .customer-category-button:active { transform: scale(0.94); }
+
+  /* Search row: reset grid positioning */
+  .customer-menu-search-row {
+    grid-column: auto;
+    grid-row: auto;
+    padding: 14px 20px 0;
+    flex-shrink: 0;
+  }
+
+  /* Menu grid: 2-column, scrollable */
+  .customer-menu-grid {
+    grid-column: auto;
+    grid-row: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    grid-template-rows: none;
+    gap: 14px;
+    padding: 14px 20px 20px;
+    overflow: visible;
+    max-height: none;
+    min-height: 0;
+    margin-top: 0;
+  }
+
+  /* Show the Add button (hidden by management canvas) */
+  .customer-menu-add-btn {
+    display: flex;
+    min-height: 44px;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  /* Card image: restore proper aspect-ratio */
+  .customer-menu-card .customer-menu-image,
+  .customer-menu-card .customer-menu-image--photo {
+    aspect-ratio: 4 / 3;
+    flex: none;
+    min-height: 0;
+  }
+
+  /* Sidebar: stack below menu */
+  .customer-sidebar {
+    border-left: 0;
+    border-top: 1px solid #cfd8e3;
+    background: #f4f6fb;
+    padding: 16px 20px 100px;
+    height: auto;
+    overflow-y: visible;
+    flex: none;
+  }
+
+  .customer-sidebar-card {
+    border-radius: 10px;
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 2px 10px rgba(31, 48, 68, 0.07);
+    margin-bottom: 14px;
+  }
+}
+
+/* ── Mobile (≤680px): tighter spacing ───────────────────────────────────── */
+@media (max-width: 680px) {
+  .customer-category-row {
+    padding: 10px 16px;
+    top: 60px; /* slightly shorter header on small screens */
+  }
+
+  .customer-category-row .customer-category-button {
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 0.85rem;
+  }
+
+  .customer-menu-search-row { padding: 12px 16px 0; }
+
+  .customer-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px 16px 16px;
+  }
+
+  .customer-menu-body {
+    padding: 10px 10px 12px;
+    gap: 4px;
+  }
+
+  .customer-menu-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: normal;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    display: -webkit-box;
+  }
+
+  .customer-menu-price { font-size: 0.82rem; }
+
+  .customer-menu-add-btn {
+    min-height: 40px;
+    font-size: 0.82rem;
+    border-radius: 6px;
+    gap: 4px;
+    padding: 0 10px;
+  }
+
+  .customer-menu-add-btn svg { width: 12px; height: 12px; }
+
+  .customer-sidebar { padding: 12px 16px 100px; }
+}
+
+/* ── Extra small (≤400px): single column menu ──────────────────────────── */
+@media (max-width: 400px) {
+  .customer-menu-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 14px 12px;
+  }
+
+  .customer-menu-card { flex-direction: row; min-height: 80px; }
+
+  .customer-menu-card .customer-menu-image,
+  .customer-menu-card .customer-menu-image--photo {
+    width: 90px;
+    flex: 0 0 90px;
+    aspect-ratio: auto;
+    align-self: stretch;
+  }
+
+  .customer-menu-body {
+    padding: 10px 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .customer-menu-add-btn { margin-top: 6px; }
+}
+
+/* ── Card active/hover micro-interactions ────────────────────────────────── */
+@media (hover: hover) {
+  .customer-menu-card:hover:not([style*="opacity: 0.5"]) {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(31, 48, 68, 0.14);
+  }
+}
+
+.customer-menu-card:active:not([style*="opacity: 0.5"]) {
+  transform: scale(0.97);
+  transition: transform 0.1s;
+}
+
 

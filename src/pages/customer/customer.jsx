@@ -1,74 +1,106 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import './customer.css';
 
 /* ── Order Status Panel ────────────────────────────────────────────── */
-function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
-  // Flatten all items across non-cancelled orders for this table
-  const allItems = useMemo(() => {
-    return tableOrders.flatMap((order) =>
-      orderItems
-        .filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
-        .map((oi) => ({ ...oi, orderStatus: order.status }))
-    );
-  }, [tableOrders, orderItems]);
+// Wrapped in memo with a custom comparator: only re-renders when item IDs or
+// statuses actually change — not on every 8-second polling reference refresh.
+// This prevents the entry animation from replaying on each poll cycle.
+const OrderStatusPanel = memo(
+  function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
+    // Flatten all items across non-cancelled orders for this table
+    const allItems = useMemo(() => {
+      return tableOrders.flatMap((order) =>
+        orderItems
+          .filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
+          .map((oi) => ({ ...oi, orderStatus: order.status }))
+      );
+    }, [tableOrders, orderItems]);
 
-  if (allItems.length === 0) return null;
+    // One-shot mount flag — set true once on first mount only.
+    // The CSS animation class is applied via this flag so it never replays
+    // during subsequent data updates.
+    const [entering, setEntering] = useState(false);
+    useEffect(() => { setEntering(true); }, []);
 
-  const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
-  const totalCount  = allItems.length;
-  const allServed   = servedCount === totalCount;
+    if (allItems.length === 0) return null;
 
-  return (
-    <div className="cos-panel" aria-label="Your order status" role="region">
-      <div className="cos-header">
-        <div className="cos-header-left">
-          <span className="cos-icon">{allServed ? '🍽️' : '🍳'}</span>
-          <div>
-            <p className="cos-kicker">Live Tracking</p>
-            <h3 className="cos-title">Order Status</h3>
-          </div>
-        </div>
-        <div className="cos-progress-wrap">
-          <div className="cos-progress-bar">
-            <div
-              className="cos-progress-fill"
-              style={{ width: `${totalCount > 0 ? (servedCount / totalCount) * 100 : 0}%` }}
-            />
-          </div>
-          <span className="cos-progress-label">{servedCount}/{totalCount} ready</span>
-        </div>
-      </div>
+    const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
+    const totalCount  = allItems.length;
+    const allServed   = servedCount === totalCount;
 
-      <div className="cos-items" role="list">
-        {allItems.map((item) => {
-          const isServed = item.status === 'SERVED';
-          return (
-            <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
-              <div className="cos-item-left">
-                <span className="cos-item-dot" aria-hidden="true" />
-                <div>
-                  <span className="cos-item-name">{item.item_name}</span>
-                  {item.quantity > 1 && <span className="cos-item-qty"> ×{item.quantity}</span>}
-                </div>
-              </div>
-              <span className={`cos-item-badge ${isServed ? 'cos-badge--ready' : 'cos-badge--preparing'}`}>
-                {isServed ? '✓ Ready' : '🍳 Preparing'}
-              </span>
+    return (
+      <div
+        className={`cos-panel${entering ? ' cos-panel--entered' : ''}`}
+        aria-label="Your order status"
+        role="region"
+      >
+        <div className="cos-header">
+          <div className="cos-header-left">
+            <span className="cos-icon">{allServed ? '🍽️' : '🍳'}</span>
+            <div>
+              <p className="cos-kicker">Live Tracking</p>
+              <h3 className="cos-title">Order Status</h3>
             </div>
-          );
-        })}
-      </div>
-
-      {allServed && (
-        <div className="cos-all-ready" role="status">
-          🎉 All dishes are ready — enjoy your meal!
+          </div>
+          <div className="cos-progress-wrap">
+            <div className="cos-progress-bar">
+              <div
+                className="cos-progress-fill"
+                style={{ width: `${totalCount > 0 ? (servedCount / totalCount) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="cos-progress-label">{servedCount}/{totalCount} ready</span>
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
+
+        <div className="cos-items" role="list">
+          {allItems.map((item) => {
+            const isServed = item.status === 'SERVED';
+            return (
+              <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
+                <div className="cos-item-left">
+                  <span className="cos-item-dot" aria-hidden="true" />
+                  <div>
+                    <span className="cos-item-name">{item.item_name}</span>
+                    {item.quantity > 1 && <span className="cos-item-qty"> ×{item.quantity}</span>}
+                  </div>
+                </div>
+                <span className={`cos-item-badge ${isServed ? 'cos-badge--ready' : 'cos-badge--preparing'}`}>
+                  {isServed ? '✓ Ready' : '🍳 Preparing'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {allServed && (
+          <div className="cos-all-ready" role="status">
+            🎉 All dishes are ready — enjoy your meal!
+          </div>
+        )}
+      </div>
+    );
+  },
+  // Custom equality: skip re-render unless item count, IDs, or statuses changed.
+  (prev, next) => {
+    const prevItems = prev.tableOrders.flatMap((o) =>
+      prev.orderItems
+        .filter((oi) => oi.order_id === o.id && oi.status !== 'CANCELLED')
+        .map((oi) => `${oi.id}:${oi.status}`)
+    );
+    const nextItems = next.tableOrders.flatMap((o) =>
+      next.orderItems
+        .filter((oi) => oi.order_id === o.id && oi.status !== 'CANCELLED')
+        .map((oi) => `${oi.id}:${oi.status}`)
+    );
+    return (
+      prevItems.length === nextItems.length &&
+      prevItems.every((v, i) => v === nextItems[i])
+    );
+  },
+);
 
 function MenuImagePlaceholderSVG() {
   return (
@@ -428,6 +460,7 @@ export default function Customer() {
   const [soldOutToast, setSoldOutToast] = useState([]);             // [{id, name}] for the toast
   const alertedSoldOutRef     = useRef(new Set());   // prevent re-alerting same item
   const prevTableStatusRef    = useRef(null);         // track previous table status for transition detection
+  const activeCategoryRef     = useRef(null);         // active category pill (for scroll-into-view on mobile)
   const [submitting, setSubmitting] = useState(false);
   const [billOutRequesting, setBillOutRequesting] = useState(false);
   const [billOutRequested, setBillOutRequested] = useState(() => {
@@ -472,6 +505,13 @@ export default function Customer() {
       } catch {}
     }
   }, [safeCustomerRequests, parsedTableId]);
+
+  // ── Scroll active category pill into view on mobile ──
+  useEffect(() => {
+    if (activeCategoryRef.current) {
+      activeCategoryRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [activeCategory]);
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory) {
@@ -899,6 +939,7 @@ export default function Customer() {
                 key={category.id}
                 className={`customer-category-button ${activeCategory === category.id ? 'active' : ''}`}
                 onClick={() => setSelectedCategory(category.id)}
+                ref={activeCategory === category.id ? activeCategoryRef : null}
                 role="tab"
                 aria-selected={activeCategory === category.id}
                 aria-label={`Category: ${category.name}`}
@@ -920,8 +961,9 @@ export default function Customer() {
             />
           </div>
 
-          {/* Menu grid */}
+          {/* Menu grid — key on activeCategory triggers stagger animation on category switch */}
           <div
+            key={activeCategory}
             className="customer-menu-grid"
             role="list"
             aria-label={`Menu items in ${categories.find(c => c.id === activeCategory)?.name || 'selected category'}`}
