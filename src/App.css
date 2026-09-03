@@ -182,3 +182,229 @@
     border-right-color: var(--border);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   GLOBAL SERVIO UI SCALE SELECTOR & TOUCH CONFIRMATION MODALS
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Segmented Scale Selector ─────────────────────────────────────────────── */
+.servio-scale-selector {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.07);
+  border: 1.5px solid rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  user-select: none;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.servio-scale-selector.dark {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+}
+
+.servio-scale-label {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 6px 0 8px;
+  color: #475569;
+}
+
+.servio-scale-selector.dark .servio-scale-label {
+  color: #94a3b8;
+}
+
+.servio-scale-btn {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.servio-scale-selector.dark .servio-scale-btn {
+  color: #cbd5e1;
+}
+
+.servio-scale-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0f172a;
+}
+
+.servio-scale-selector.dark .servio-scale-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.servio-scale-btn.active {
+  background: #087f63;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(8, 127, 99, 0.35);
+}
+
+/* ── Global Touch-Thick Logout Confirmation Modals ────────────────────────── */
+.kitchen-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  animation: servioModalFadeIn 0.18s ease-out;
+}
+
+@keyframes servioModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kitchen-modal-card {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35), 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 540px;
+  overflow: hidden;
+  animation: servioModalCardSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kitchen-modal-card.kitchen-modal-card--lg {
+  max-width: 580px;
+}
+
+@keyframes servioModalCardSlide {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.kitchen-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 32px 18px;
+  border-bottom: 1.5px solid #f1f5f9;
+}
+
+.kitchen-modal-header h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 850;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.kitchen-modal-header.danger {
+  color: #dc2626;
+  background: #fff5f5;
+  border-bottom-color: #fee2e2;
+}
+
+.kitchen-modal-header.danger h2 {
+  color: #991b1b;
+}
+
+.kitchen-modal-header.danger svg {
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.kitchen-modal-body {
+  padding: 24px 32px;
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: #475569;
+  font-weight: 500;
+}
+
+.kitchen-modal-actions {
+  display: flex;
+  gap: 16px;
+  padding: 16px 32px 32px;
+}
+
+.kitchen-modal-actions--stacked {
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Extra thick vertically (68px min-height) for effortless touch-screen tapping */
+.kitchen-modal-btn {
+  flex: 1;
+  height: 68px !important;
+  min-height: 68px !important;
+  padding: 18px 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  border-radius: 14px !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
+  transition: all 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.kitchen-modal-btn:active:not(:disabled) {
+  transform: scale(0.97) !important;
+}
+
+.kitchen-modal-btn.secondary {
+  border: 2px solid #cbd5e1 !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.kitchen-modal-btn.secondary:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.kitchen-modal-btn.switch-interface {
+  border: 2.5px solid #087f63 !important;
+  background: #f0fdf4 !important;
+  color: #087f63 !important;
+}
+
+.kitchen-modal-btn.switch-interface:hover {
+  background: #087f63 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(8, 127, 99, 0.3) !important;
+}
+
+.kitchen-modal-btn.danger {
+  border: 0 !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4) !important;
+}
+
+.kitchen-modal-btn.danger:hover {
+  background: #b91c1c !important;
+  box-shadow: 0 6px 20px rgba(185, 28, 28, 0.45) !important;
+}
+

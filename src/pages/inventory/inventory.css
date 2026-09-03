@@ -69,3 +69,17 @@
     width: auto !important;
   }
 }
+
+/* ── UI Scale Rules: Font & Small Element Scaling (No Page Overflow) ── */
+.inventory-page--scale-Std {
+  font-size: 0.94rem;
+}
+
+.inventory-page--scale-Large {
+  font-size: 1.05rem;
+}
+
+.inventory-page--scale-XL {
+  font-size: 1.18rem;
+}
+

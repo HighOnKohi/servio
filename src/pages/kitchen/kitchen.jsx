@@ -1,25 +1,59 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
+import { useAuth } from '../../context/AuthContext';
+import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
 import './kitchen.css';
 
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener('resize', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
-    return () => { window.removeEventListener('resize', updateScale); window.visualViewport?.removeEventListener('resize', updateScale); };
-  }, []);
-  if (typeof window === 'undefined') return { scale: 1, width: '100%', height: '100vh' };
-  const pixelRatio = window.devicePixelRatio || 1;
-  return { scale: 1 / pixelRatio, width: `${Math.round(window.innerWidth * pixelRatio)}px`, height: `${Math.round(window.innerHeight * pixelRatio)}px` };
+  return { scale: 1, width: '100%', height: '100vh' };
 }
 
 function formatElapsed(createdAt, now) {
   const created = typeof createdAt === 'string' ? new Date(createdAt).getTime() : createdAt;
   const seconds = Math.max(0, Math.floor((now - created) / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/* ── Confirmation Modal for Logout ──────────────────────────────────── */
+function LogoutConfirmModal({ onConfirmLogout, onSwitchInterface, onDismiss }) {
+  return (
+    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="logout-modal-title">
+      <div className="kitchen-modal-card kitchen-modal-card--lg" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <h2 id="logout-modal-title">Log Out of Kitchen?</h2>
+        </div>
+        <p className="kitchen-modal-body">
+          Are you sure you want to leave the Kitchen interface? Any active tickets and cooking items will remain safely in the queue.
+        </p>
+        <div className="kitchen-modal-actions kitchen-modal-actions--stacked">
+          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirmLogout}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22, marginRight: 10 }} aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Log Out Completely
+          </button>
+          <button type="button" className="kitchen-modal-btn switch-interface" onClick={onSwitchInterface}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22, marginRight: 10 }} aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+            </svg>
+            Switch Interface
+          </button>
+          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
+            Stay in Kitchen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ── Confirmation Modal for cancel ─────────────────────────────────── */
@@ -221,6 +255,10 @@ function Kitchen() {
     loading,
   } = usePOS();
 
+  const { logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
+
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('active-orders');
@@ -358,10 +396,25 @@ function Kitchen() {
 
   const handleCancelConfirm = useCallback(async (_reason) => {
     if (!cancelTarget) return;
-    await updateOrderStatus(cancelTarget.id, 'CANCELLED');
-    // Store reason on the order for cashier visibility (best-effort update)
+    const target = cancelTarget;
     setCancelTarget(null);
+    await updateOrderStatus(target.id, 'CANCELLED');
   }, [cancelTarget, updateOrderStatus]);
+
+  const handleConfirmLogout = useCallback(async () => {
+    setShowLogoutModal(false);
+    try {
+      if (logout) await logout();
+    } catch (err) {
+      console.error('Error logging out:', err);
+    }
+    navigate('/login');
+  }, [logout, navigate]);
+
+  const handleSwitchInterface = useCallback(() => {
+    setShowLogoutModal(false);
+    navigate('/');
+  }, [navigate]);
 
   const handleForwardToCashier = useCallback(async (requestId) => {
     if (processingIds.has(requestId)) return;
@@ -377,12 +430,29 @@ function Kitchen() {
   }, [unavailableTarget, rejectCustomerRequestKitchen]);
 
   if (loading) {
-    return <div className="kitchen-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.2rem' }}>Loading…</div>;
+    return <div className="kitchen-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.4rem' }}>Loading…</div>;
   }
 
   return (
-    <div className="kitchen-app" style={{ '--kitchen-scale': interfaceCanvas.scale, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height }}>
+    <div
+      className={`kitchen-app kitchen-app--scale-${uiScale}`}
+      style={{
+        '--servio-font-scale': fontScale,
+        '--servio-elem-scale': elementScale,
+        width: '100vw',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+      }}
+    >
       {/* ── Modals ── */}
+      {showLogoutModal && (
+        <LogoutConfirmModal
+          onConfirmLogout={handleConfirmLogout}
+          onSwitchInterface={handleSwitchInterface}
+          onDismiss={() => setShowLogoutModal(false)}
+        />
+      )}
       {cancelTarget && (
         <CancelConfirmModal
           ticket={cancelTarget}
@@ -410,14 +480,14 @@ function Kitchen() {
       <header className="kitchen-topbar">
         <div className="kitchen-brand">
           <span className="kitchen-brand-logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-            </svg>
+            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
           </span>
-          <span>Kitchen Interface</span>
+          <div className="kitchen-brand-text">
+            <span className="kitchen-brand-title">Kitchen Interface</span>
+          </div>
         </div>
         <div className="kitchen-topbar-right">
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} isDark />
           <button
             type="button"
             className="kitchen-stock-manage-btn"
@@ -425,11 +495,21 @@ function Kitchen() {
             aria-label="Manage item stock"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z" /></svg>
-            Manage Stock
+            <span>Manage Stock</span>
           </button>
-          <span>{new Date(currentTime).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, {new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</span>
-          <button className="kitchen-return-button" onClick={() => navigate('/')} aria-label="Return to interface selector">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg>
+          <div className="kitchen-clock" aria-label="Current date and time">
+            <span className="kitchen-clock-date">{new Date(currentTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span className="kitchen-clock-time">{new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</span>
+          </div>
+          <button
+            type="button"
+            className="kitchen-logout-btn"
+            onClick={() => setShowLogoutModal(true)}
+            aria-label="Log out or exit kitchen interface"
+            title="Log out or exit kitchen interface"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            <span>Log Out</span>
           </button>
         </div>
       </header>

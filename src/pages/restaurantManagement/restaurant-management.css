@@ -1,4 +1,26 @@
-.restaurant-management-root { --restaurant-scale: 1; min-height:0; zoom:var(--restaurant-scale); font-family: system-ui, -apple-system, sans-serif; background: #eef2f7; display: flex; flex-direction: column; }
+.restaurant-management-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #eef2f7;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── UI Scale Rules: Font & Small Element Scaling (No Page Overflow) ── */
+.restaurant-management-root--scale-Std {
+  font-size: 0.94rem;
+}
+
+.restaurant-management-root--scale-Large {
+  font-size: 1.05rem;
+}
+
+.restaurant-management-root--scale-XL {
+  font-size: 1.18rem;
+}
 
 /* Modal */
 .rmc2 { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; background: rgba(15,23,42,0.34); }

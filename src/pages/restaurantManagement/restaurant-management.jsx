@@ -4,6 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../lib/supabaseClient';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
+import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
 import './restaurant-management.css';
 
 const STATUSES = ['Available', 'Occupied', 'Reserved', 'Request'];
@@ -110,22 +111,7 @@ const toTitleCase = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase().rep
 const toSentenceCase = (text) => text.trim().replace(/\s+/g, ' ').toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
 
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
-
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, []);
-
-  if (typeof window === 'undefined') return { scale: 1, width: '100%', height: '100vh' };
-
-  const pixelRatio = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pixelRatio,
-    width: `${Math.round(window.innerWidth * pixelRatio)}px`,
-    height: `${Math.round(window.innerHeight * pixelRatio)}px`,
-  };
+  return { scale: 1, width: '100%', height: '100vh' };
 }
 
 /* Simple SVG icons (kept inline for clarity) */
@@ -821,6 +807,7 @@ function TableInterface() {
 export default function RestaurantManagement({ managerType = 'menu' }) {
   const interfaceCanvas = useFixedInterfaceCanvas();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
   const isTableManager = managerType === 'tables';
 
   useEffect(() => {
@@ -831,10 +818,11 @@ export default function RestaurantManagement({ managerType = 'menu' }) {
   const time = currentDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: "2-digit" });
   const date = currentDateTime.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   return (
-    <div className={`rmc108 restaurant-management-root ${isTableManager ? 'table-manager-root' : 'menu-manager-root'}`} style={{ '--restaurant-scale': interfaceCanvas.scale, '--restaurant-canvas-height': interfaceCanvas.height, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height }}>
+    <div className={`rmc108 restaurant-management-root ${isTableManager ? 'table-manager-root' : 'menu-manager-root'} restaurant-management-root--scale-${uiScale}`} style={{ '--servio-font-scale': fontScale, '--servio-elem-scale': elementScale, width: '100%', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
       <header className="rmc109">
         <div className="rmc110"><div className="rmc111"><GridIcon /></div><span className="rmc112">{isTableManager ? 'Table Manager' : 'Menu Manager'}</span></div>
         <div className="rmc113">
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
           <div className="restaurant-management-date-time">{date}, {time}</div>
           {!isTableManager && <button type="button" className="restaurant-management-help" aria-label="Menu Manager help" title="Help"><HelpIcon /></button>}
           <Link to="/" className="rmc114" aria-label="Return to interface selector" title="Return to interface selector"><ReturnIcon /></Link>

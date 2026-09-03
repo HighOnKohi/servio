@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
+import { useAuth } from '../../context/AuthContext';
+import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
 import './cashier.css';
 
 const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
@@ -16,31 +18,56 @@ function MenuImagePlaceholder() {
 }
 
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
+  return { scale: 1, width: '100%', height: '100vh' };
+}
 
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener('resize', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
-    return () => {
-      window.removeEventListener('resize', updateScale);
-      window.visualViewport?.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  if (typeof window === 'undefined') return { scale: 1, width: '100%', height: '100vh' };
-
-  const pixelRatio = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pixelRatio,
-    width: `${Math.round(window.innerWidth * pixelRatio)}px`,
-    height: `${Math.round(window.innerHeight * pixelRatio)}px`,
-  };
+/* ── Confirmation Modal for Cashier Logout / Exit ─────────────────────── */
+function CashierLogoutModal({ onConfirmLogout, onSwitchInterface, onDismiss }) {
+  return (
+    <div className="kitchen-modal-overlay cashier-logout-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="cashier-logout-title">
+      <div className="kitchen-modal-card kitchen-modal-card--lg" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 28, height: 28 }} aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <h2 id="cashier-logout-title">Exit Cashier Interface?</h2>
+        </div>
+        <p className="kitchen-modal-body">
+          Are you sure you want to leave the Cashier interface? Any active tables and unbilled orders will remain saved.
+        </p>
+        <div className="kitchen-modal-actions kitchen-modal-actions--stacked">
+          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirmLogout}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20, marginRight: 8 }} aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Log Out Completely
+          </button>
+          <button type="button" className="kitchen-modal-btn switch-interface" onClick={onSwitchInterface}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20, marginRight: 8 }} aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+            </svg>
+            Switch to Interface Selector
+          </button>
+          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
+            Stay on Cashier
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Cashier() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
 
   const {
     tables: dbTables,
@@ -64,11 +91,22 @@ function Cashier() {
     rejectCustomerRequestCashier,
     loading,
     formatPrice,
+    tableBillOutPayments,
+    itemSales,
   } = usePOS();
 
-  const menuCategories = useMemo(() =>
-    dbCategories.map((c) => ({ id: c.id, name: c.name })),
-    [dbCategories]
+  const BEST_SELLERS_CATEGORY = {
+    id: 'best-sellers',
+    name: '🔥 Best Sellers',
+    isBestSeller: true,
+  };
+
+  const menuCategories = useMemo(
+    () => [
+      BEST_SELLERS_CATEGORY,
+      ...dbCategories.map((c) => ({ id: c.id, name: c.name })),
+    ],
+    [dbCategories],
   );
 
   const menuItems = useMemo(() =>
@@ -105,8 +143,9 @@ function Cashier() {
       totalBill: Number(t.total_bill ?? t.current_bill ?? 0),
       currentBill: Number(t.current_bill ?? 0),
       billOutRequested: t.bill_out_requested === true,
+      billOutPaymentMethod: tableBillOutPayments?.[t.table_number] || null,
     })),
-    [dbTables]
+    [dbTables, tableBillOutPayments]
   );
 
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -310,10 +349,96 @@ function Cashier() {
   const menuKeywordMatches = menuSearchTerm
     ? menuItems.filter((item) => item.name.toLowerCase().includes(menuSearchTerm)).slice(0, 6)
     : [];
-  const visibleMenuItems = menuItems.filter((item) =>
-    item.category === activeMenuCategory &&
-    (!menuSearchTerm || item.name.toLowerCase().includes(menuSearchTerm))
-  );
+  const isBestSellerCategory = activeMenuCategory === 'best-sellers';
+  const visibleMenuItems = useMemo(() => {
+    if (isBestSellerCategory) {
+      const top3PerCategory = [];
+      const seenIds = new Set();
+
+      // Collect top 3 of each category based on all-time sales
+      dbCategories.forEach((cat) => {
+        const catItems = menuItems
+          .filter((item) => item.category === cat.id)
+          .map((item) => ({
+            ...item,
+            soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+          }))
+          .filter((item) => item.soldCount > 0)
+          .sort((a, b) => b.soldCount - a.soldCount)
+          .slice(0, 3);
+
+        catItems.forEach((item) => {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            top3PerCategory.push(item);
+          }
+        });
+      });
+
+      // Also include top 3 for any items not matching standard category IDs
+      const uncategorizedItems = menuItems
+        .filter((item) => !dbCategories.some((c) => c.id === item.category))
+        .map((item) => ({
+          ...item,
+          soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+        }))
+        .filter((item) => item.soldCount > 0)
+        .sort((a, b) => b.soldCount - a.soldCount)
+        .slice(0, 3);
+
+      uncategorizedItems.forEach((item) => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          top3PerCategory.push(item);
+        }
+      });
+
+      // Sort all combined top category items by sales descending
+      top3PerCategory.sort((a, b) => b.soldCount - a.soldCount);
+
+      // Identify the #1 overall best seller across all categories
+      const topOverallId = top3PerCategory.length > 0 && top3PerCategory[0].soldCount > 0
+        ? top3PerCategory[0].id
+        : null;
+
+      return top3PerCategory
+        .map((item) => ({
+          ...item,
+          isTopBestSeller: item.id === topOverallId,
+        }))
+        .filter((item) => {
+          if (menuSearchTerm && !item.name.toLowerCase().includes(menuSearchTerm)) {
+            return false;
+          }
+          return true;
+        });
+    }
+    // For standard categories: find the #1 best seller of this specific category
+    const categoryItems = menuItems
+      .filter((item) => item.category === activeMenuCategory)
+      .map((item) => ({
+        ...item,
+        soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+      }));
+
+    let topCategoryItemId = null;
+    let maxCategorySold = 0;
+    categoryItems.forEach((item) => {
+      if (item.soldCount > maxCategorySold) {
+        maxCategorySold = item.soldCount;
+        topCategoryItemId = item.id;
+      }
+    });
+
+    return categoryItems
+      .map((item) => ({
+        ...item,
+        isTopBestSeller: maxCategorySold > 0 && item.id === topCategoryItemId,
+      }))
+      .filter((item) =>
+        !menuSearchTerm || item.name.toLowerCase().includes(menuSearchTerm)
+      );
+  }, [menuItems, dbCategories, activeMenuCategory, isBestSellerCategory, menuSearchTerm, itemSales]);
   const menuItemsPerPage = 8;
   const totalMenuPages = Math.max(1, Math.ceil(visibleMenuItems.length / menuItemsPerPage));
   const requestedMenuPage = Number(new URLSearchParams(location.search).get('page')) || 1;
@@ -543,13 +668,33 @@ function Cashier() {
 
   function openPaymentModal() {
     if (!hasItems) return;
-    setPaymentMethod('cash');
+    const requestedMethod = selected?.billOutPaymentMethod || tableBillOutPayments?.[selected?.table_number];
+    if (requestedMethod && ['cash', 'credit', 'qr'].includes(requestedMethod)) {
+      setPaymentMethod(requestedMethod);
+    } else {
+      setPaymentMethod('cash');
+    }
     setShowPaymentModal(true);
   }
 
   function goLogin() {
-    navigate('/');
+    setShowLogoutModal(true);
   }
+
+  const handleConfirmLogout = useCallback(async () => {
+    setShowLogoutModal(false);
+    try {
+      if (logout) await logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    navigate('/login');
+  }, [logout, navigate]);
+
+  const handleSwitchInterface = useCallback(() => {
+    setShowLogoutModal(false);
+    navigate('/');
+  }, [navigate]);
 
   async function completeBill() {
     if (!selected) return;
@@ -634,7 +779,262 @@ function Cashier() {
   }
 
   function triggerPrint() {
-    window.print();
+    if (!receipt) return;
+
+    // Clean up any existing hidden thermal print iframe
+    const oldFrame = document.getElementById('receipt-thermal-print-frame');
+    if (oldFrame) {
+      oldFrame.remove();
+    }
+
+    const printFrame = document.createElement('iframe');
+    printFrame.id = 'receipt-thermal-print-frame';
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow.document;
+    const paymentLabel =
+      receipt.paymentMethod === 'qr'
+        ? 'InstaPay QR'
+        : receipt.paymentMethod === 'credit'
+        ? 'Credit Card'
+        : 'Cash';
+
+    const itemsHtml = (receipt.items || [])
+      .map(
+        (item) => `
+      <div class="thermal-item-block">
+        <div class="thermal-item-row">
+          <span class="t-col-name">${item.name}</span>
+          <span class="t-col-qty">${item.quantity}</span>
+          <span class="t-col-price">${formatPrice(item.unitPrice)}</span>
+          <span class="t-col-total">${formatPrice(item.subtotalLine)}</span>
+        </div>
+        ${(item.discountLabels || [])
+          .map(
+            (label) => `
+          <div class="thermal-item-discount">  - ${label}</div>
+        `
+          )
+          .join('')}
+      </div>
+    `
+      )
+      .join('');
+
+    const discountsHtml = [
+      receipt.individualDiscount > 0
+        ? `<div class="thermal-total-row"><span>Item Discounts</span><span>-${formatPrice(receipt.individualDiscount)}</span></div>`
+        : '',
+      ...(receipt.selectedDiscounts || []).map(
+        (d) => `<div class="thermal-total-row"><span>${d.label}</span><span>-${formatPrice(d.amount)}</span></div>`
+      ),
+      receipt.discount > 0
+        ? `<div class="thermal-total-row"><span>Total Discount</span><span>-${formatPrice(receipt.discount)}</span></div>`
+        : '',
+    ].join('');
+
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Receipt - Table #${receipt.table}</title>
+        <style>
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
+          html, body {
+            width: 80mm;
+            max-width: 80mm;
+            background: #ffffff;
+            color: #000000;
+            font-family: 'Courier New', Courier, monospace, system-ui;
+            font-size: 11px;
+            line-height: 1.35;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .thermal-body {
+            width: 80mm;
+            max-width: 80mm;
+            padding: 4mm 3mm;
+            margin: 0 auto;
+          }
+          .thermal-header {
+            text-align: center;
+            margin-bottom: 2mm;
+          }
+          .thermal-brand {
+            font-size: 17px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+          }
+          .thermal-tagline {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 1px;
+          }
+          .thermal-dashed {
+            border-top: 1px dashed #000000;
+            margin: 2.5mm 0;
+          }
+          .thermal-double-dashed {
+            border-top: 2px dashed #000000;
+            margin: 2.5mm 0;
+          }
+          .thermal-meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-bottom: 1.5px;
+          }
+          .thermal-meta-row strong {
+            font-weight: 800;
+          }
+          .thermal-items-header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 26px 50px 52px;
+            font-weight: 900;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            padding-bottom: 1mm;
+            border-bottom: 1px dashed #000000;
+            margin-bottom: 2mm;
+            text-transform: uppercase;
+          }
+          .t-col-name {
+            word-break: break-word;
+            padding-right: 3px;
+          }
+          .t-col-qty { text-align: center; }
+          .t-col-price { text-align: right; }
+          .t-col-total { text-align: right; }
+          .thermal-item-block {
+            margin-bottom: 2mm;
+          }
+          .thermal-item-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 26px 50px 52px;
+            align-items: baseline;
+            font-size: 11px;
+          }
+          .thermal-item-discount {
+            font-size: 10px;
+            padding-left: 4px;
+            margin-top: 1px;
+          }
+          .thermal-total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-bottom: 1.5px;
+          }
+          .thermal-grand-total {
+            font-size: 14px;
+            font-weight: 900;
+            padding: 1mm 0;
+          }
+          .thermal-footer {
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.4;
+            padding-top: 1mm;
+          }
+          .thermal-footer-bold {
+            font-weight: 800;
+          }
+          .thermal-copy {
+            font-size: 9px;
+            margin-top: 2mm;
+            letter-spacing: 1px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="thermal-body">
+          <div class="thermal-header">
+            <div class="thermal-brand">SERVIO</div>
+            <div class="thermal-tagline">Point of Sale System</div>
+            <div class="thermal-tagline">Official Dining Receipt</div>
+          </div>
+
+          <div class="thermal-dashed"></div>
+
+          <div class="thermal-meta-row"><span>Table:</span><strong>#${receipt.table}</strong></div>
+          <div class="thermal-meta-row"><span>Date:</span><span>${receipt.date}</span></div>
+          <div class="thermal-meta-row"><span>Payment:</span><strong>${paymentLabel}</strong></div>
+          <div class="thermal-meta-row"><span>Status:</span><strong>COMPLETED / PAID</strong></div>
+
+          <div class="thermal-dashed"></div>
+
+          <div class="thermal-items-header">
+            <span>ITEM</span>
+            <span class="t-col-qty">QTY</span>
+            <span class="t-col-price">PRICE</span>
+            <span class="t-col-total">TOTAL</span>
+          </div>
+
+          <div>
+            ${itemsHtml}
+          </div>
+
+          <div class="thermal-dashed"></div>
+
+          <div class="thermal-total-row"><span>Subtotal</span><span>${formatPrice(receipt.subtotal)}</span></div>
+          ${discountsHtml}
+
+          <div class="thermal-double-dashed"></div>
+
+          <div class="thermal-total-row thermal-grand-total">
+            <span>TOTAL PAID</span>
+            <span>${formatPrice(receipt.total)}</span>
+          </div>
+          <div class="thermal-total-row">
+            <span>Payment Method</span>
+            <strong>${paymentLabel}</strong>
+          </div>
+
+          <div class="thermal-dashed"></div>
+
+          <div class="thermal-footer">
+            <div class="thermal-footer-bold">THANK YOU FOR DINING WITH US!</div>
+            <div>Please come again</div>
+            <div class="thermal-copy">*** CUSTOMER COPY ***</div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    doc.open();
+    doc.write(receiptHtml);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (err) {
+        console.warn('Iframe print failed, falling back to window.print():', err);
+        window.print();
+      }
+    }, 200);
   }
 
   const getElapsedTime = useCallback((table) => {
@@ -674,30 +1074,39 @@ function Cashier() {
 
   return (
     <div
-      className="cashier-app"
+      className={`cashier-app cashier-app--scale-${uiScale}`}
       style={{
-        '--cashier-scale': interfaceCanvas.scale,
-        '--cashier-canvas-height': interfaceCanvas.height,
-        width: interfaceCanvas.width,
-        height: interfaceCanvas.height,
-        minHeight: interfaceCanvas.height,
+        '--servio-font-scale': fontScale,
+        '--servio-elem-scale': elementScale,
+        width: '100%',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflow: 'hidden',
       }}
     >
       <div className="topbar">
         <div className="brand">
           <div className="brand-logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-            </svg>
+            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
           </div>
           <div className="brand-text">Cashier Interface</div>
         </div>
         <div className="topbar-right">
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
           <span className="date-time">{formattedDate}, {formattedTime}</span>
-          <button className="return-button" onClick={goLogin} aria-label="Return to interface selector"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></svg></button>
+          <button
+            type="button"
+            className="cashier-logout-btn"
+            onClick={() => setShowLogoutModal(true)}
+            aria-label="Exit or Log Out"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span>Log Out</span>
+          </button>
         </div>
       </div>
       {/* ── Kitchen Cancellation Alert Banners ── */}
@@ -739,22 +1148,19 @@ function Cashier() {
         </button>
       </nav>
 
-      {!isMenuOrdering && <div className="action-row">
-        <div className="table-summary">
-          <span><strong>{tables.filter((table) => !table.occupied && !table.request && !table.reserved).length}</strong> available</span>
-          <span><strong>{tables.filter((table) => table.occupied).length}</strong> occupied</span>
-          <span><strong>{tables.filter((table) => table.reserved).length}</strong> reserved</span>
-          <span><strong>{tables.filter((table) => table.request).length}</strong> requests</span>
-        </div>
-      </div>}
-
       <div className={`main ${isMenuOrdering ? 'menu-ordering-main' : ''}`}>
         {isMenuOrdering ? (
           <section className="menu-ordering-workspace">
             <aside className="menu-category-sidebar">
               <p className="menu-category-label">Categories</p>
               {menuCategories.map((category) => (
-                <button key={category.id} className={`menu-category-button ${activeMenuCategory === category.id ? 'active' : ''}`} onClick={() => selectCategory(category.id)}>{category.name}</button>
+                <button
+                  key={category.id}
+                  className={`menu-category-button ${category.isBestSeller ? 'menu-category-button--best-seller' : ''} ${activeMenuCategory === category.id ? 'active' : ''}`}
+                  onClick={() => selectCategory(category.id)}
+                >
+                  {category.name}
+                </button>
               ))}
             </aside>
             <div className="menu-catalog">
@@ -791,20 +1197,32 @@ function Cashier() {
                 </div>
               </div>
               <div className="menu-item-grid">
-                {pagedMenuItems.map((item) => (
+                {pagedMenuItems.map((item, idx) => (
                   <button
                     key={item.id}
-                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''}`}
+                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''} ${item.isTopBestSeller ? 'menu-item-card--bestseller' : ''}`}
                     onClick={() => addMenuItem(item)}
                     disabled={item.status === 'SOLD OUT'}
                   >
                     <span className="menu-item-image"><MenuImagePlaceholder /></span>
+                    {item.isTopBestSeller && item.soldCount > 0 && (
+                      <span className="cashier-menu-bestseller-rank">
+                        🔥 #1 Best Seller · {item.soldCount} sold
+                      </span>
+                    )}
                     <span className="menu-item-name">{item.name}</span>
                     <span className="menu-item-bottom">
                       <span className="menu-item-price">{formatPrice(item.price)}</span>
                     </span>
                   </button>
                 ))}
+                {visibleMenuItems.length === 0 && (
+                  <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#64748b', padding: '48px 20px', background: '#fff', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🔥</div>
+                    <h3 style={{ margin: '0 0 6px', color: '#0f172a', fontSize: '1.1rem' }}>No Best Sellers Recorded Yet</h3>
+                    <p style={{ margin: 0, fontSize: '0.85rem' }}>Items will automatically appear here ranked by sales as orders are placed.</p>
+                  </div>
+                )}
               </div>
               <footer className="table-pagination menu-pagination">
                 <span>{visibleMenuItems.length ? `${menuPageStart + 1}–${Math.min(menuPageStart + menuItemsPerPage, visibleMenuItems.length)}` : '0'} of {visibleMenuItems.length}</span>
@@ -818,6 +1236,14 @@ function Cashier() {
           </section>
         ) : (
         <section className="cashier-table-area">
+          <div className="action-row">
+            <div className="table-summary">
+              <span><strong>{tables.filter((table) => !table.occupied && !table.request && !table.reserved).length}</strong> available</span>
+              <span><strong>{tables.filter((table) => table.occupied).length}</strong> occupied</span>
+              <span><strong>{tables.filter((table) => table.reserved).length}</strong> reserved</span>
+              <span><strong>{tables.filter((table) => table.request).length}</strong> requests</span>
+            </div>
+          </div>
           <div className="table-grid">
           {visibleTables.map((table) => {
             const isReserved = table.reserved;
@@ -844,7 +1270,12 @@ function Cashier() {
                 onClick={() => selectTable(table.id)}
               >
                 {table.billOutRequested && (
-                  <div className="table-card-billout-badge" title="Customer requested bill out">🧾</div>
+                  <div
+                    className="table-card-billout-badge"
+                    title={`Customer requested bill out${table.billOutPaymentMethod ? ` (${table.billOutPaymentMethod === 'qr' ? 'InstaPay QR' : table.billOutPaymentMethod === 'credit' ? 'Credit Card' : 'Cash'})` : ''}`}
+                  >
+                    🧾{table.billOutPaymentMethod ? ` ${table.billOutPaymentMethod === 'qr' ? 'QR' : table.billOutPaymentMethod === 'credit' ? 'Card' : 'Cash'}` : ''}
+                  </div>
                 )}
                 <div className="table-card-center">
                   <div className="table-number">{table.label}</div>
@@ -1129,6 +1560,16 @@ function Cashier() {
                     <span>-{formatPrice(item.amount)}</span>
                   </div>
                 ))}
+                {selected?.billOutPaymentMethod && (
+                  <div className="summary-row summary-payment-method">
+                    <span>Requested Payment</span>
+                    <span className="summary-payment-badge">
+                      {selected.billOutPaymentMethod === 'qr' && '📱 InstaPay QR'}
+                      {selected.billOutPaymentMethod === 'credit' && '💳 Credit Card'}
+                      {selected.billOutPaymentMethod === 'cash' && '💵 Cash'}
+                    </span>
+                  </div>
+                )}
                 <div className="summary-total">
                   <span>Total</span>
                   <span>{formatPrice(total)}</span>
@@ -1315,6 +1756,9 @@ function Cashier() {
                   onChange={() => setPaymentMethod('cash')}
                 />
                 Cash
+                {selected?.billOutPaymentMethod === 'cash' && (
+                  <span className="payment-customer-pick">Customer Choice</span>
+                )}
               </label>
               <label>
                 <input
@@ -1325,6 +1769,9 @@ function Cashier() {
                   onChange={() => setPaymentMethod('credit')}
                 />
                 Credit Card
+                {selected?.billOutPaymentMethod === 'credit' && (
+                  <span className="payment-customer-pick">Customer Choice</span>
+                )}
               </label>
               <label>
                 <input
@@ -1334,7 +1781,10 @@ function Cashier() {
                   checked={paymentMethod === 'qr'}
                   onChange={() => setPaymentMethod('qr')}
                 />
-                QR Code
+                InstaPay QR
+                {selected?.billOutPaymentMethod === 'qr' && (
+                  <span className="payment-customer-pick">Customer Choice</span>
+                )}
               </label>
             </div>
             <div className="modal-actions">
@@ -1370,22 +1820,17 @@ function Cashier() {
           <div className="modal receipt-modal" id="receipt-printable" onClick={(e) => e.stopPropagation()}>
             {/* ── Header ── */}
             <div className="receipt-header">
-              <div className="receipt-logo" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                </svg>
-              </div>
-              <div className="receipt-brand">Servio</div>
-              <div className="receipt-check" aria-hidden="true">✓</div>
-              <p className="receipt-tagline">Payment Complete</p>
+              <div className="receipt-brand">SERVIO</div>
+              <p className="receipt-tagline">Point of Sale System</p>
+              <p className="receipt-tagline">Official Dining Receipt</p>
             </div>
 
             {/* ── Meta ── */}
             <div className="receipt-meta">
               <div><span>Table</span><strong>#{receipt.table}</strong></div>
               <div><span>Date</span><strong>{receipt.date}</strong></div>
-              <div><span>Payment</span><strong>{receipt.paymentMethod === 'qr' ? 'QR Code' : receipt.paymentMethod === 'credit' ? 'Credit Card' : 'Cash'}</strong></div>
+              <div><span>Payment</span><strong>{receipt.paymentMethod === 'qr' ? 'InstaPay QR' : receipt.paymentMethod === 'credit' ? 'Credit Card' : 'Cash'}</strong></div>
+              <div><span>Status</span><strong>COMPLETED / PAID</strong></div>
             </div>
 
             {/* ── Itemized list ── */}
@@ -1404,7 +1849,7 @@ function Cashier() {
                   {item.discountLabels.length > 0 && (
                     <div className="receipt-item-discounts">
                       {item.discountLabels.map((label, di) => (
-                        <span key={di} className="receipt-item-discount-tag">{label}</span>
+                        <span key={di} className="receipt-item-discount-tag">- {label}</span>
                       ))}
                     </div>
                   )}
@@ -1427,7 +1872,11 @@ function Cashier() {
               <div className="receipt-totals-row receipt-grand-total"><span>Total Paid</span><span>{formatPrice(receipt.total)}</span></div>
             </div>
 
-            <p className="receipt-footer-note">Thank you for dining with us!</p>
+            <p className="receipt-footer-note">
+              <strong>THANK YOU FOR DINING WITH US!</strong><br />
+              Please come again<br />
+              <small>*** CUSTOMER COPY ***</small>
+            </p>
 
             {/* ── Actions (hidden on print) ── */}
             <div className="receipt-actions no-print">
@@ -1443,6 +1892,13 @@ function Cashier() {
             </div>
           </div>
         </div>
+      )}
+      {showLogoutModal && (
+        <CashierLogoutModal
+          onConfirmLogout={handleConfirmLogout}
+          onSwitchInterface={handleSwitchInterface}
+          onDismiss={() => setShowLogoutModal(false)}
+        />
       )}
     </div>
   );

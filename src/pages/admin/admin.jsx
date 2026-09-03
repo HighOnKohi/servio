@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { usePOS } from "../../context/POSContext";
 import { useAuth } from "../../context/AuthContext";
+import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
 import ProtocolUploadModal from "../../components/ProtocolUploadModal";
 import ProtocolManagementPanel from "../../components/ProtocolManagementPanel";
 import "./admin.css";
@@ -326,34 +327,89 @@ function ResetRevenueConfirmModal({ onClose, onConfirm }) {
   );
 }
 
+// ─── Reset Best Sellers Confirm Modal ─────────────────────────────────────────
+function ResetBestSellersConfirmModal({ onClose, onConfirm }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "28px 32px",
+        maxWidth: 440, width: "90%", boxShadow: "0 20px 48px rgba(0,0,0,0.18)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: "1.6rem" }}>🔥</span>
+          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#111827" }}>
+            Clear All-Time Best Sellers?
+          </h3>
+        </div>
+        <p style={{ color: "#475569", fontSize: "0.88rem", margin: "0 0 14px", lineHeight: 1.5 }}>
+          This will reset the all-time purchase counters for all menu items back to 0. The permanent <strong>Best Sellers</strong> menu category in Customer and Cashier terminals will start tracking fresh as new orders are placed.
+        </p>
+        <p style={{ color: "#64748b", fontSize: "0.8rem", margin: "0 0 22px" }}>
+          This operation is immediate and synchronizes across all active devices and browser windows.
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={onClose}
+            style={{ flex: 1, padding: "9px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", cursor: "pointer", fontSize: "0.85rem" }}>
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm}
+            style={{ flex: 1, padding: "9px", border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }}>
+            Clear History
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── useFixedInterfaceCanvas ──────────────────────────────────────────────────
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
+  return { scale: 1, width: "100%", height: "100vh" };
+}
 
-  useEffect(() => {
-    const updateScale = () => refreshScale((v) => v + 1);
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, []);
-
-  if (typeof window === "undefined") return { scale: 1, width: "100%", height: "100vh" };
-
-  const pr = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pr,
-    width: `${Math.round(window.innerWidth * pr)}px`,
-    height: `${Math.round(window.innerHeight * pr)}px`,
-  };
+/* ── Confirmation Modal for Admin Logout ────────────────────────────── */
+function AdminLogoutModal({ onConfirm, onDismiss }) {
+  return (
+    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="admin-logout-title">
+      <div className="kitchen-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 28, height: 28 }} aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <h2 id="admin-logout-title">Log Out of Admin?</h2>
+        </div>
+        <p className="kitchen-modal-body">
+          Are you sure you want to log out of the Admin dashboard?
+        </p>
+        <div className="kitchen-modal-actions">
+          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
+            Cancel
+          </button>
+          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirm}>
+            Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 const Admin = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
   const {
     tables, menuItems, categories, orders, profiles, ingredients,
     getLowStockIngredients, loading, refetchProfiles,
     updateProfile, deleteProfile,
+    itemSales, resetBestSellers, restoreDefaultBestSellers,
   } = usePOS();
 
   const interfaceCanvas = useFixedInterfaceCanvas();
@@ -365,6 +421,7 @@ const Admin = () => {
   const [deletingProfile, setDeletingProfile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showResetRevenueModal, setShowResetRevenueModal] = useState(false);
+  const [showResetBestSellersModal, setShowResetBestSellersModal] = useState(false);
   const [toast, setToast] = useState("");
 
   // ── Revenue filter & reset state ──────────────────────────────────────────
@@ -429,6 +486,23 @@ const Admin = () => {
     localStorage.removeItem(LS_RESET_KEY);
     showToast("✓ Shift baseline cleared. Showing full period revenue.");
   }, [showToast]);
+
+  const handleClearBestSellers = useCallback(() => {
+    resetBestSellers();
+    setShowResetBestSellersModal(false);
+    showToast("✓ All-time Best Sellers history has been cleared.");
+  }, [resetBestSellers, showToast]);
+
+  const topBestSellers = useMemo(() => {
+    return menuItems
+      .map((item) => ({
+        ...item,
+        soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+      }))
+      .filter((item) => item.soldCount > 0)
+      .sort((a, b) => b.soldCount - a.soldCount)
+      .slice(0, 5);
+  }, [menuItems, itemSales]);
 
   const time = currentDateTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
   const date = currentDateTime.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -515,14 +589,14 @@ const Admin = () => {
 
   return (
     <div
-      className="admin-page"
+      className={`admin-page admin-page--scale-${uiScale}`}
       style={{
-        "--admin-scale": interfaceCanvas.scale,
-        width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height,
+        "--servio-font-scale": fontScale,
+        "--servio-elem-scale": elementScale,
+        width: "100%", height: "100vh", maxHeight: "100vh",
         background: "#f8fafc", color: "#111827",
         fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex", flexDirection: "column", overflow: "hidden",
-        zoom: "var(--admin-scale)",
       }}
     >
       {/* ── Header ── */}
@@ -534,14 +608,15 @@ const Admin = () => {
           </svg>
           <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Admin Dashboard</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "0.82rem", color: "#b8c5d6" }}>{date}, {time}</span>
-          <button onClick={() => navigate("/")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 10px", color: "#374151", cursor: "pointer" }} aria-label="Return to Interface Selector">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
+          <span style={{ fontSize: "0.92rem", color: "#64748b", fontWeight: 600 }}>{date}, {time}</span>
+          <button onClick={() => navigate("/")} style={{ background: "none", border: "1.5px solid #e5e7eb", borderRadius: 10, height: 44, padding: "0 14px", color: "#374151", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }} aria-label="Return to Interface Selector">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
             </svg>
           </button>
-          <button onClick={handleLogout} style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 8, padding: "6px 10px", color: "#dc2626", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600 }}>
+          <button onClick={() => setShowLogoutModal(true)} style={{ background: "rgba(239, 68, 68, 0.12)", border: "1.5px solid #fca5a5", borderRadius: 10, height: 44, padding: "0 18px", color: "#dc2626", cursor: "pointer", fontSize: "0.95rem", fontWeight: 750, display: "inline-flex", alignItems: "center", gap: 6 }}>
             Logout
           </button>
         </div>
@@ -571,6 +646,13 @@ const Admin = () => {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => setShowResetBestSellersModal(true)}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 12px 3px 8px", fontSize: "0.72rem", fontWeight: 600, border: "1px solid #fed7aa", borderRadius: 20, background: "#fff7ed", color: "#c2410c", cursor: "pointer" }}
+            aria-label="Clear all-time Best Sellers history"
+          >
+            🔥 Clear Best Sellers
+          </button>
           {revenueResetTimestamp && (
             <button
               onClick={handleClearRevenueReset}
@@ -628,7 +710,7 @@ const Admin = () => {
       </div>
 
       {/* ── Stats Row 2 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, padding: "16px 24px 20px", flexShrink: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, padding: "16px 24px 20px", flexShrink: 0 }}>
         <div style={{ ...cardStyle, background: lowStock.length > 0 ? "#fff7ed" : "#ffffff", borderColor: lowStock.length > 0 ? "#fdba74" : "#e2e8f0" }}>
           <div style={labelStyle}>Low Stock Alerts</div>
           <div style={{ ...valueStyle, color: lowStock.length > 0 ? "#c2410c" : "#16a34a" }}>{lowStock.length}</div>
@@ -646,6 +728,38 @@ const Admin = () => {
         <div style={cardStyle}>
           <div style={labelStyle}>Staff Profiles</div>
           <div style={valueStyle}>{profiles.length}</div>
+        </div>
+        <div style={{ ...cardStyle, background: topBestSellers.length > 0 ? "#fffbeb" : "#ffffff", borderColor: topBestSellers.length > 0 ? "#fed7aa" : "#e2e8f0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={labelStyle}>All-Time Best Sellers</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {topBestSellers.length === 0 && (
+                <button
+                  onClick={() => {
+                    restoreDefaultBestSellers();
+                    showToast("✓ Restored default best seller samples.");
+                  }}
+                  style={{ background: "none", border: "none", color: "#087f63", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", padding: 0 }}
+                >
+                  Restore Defaults
+                </button>
+              )}
+              <button
+                onClick={() => setShowResetBestSellersModal(true)}
+                style={{ background: "none", border: "none", color: "#c2410c", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", padding: 0 }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div style={{ ...valueStyle, color: "#d97706", fontSize: "1.1rem" }}>
+            {topBestSellers[0] ? `${topBestSellers[0].name} (${topBestSellers[0].soldCount})` : "No sales yet"}
+          </div>
+          <div style={{ ...mutedStyle, fontSize: "0.75rem" }}>
+            {topBestSellers.length > 1
+              ? topBestSellers.slice(1, 4).map((i) => `${i.name} (${i.soldCount})`).join(" · ")
+              : "Ranked by all-time units sold"}
+          </div>
         </div>
       </div>
 
@@ -789,6 +903,19 @@ const Admin = () => {
         <ResetRevenueConfirmModal
           onClose={() => setShowResetRevenueModal(false)}
           onConfirm={handleRevenueReset}
+        />
+      )}
+      {showResetBestSellersModal && (
+        <ResetBestSellersConfirmModal
+          onClose={() => setShowResetBestSellersModal(false)}
+          onConfirm={handleClearBestSellers}
+        />
+      )}
+
+      {showLogoutModal && (
+        <AdminLogoutModal
+          onConfirm={handleLogout}
+          onDismiss={() => setShowLogoutModal(false)}
         />
       )}
     </div>

@@ -1,29 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePOS } from "../../context/POSContext";
+import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
 import "./inventory.css";
 
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
-
-  useEffect(() => {
-    const updateScale = () => refreshScale((v) => v + 1);
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, []);
-
-  if (typeof window === "undefined") return { scale: 1, width: "100%", height: "100vh" };
-
-  const pr = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pr,
-    width: `${Math.round(window.innerWidth * pr)}px`,
-    height: `${Math.round(window.innerHeight * pr)}px`,
-  };
+  return { scale: 1, width: "100%", height: "100vh" };
 }
 
 const Inventory = () => {
   const navigate = useNavigate();
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
   const {
     ingredients,
     addIngredient,
@@ -212,19 +199,19 @@ const Inventory = () => {
 
   return (
     <div
-      className="inventory-page"
+      className={`inventory-page inventory-page--scale-${uiScale}`}
       style={{
-        "--inv-scale": interfaceCanvas.scale,
-        width: interfaceCanvas.width,
-        height: interfaceCanvas.height,
-        minHeight: interfaceCanvas.height,
+        "--servio-font-scale": fontScale,
+        "--servio-elem-scale": elementScale,
+        width: "100%",
+        height: "100vh",
+        maxHeight: "100vh",
         background: "#f8fafc",
         color: "#111827",
         fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        zoom: "var(--inv-scale)",
       }}
     >
       <header
@@ -247,16 +234,22 @@ const Inventory = () => {
           <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Inventory Interface</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontSize: "0.82rem", color: "#b8c5d6" }}>{date}, {time}</span>
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
+          <span style={{ fontSize: "0.92rem", color: "#64748b", fontWeight: 600 }}>{date}, {time}</span>
           <button
             onClick={() => navigate("/")}
             style={{
               ...secondaryButtonStyle,
-              padding: "6px 10px",
+              height: 44,
+              padding: "0 16px",
+              borderRadius: 10,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
             aria-label="Return"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5" />
               <path d="m12 19-7-7 7-7" />
             </svg>

@@ -96,27 +96,33 @@ function MenuImagePlaceholderSVG() {
 }
 
 /* ── Menu Image Display — real photo with shimmer skeleton + fallback ────── */
-function MenuImageDisplay({ src, alt }) {
+function MenuImageDisplay({ src, alt, soldOut = false, unavailable = false }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
-  if (!src || error) {
-    return (
-      <span className="customer-menu-image" aria-hidden="true">
-        <MenuImagePlaceholderSVG />
-      </span>
-    );
-  }
-
   return (
-    <span className={`customer-menu-image customer-menu-image--photo${loaded ? ' loaded' : ''}`}>
-      <img
-        src={src}
-        alt={alt}
-        className="customer-menu-img"
-        onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
-      />
+    <span className={`customer-menu-image customer-menu-image--photo${loaded ? ' loaded' : ''}${!src || error ? ' placeholder' : ''}`}>
+      {!src || error ? (
+        <MenuImagePlaceholderSVG />
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          className="customer-menu-img"
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
+      )}
+      {soldOut && (
+        <span className="customer-image-soldout-overlay" aria-hidden="true">
+          <span>SOLD OUT</span>
+        </span>
+      )}
+      {!soldOut && unavailable && (
+        <span className="customer-image-soldout-overlay unavail" aria-hidden="true">
+          <span>UNAVAILABLE</span>
+        </span>
+      )}
     </span>
   );
 }
@@ -135,6 +141,131 @@ function PlusIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
     </svg>
+  );
+}
+
+/* ── Customer Bill Out Payment Selection Modal ────────────────────────────── */
+function CustomerBillOutModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  selectedMethod,
+  onSelectMethod,
+  submitting,
+  totalAmount,
+  formatPrice,
+}) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && !submitting) onClose();
+    };
+    if (isOpen) document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isOpen, onClose, submitting]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="cbillout-overlay" onClick={() => !submitting && onClose()} role="dialog" aria-modal="true" aria-label="Select payment method">
+      <div className="cbillout-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cbillout-header">
+          <div className="cbillout-header-text">
+            <span className="cbillout-kicker">BILL OUT REQUEST</span>
+            <h2 className="cbillout-title">Select Payment Method</h2>
+            <p className="cbillout-subtitle">Choose how you prefer to settle your bill with the cashier.</p>
+          </div>
+          <button className="cbillout-close-btn" onClick={onClose} disabled={submitting} aria-label="Close" type="button">×</button>
+        </div>
+
+        {totalAmount > 0 && (
+          <div className="cbillout-amount-card">
+            <span className="cbillout-amount-label">Current Total Bill</span>
+            <span className="cbillout-amount-val">{formatPrice(totalAmount)}</span>
+          </div>
+        )}
+
+        <div className="cbillout-options" role="radiogroup" aria-label="Payment methods">
+          {/* Cash option */}
+          <label className={`cbillout-option ${selectedMethod === 'cash' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name="customer-payment"
+              value="cash"
+              checked={selectedMethod === 'cash'}
+              onChange={() => onSelectMethod('cash')}
+              className="cbillout-radio"
+            />
+            <div className="cbillout-option-icon cash-icon">💵</div>
+            <div className="cbillout-option-details">
+              <div className="cbillout-option-top">
+                <span className="cbillout-option-title">Cash</span>
+                {selectedMethod === 'cash' && <span className="cbillout-check">✓</span>}
+              </div>
+              <p className="cbillout-option-desc">Pay with cash at the counter or give to staff</p>
+            </div>
+          </label>
+
+          {/* Credit Card option */}
+          <label className={`cbillout-option ${selectedMethod === 'credit' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name="customer-payment"
+              value="credit"
+              checked={selectedMethod === 'credit'}
+              onChange={() => onSelectMethod('credit')}
+              className="cbillout-radio"
+            />
+            <div className="cbillout-option-icon card-icon">💳</div>
+            <div className="cbillout-option-details">
+              <div className="cbillout-option-top">
+                <span className="cbillout-option-title">Credit Card</span>
+                {selectedMethod === 'credit' && <span className="cbillout-check">✓</span>}
+              </div>
+              <p className="cbillout-option-desc">Debit or Credit Card terminal (Visa / Mastercard)</p>
+            </div>
+          </label>
+
+          {/* InstaPay QR option */}
+          <label className={`cbillout-option ${selectedMethod === 'qr' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name="customer-payment"
+              value="qr"
+              checked={selectedMethod === 'qr'}
+              onChange={() => onSelectMethod('qr')}
+              className="cbillout-radio"
+            />
+            <div className="cbillout-option-icon qr-icon">📱</div>
+            <div className="cbillout-option-details">
+              <div className="cbillout-option-top">
+                <span className="cbillout-option-title">InstaPay QR</span>
+                {selectedMethod === 'qr' && <span className="cbillout-check">✓</span>}
+              </div>
+              <p className="cbillout-option-desc">Scan to pay via GCash, Maya, or any banking app</p>
+            </div>
+          </label>
+        </div>
+
+        <div className="cbillout-actions">
+          <button
+            type="button"
+            className="cbillout-cancel-btn"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="cbillout-confirm-btn"
+            onClick={onConfirm}
+            disabled={submitting}
+          >
+            {submitting ? 'Sending Request…' : 'Confirm & Request Bill'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -414,6 +545,7 @@ export default function Customer() {
     cancelCustomerRequest,
     requestTableBillOut,
     formatPrice,
+    itemSales,
     loading,
   } = usePOS();
 
@@ -432,25 +564,59 @@ export default function Customer() {
     (o) => o.table_number === parsedTableId && o.status !== 'CANCELLED',
   );
 
+  const activeOrderDishes = useMemo(() => {
+    return tableOrders.flatMap((order) =>
+      safeOrderItems.filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
+    );
+  }, [tableOrders, safeOrderItems]);
+
+  const activeOrderServedCount = activeOrderDishes.filter(
+    (i) => String(i.status || '').toUpperCase() === 'SERVED' || String(i.status || '').toUpperCase() === 'READY'
+  ).length;
+
   // Show ALL items — SOLD OUT ones appear grayed out / disabled so customers
   // know the item exists but isn't available right now.
   const menuItems = useMemo(
-    () => safeMenuItems.map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: Number(item.price) || 0,
-      description: item.description || '',
-      imageUrl: item.image_url || null,
-      category: item.category_id,
-      soldOut: item.status !== 'ACTIVE',
-    })),
+    () => safeMenuItems.map((item) => {
+      const statusUpper = String(item.status || 'ACTIVE').toUpperCase();
+      const isSoldOut = statusUpper === 'SOLD OUT' || statusUpper === 'INACTIVE' || item.status !== 'ACTIVE';
+      return {
+        id: item.id,
+        name: item.name,
+        price: Number(item.price) || 0,
+        description: item.description || '',
+        imageUrl: item.image_url || null,
+        category: item.category_id,
+        status: item.status || (isSoldOut ? 'SOLD OUT' : 'ACTIVE'),
+        soldOut: isSoldOut,
+      };
+    }),
     [safeMenuItems],
   );
 
+  const BEST_SELLERS_CATEGORY = {
+    id: 'best-sellers',
+    name: '🔥 Best Sellers',
+    isBestSeller: true,
+  };
+
   const categories = useMemo(
-    () => safeCategories.map((category) => ({ id: category.id, name: category.name })),
+    () => [
+      BEST_SELLERS_CATEGORY,
+      ...safeCategories.map((category) => ({ id: category.id, name: category.name })),
+    ],
     [safeCategories],
   );
+
+  // ── Unlock document scrolling on mobile/tablet while in the Customer interface ──
+  useEffect(() => {
+    document.documentElement.classList.add('customer-page-active');
+    document.body.classList.add('customer-page-active');
+    return () => {
+      document.documentElement.classList.remove('customer-page-active');
+      document.body.classList.remove('customer-page-active');
+    };
+  }, []);
 
   // ── sessionStorage keys scoped to this table so different tables don't collide ──
   const storageKey = (key) => `customer_t${parsedTableId}_${key}`;
@@ -483,6 +649,14 @@ export default function Customer() {
   const [billOutRequested, setBillOutRequested] = useState(() => {
     try { return sessionStorage.getItem(storageKey('billout')) === 'true'; } catch { return false; }
   });
+  const [showBillOutModal, setShowBillOutModal] = useState(false);
+  const [selectedBillOutMethod, setSelectedBillOutMethod] = useState(() => {
+    try {
+      return sessionStorage.getItem(storageKey('billout_method')) || 'cash';
+    } catch {
+      return 'cash';
+    }
+  });
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [menuSearch, setMenuSearch] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
@@ -509,6 +683,12 @@ export default function Customer() {
   useEffect(() => {
     try { sessionStorage.setItem(storageKey('billout'), String(billOutRequested)); } catch {}
   }, [billOutRequested, parsedTableId]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey('billout_method'), selectedBillOutMethod);
+    } catch {}
+  }, [selectedBillOutMethod, parsedTableId]);
 
   // Clear the stored cart once the request is ACCEPTED (kitchen is cooking — cart locked)
   useEffect(() => {
@@ -613,11 +793,98 @@ export default function Customer() {
   }, [menuItems, cart]);
 
   const activeCategory = selectedCategory || categories[0]?.id;
+  const isBestSellerCategory = activeCategory === 'best-sellers';
   const normalizedMenuSearch = debouncedSearch;
-  const visibleItems = menuItems.filter((item) =>
-    item.category === activeCategory &&
-    (!normalizedMenuSearch || item.name.toLowerCase().includes(normalizedMenuSearch))
-  );
+
+  const visibleItems = useMemo(() => {
+    if (isBestSellerCategory) {
+      const top3PerCategory = [];
+      const seenIds = new Set();
+
+      // Collect top 3 of each category based on all-time sales
+      safeCategories.forEach((cat) => {
+        const catItems = menuItems
+          .filter((item) => item.category === cat.id)
+          .map((item) => ({
+            ...item,
+            soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+          }))
+          .filter((item) => item.soldCount > 0)
+          .sort((a, b) => b.soldCount - a.soldCount)
+          .slice(0, 3);
+
+        catItems.forEach((item) => {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            top3PerCategory.push(item);
+          }
+        });
+      });
+
+      // Also include top 3 for any items not matching standard category IDs
+      const uncategorizedItems = menuItems
+        .filter((item) => !safeCategories.some((c) => c.id === item.category))
+        .map((item) => ({
+          ...item,
+          soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+        }))
+        .filter((item) => item.soldCount > 0)
+        .sort((a, b) => b.soldCount - a.soldCount)
+        .slice(0, 3);
+
+      uncategorizedItems.forEach((item) => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          top3PerCategory.push(item);
+        }
+      });
+
+      // Sort all combined top category items by sales descending
+      top3PerCategory.sort((a, b) => b.soldCount - a.soldCount);
+
+      // Identify the #1 overall best seller across all categories
+      const topOverallId = top3PerCategory.length > 0 && top3PerCategory[0].soldCount > 0
+        ? top3PerCategory[0].id
+        : null;
+
+      return top3PerCategory
+        .map((item) => ({
+          ...item,
+          isTopBestSeller: item.id === topOverallId,
+        }))
+        .filter((item) => {
+          if (normalizedMenuSearch && !item.name.toLowerCase().includes(normalizedMenuSearch)) {
+            return false;
+          }
+          return true;
+        });
+    }
+    // For standard categories: find the #1 best seller of this specific category
+    const categoryItems = menuItems
+      .filter((item) => item.category === activeCategory)
+      .map((item) => ({
+        ...item,
+        soldCount: Number(itemSales?.[item.id] ?? itemSales?.[item.name] ?? 0),
+      }));
+
+    let topCategoryItemId = null;
+    let maxCategorySold = 0;
+    categoryItems.forEach((item) => {
+      if (item.soldCount > maxCategorySold) {
+        maxCategorySold = item.soldCount;
+        topCategoryItemId = item.id;
+      }
+    });
+
+    return categoryItems
+      .map((item) => ({
+        ...item,
+        isTopBestSeller: maxCategorySold > 0 && item.id === topCategoryItemId,
+      }))
+      .filter((item) =>
+        !normalizedMenuSearch || item.name.toLowerCase().includes(normalizedMenuSearch)
+      );
+  }, [menuItems, safeCategories, activeCategory, isBestSellerCategory, normalizedMenuSearch, itemSales]);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const now = new Date(currentTime);
@@ -716,17 +983,33 @@ export default function Customer() {
     setSubmitting(false);
   }
 
-  async function handleBillOut() {
+  function openBillOutModal() {
     if (billOutRequesting || billOutRequested || !selectedTable) return;
+    setShowBillOutModal(true);
+  }
+
+  async function handleConfirmBillOut() {
+    if (billOutRequesting || !selectedTable) return;
     setBillOutRequesting(true);
-    await requestTableBillOut(selectedTable.table_number);
+    await requestTableBillOut(selectedTable.table_number, selectedBillOutMethod);
     setBillOutRequested(true);
     setBillOutRequesting(false);
+    setShowBillOutModal(false);
   }
 
   function openDetailModal(item) {
-    if (!item.soldOut) setDetailItem(item);
+    if (!item.soldOut && item.status !== 'SOLD OUT') setDetailItem(item);
   }
+
+  // Auto-close detail modal if the item goes sold out while browsing
+  useEffect(() => {
+    if (detailItem) {
+      const live = menuItems.find((m) => m.id === detailItem.id);
+      if (live?.soldOut || live?.status === 'SOLD OUT') {
+        setDetailItem(null);
+      }
+    }
+  }, [menuItems, detailItem]);
 
   function closeDetailModal() {
     setDetailItem(null);
@@ -784,7 +1067,7 @@ export default function Customer() {
             return (
               <div
                 key={item.id}
-                className="customer-cart-item"
+                className={`customer-cart-item ${isProblematic ? 'is-problematic' : ''} ${isCartSoldOut ? 'is-sold-out' : ''}`}
                 style={isProblematic ? { border: '1.5px solid #fecaca', background: '#fef2f2', borderRadius: 8 } : {}}
               >
                 <div className="customer-cart-item-info">
@@ -832,13 +1115,13 @@ export default function Customer() {
           <p className="customer-served-subtitle">Enjoy your meal. Ready to pay?</p>
           {billOutRequested ? (
             <div className="customer-billout-requested" aria-live="polite">
-              ✓ Bill requested — Staff is heading to your table
+              ✓ Bill requested ({selectedBillOutMethod === 'qr' ? 'InstaPay QR' : selectedBillOutMethod === 'credit' ? 'Credit Card' : 'Cash'}) — Staff is heading to your table
             </div>
           ) : (
             <button
               type="button"
               className="customer-billout-button"
-              onClick={handleBillOut}
+              onClick={openBillOutModal}
               disabled={billOutRequesting}
               aria-label="Request bill out"
             >
@@ -896,6 +1179,18 @@ export default function Customer() {
         />
       )}
 
+      {/* ── Bill Out Payment Method Modal ── */}
+      <CustomerBillOutModal
+        isOpen={showBillOutModal}
+        onClose={() => setShowBillOutModal(false)}
+        onConfirm={handleConfirmBillOut}
+        selectedMethod={selectedBillOutMethod}
+        onSelectMethod={setSelectedBillOutMethod}
+        submitting={billOutRequesting}
+        totalAmount={tableOrders.reduce((s, o) => s + Number(o.total || o.subtotal || 0), 0) || Number(dbTable?.total_bill ?? dbTable?.current_bill ?? 0)}
+        formatPrice={formatPrice}
+      />
+
       {/* ── Item Detail Modal ── */}
       {detailItem && (
         <ItemDetailModal
@@ -910,7 +1205,21 @@ export default function Customer() {
       <header className="customer-topbar">
         <div>
           <p className="customer-kicker">Customer Interface</p>
-          <h1>Table #{String(selectedTable.table_number).padStart(2, '0')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0 }}>Table #{String(selectedTable.table_number).padStart(2, '0')}</h1>
+            {activeOrderDishes.length > 0 && (
+              <button
+                type="button"
+                className="customer-topbar-order-badge"
+                onClick={() => {
+                  document.getElementById('customer-order-status')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                aria-label="View live order status"
+              >
+                🍳 {activeOrderServedCount}/{activeOrderDishes.length} ready ↓
+              </button>
+            )}
+          </div>
         </div>
         <div className="customer-topbar-actions">
           <button
@@ -943,7 +1252,7 @@ export default function Customer() {
             {categories.map((category) => (
               <button
                 key={category.id}
-                className={`customer-category-button ${activeCategory === category.id ? 'active' : ''}`}
+                className={`customer-category-button ${category.isBestSeller ? 'customer-category-button--best-seller' : ''} ${activeCategory === category.id ? 'active' : ''}`}
                 onClick={() => setSelectedCategory(category.id)}
                 ref={activeCategory === category.id ? activeCategoryRef : null}
                 role="tab"
@@ -974,45 +1283,51 @@ export default function Customer() {
             role="list"
             aria-label={`Menu items in ${categories.find(c => c.id === activeCategory)?.name || 'selected category'}`}
           >
-            {visibleItems.map((item) => {
-              const isSoldOut   = item.soldOut;
+            {visibleItems.map((item, index) => {
+              const isSoldOut   = item.soldOut || item.status === 'SOLD OUT';
               const isUnavail   = unavailableItemIds.has(item.id) || unavailableItemIds.has(item.name);
               const isDisabled  = isSoldOut || isUnavail;
               return (
-              <article
+                <article
                   key={item.id}
-                  className="customer-menu-card"
+                  className={`customer-menu-card ${isDisabled ? 'is-disabled' : ''} ${isSoldOut ? 'is-sold-out' : ''} ${item.isTopBestSeller ? 'customer-menu-card--bestseller' : ''}`}
                   onClick={() => !isDisabled && openDetailModal(item)}
                   role="listitem"
-                  aria-label={`${item.name}, ${formatPrice(item.price)}${isDisabled ? ', unavailable' : ''}`}
-                  style={isDisabled ? { opacity: .5 } : {}}
+                  aria-label={`${item.name}, ${formatPrice(item.price)}${isSoldOut ? ', sold out' : isUnavail ? ', unavailable' : ''}`}
                 >
-                  <MenuImageDisplay src={item.imageUrl} alt={item.name} />
+                  <MenuImageDisplay src={item.imageUrl} alt={item.name} soldOut={isSoldOut} unavailable={!isSoldOut && isUnavail} />
                   <div className="customer-menu-body">
+                    {item.isTopBestSeller && item.soldCount > 0 && (
+                      <div className="customer-menu-bestseller-rank">
+                        🔥 #1 Best Seller · {item.soldCount} sold
+                      </div>
+                    )}
                     <span className="customer-menu-name">
                       {item.name}
+                    </span>
+                    <div className="customer-menu-meta-row">
+                      <span className="customer-menu-price" aria-label={`Price: ${formatPrice(item.price)}`}>
+                        {formatPrice(item.price)}
+                      </span>
                       {isSoldOut && (
-                        <span style={{ display: 'block', fontSize: '.7rem', color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                        <span className="customer-menu-status-badge customer-menu-badge-soldout">
                           Sold Out
                         </span>
                       )}
                       {!isSoldOut && isUnavail && (
-                        <span style={{ display: 'block', fontSize: '.7rem', color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                        <span className="customer-menu-status-badge customer-menu-badge-unavail">
                           Unavailable
                         </span>
                       )}
-                    </span>
-                    <span className="customer-menu-price" aria-label={`Price: ${formatPrice(item.price)}`}>
-                      {formatPrice(item.price)}
-                    </span>
+                    </div>
                     <button
                       className="customer-menu-add-btn"
                       onClick={(event) => { event.stopPropagation(); addItem(item); }}
-                      aria-label={`Add ${item.name} to order`}
+                      aria-label={isDisabled ? `${item.name} is ${isSoldOut ? 'sold out' : 'unavailable'}` : `Add ${item.name} to order`}
                       type="button"
                       disabled={isDisabled}
                     >
-                      <PlusIcon /> Add to Order
+                      {isDisabled ? (isSoldOut ? '✕ Sold Out' : '⚠ Unavailable') : <><PlusIcon /> Add to Order</>}
                     </button>
                   </div>
                 </article>
@@ -1020,17 +1335,19 @@ export default function Customer() {
             })}
 
             {visibleItems.length === 0 && (
-              <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: '40px 20px' }}>
-                No items in this category yet.
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#64748b', padding: '48px 20px', background: '#fff', borderRadius: 16, border: '1px dashed #cbd5e1' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🔥</div>
+                <h3 style={{ margin: '0 0 6px', color: '#0f172a', fontSize: '1.15rem' }}>No Best Sellers Recorded Yet</h3>
+                <p style={{ margin: 0, fontSize: '0.88rem' }}>Items will automatically appear here ranked by sales as orders are placed.</p>
               </div>
             )}
           </div>
         </section>
 
-        {/* ── Desktop Sidebar ── */}
+        {/* ── Sidebar (Desktop right column, Mobile stacked below menu) ── */}
         <aside className="customer-sidebar">
           {tableOrders.length > 0 && (
-            <div className="customer-sidebar-order-status" style={{ marginBottom: 16 }}>
+            <div className="customer-sidebar-order-status" id="customer-order-status">
               <OrderStatusPanel
                 tableOrders={tableOrders}
                 orderItems={safeOrderItems}
@@ -1041,17 +1358,6 @@ export default function Customer() {
           <CartPanel isInline />
         </aside>
       </main>
-
-      {/* ── Mobile Order Status (shown between menu and sticky bar) ── */}
-      {tableOrders.length > 0 && (
-        <div className="customer-mobile-order-status">
-          <OrderStatusPanel
-            tableOrders={tableOrders}
-            orderItems={safeOrderItems}
-            formatPrice={formatPrice}
-          />
-        </div>
-      )}
 
       {/* ── Mobile Sticky Bottom Bar ── */}
       <div className="customer-mobile-bar" role="region" aria-label="Order summary and checkout">
@@ -1068,7 +1374,7 @@ export default function Customer() {
           <button
             type="button"
             className="customer-billout-button"
-            onClick={handleBillOut}
+            onClick={openBillOutModal}
             disabled={billOutRequesting}
           >
             {billOutRequesting ? 'Sending…' : '🧾 Request Bill Out'}
@@ -1076,7 +1382,7 @@ export default function Customer() {
         )}
         {showBillOut && billOutRequested && (
           <div className="customer-billout-requested">
-            ✓ Bill requested — Staff is heading to your table
+            ✓ Bill requested ({selectedBillOutMethod === 'qr' ? 'InstaPay QR' : selectedBillOutMethod === 'credit' ? 'Credit Card' : 'Cash'}) — Staff is heading to your table
           </div>
         )}
         <button

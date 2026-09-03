@@ -89,6 +89,18 @@ const buildTableDiscountPayload = (subtotal, tableRow = {}) => {
 }; // 12% VAT for Philippines
 const CURRENCY = "₱";
 
+const DEFAULT_BASELINE_SALES = {
+  "Crispy Fried Chicken": 84,
+  "Pizza": 67,
+  "Crispy Fries": 52,
+  "Coke": 45,
+  "Chicken Cat": 38,
+  "Fries": 31,
+  "Ice Cream": 26,
+  "Water": 18,
+  "Burger": 12,
+};
+
 /**
  * POSProvider Component
  * Wraps the application and manages the global state.
@@ -106,11 +118,99 @@ export function POSProvider({ children }) {
   const [ingredients, setIngredients] = useState([]);
   const [recipeIngredients, setRecipeIngredients] = useState([]);
   const [customerRequests, setCustomerRequests] = useState([]);
+  const [tableBillOutPayments, setTableBillOutPayments] = useState(() => {
+    try {
+      const saved = localStorage.getItem("servio_billout_payments");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // All-time sales counter for the permanent Best Sellers category
+  const [itemSales, setItemSales] = useState(() => {
+    try {
+      const isCleared = localStorage.getItem("servio_best_sellers_reset_ts");
+      const saved = localStorage.getItem("servio_item_sales");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      if (isCleared) {
+        return {};
+      }
+      return DEFAULT_BASELINE_SALES;
+    } catch {
+      return DEFAULT_BASELINE_SALES;
+    }
+  });
 
   const [loading, setLoading] = useState(true);
 
   // Shared WebSocket channel ref for instant peer-to-peer broadcast across tabs
   const realtimeChannelRef = useRef(null);
+
+  /** Records item sales to the all-time best seller counts and broadcasts across terminals */
+  const recordItemSales = useCallback((itemsToRecord) => {
+    if (!Array.isArray(itemsToRecord) || itemsToRecord.length === 0) return;
+    setItemSales((prev) => {
+      const next = { ...prev };
+      itemsToRecord.forEach((i) => {
+        const qty = Number(i.quantity || i.qty || 1);
+        const name = i.name || i.item_name;
+        const id = i.id || i.menu_item_id;
+        if (id) {
+          next[id] = (Number(next[id]) || 0) + qty;
+        }
+        if (name) {
+          next[name] = (Number(next[name]) || 0) + qty;
+        }
+      });
+      try {
+        localStorage.setItem("servio_item_sales", JSON.stringify(next));
+      } catch {}
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "best-sellers-sales-updated",
+          payload: { itemSales: next },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+      return next;
+    });
+  }, []);
+
+  /** Clears all-time best seller counts (unless cleared by admin) and syncs across terminals */
+  const resetBestSellers = useCallback(() => {
+    const emptySales = {};
+    setItemSales(emptySales);
+    try {
+      localStorage.setItem("servio_item_sales", JSON.stringify(emptySales));
+      localStorage.setItem("servio_best_sellers_reset_ts", Date.now().toString());
+    } catch {}
+    if (realtimeChannelRef.current) {
+      realtimeChannelRef.current.send({
+        type: "broadcast",
+        event: "best-sellers-reset",
+        payload: { timestamp: Date.now() },
+      }).catch((err) => console.warn("Realtime broadcast error:", err));
+    }
+  }, []);
+
+  /** Restores demo baseline sales if needed */
+  const restoreDefaultBestSellers = useCallback(() => {
+    setItemSales(DEFAULT_BASELINE_SALES);
+    try {
+      localStorage.setItem("servio_item_sales", JSON.stringify(DEFAULT_BASELINE_SALES));
+      localStorage.removeItem("servio_best_sellers_reset_ts");
+    } catch {}
+    if (realtimeChannelRef.current) {
+      realtimeChannelRef.current.send({
+        type: "broadcast",
+        event: "best-sellers-sales-updated",
+        payload: { itemSales: DEFAULT_BASELINE_SALES },
+      }).catch((err) => console.warn("Realtime broadcast error:", err));
+    }
+  }, []);
 
   // --- Refetch Helpers ---
   // These functions query the Supabase database and update the local state.
@@ -166,7 +266,25 @@ export function POSProvider({ children }) {
       .from("customer_requests")
       .select("*")
       .order("created_at", { ascending: false });
-    if (data) setCustomerRequests(data);
+    if (data) {
+      setCustomerRequests(data);
+      // Sync payment methods from customer_requests if bill_out_requested is true
+      const paymentsFromRequests = {};
+      data.forEach((req) => {
+        if (req.bill_out_requested && req.rejection_reason && req.table_number) {
+          paymentsFromRequests[req.table_number] = req.rejection_reason;
+        }
+      });
+      if (Object.keys(paymentsFromRequests).length > 0) {
+        setTableBillOutPayments((prev) => {
+          const merged = { ...prev, ...paymentsFromRequests };
+          try {
+            localStorage.setItem("servio_billout_payments", JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }
   }, []);
 
   /** Fetches all staff profiles, ordered alphabetically by full name. */
@@ -273,6 +391,16 @@ export function POSProvider({ children }) {
       .on("broadcast", { event: "requests-changed" }, () => {
         refetchCustomerRequests();
       })
+      .on("broadcast", { event: "menu-changed" }, ({ payload }) => {
+        if (payload?.itemId && payload?.status) {
+          setMenuItems((prev) =>
+            prev.map((m) =>
+              m.id === payload.itemId ? { ...m, status: payload.status } : m
+            )
+          );
+        }
+        refetchMenu();
+      })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
@@ -315,6 +443,46 @@ export function POSProvider({ children }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "customer_requests" },
         () => refetchCustomerRequests(),
+      )
+      .on(
+        "broadcast",
+        { event: "bill-out-requested" },
+        ({ payload }) => {
+          if (payload?.tableNumber && payload?.paymentMethod) {
+            setTableBillOutPayments((prev) => {
+              const updated = {
+                ...prev,
+                [payload.tableNumber]: payload.paymentMethod,
+              };
+              try {
+                localStorage.setItem("servio_billout_payments", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+          }
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "best-sellers-sales-updated" },
+        ({ payload }) => {
+          if (payload?.itemSales) {
+            setItemSales(payload.itemSales);
+            try {
+              localStorage.setItem("servio_item_sales", JSON.stringify(payload.itemSales));
+            } catch {}
+          }
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "best-sellers-reset" },
+        () => {
+          setItemSales({});
+          try {
+            localStorage.setItem("servio_item_sales", "{}");
+          } catch {}
+        },
       )
       .subscribe((status, err) => {
         if (err) console.warn("Supabase Realtime subscription warning:", err);
@@ -667,6 +835,7 @@ export function POSProvider({ children }) {
 
         // Step 4: Automatically deduct the ingredients used from the inventory
         await deductIngredients(items);
+        recordItemSales(items);
       }
 
       // Step 5: Update the physical table's status to reflect that guests are eating
@@ -744,6 +913,7 @@ export function POSProvider({ children }) {
       }
 
       await deductIngredients(items);
+      recordItemSales(items);
 
       const { data: allItems } = await supabase
         .from("order_items")
@@ -838,6 +1008,8 @@ export function POSProvider({ children }) {
         if (insertError) {
           return { error: insertError };
         }
+
+        recordItemSales(orderItemsToInsert);
 
         // Mark request as accepted
         const { data, error } = await supabase
@@ -983,6 +1155,12 @@ export function POSProvider({ children }) {
           .from("menu_items")
           .update({ status: "SOLD OUT" })
           .in("id", itemIdsToMark);
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: "broadcast",
+            event: "menu-changed",
+          }).catch((err) => console.warn("Realtime broadcast error:", err));
+        }
       }
 
       // Reset the table back to EMPTY so it doesn't stay stuck as REQUEST
@@ -1075,24 +1253,66 @@ export function POSProvider({ children }) {
   const toggleMenuItemStock = useCallback(
     async (itemId, currentStatus) => {
       const nextStatus = currentStatus === "ACTIVE" ? "SOLD OUT" : "ACTIVE";
+      setMenuItems((prev) =>
+        prev.map((m) => (m.id === itemId ? { ...m, status: nextStatus } : m))
+      );
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "menu-changed",
+          payload: { itemId, status: nextStatus },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
       const { error } = await supabase
         .from("menu_items")
         .update({ status: nextStatus })
         .eq("id", itemId);
-      if (error) console.error("Failed to toggle menu item stock:", error);
-      await refetchMenu();
+      if (error) {
+        console.error("Failed to toggle menu item stock:", error);
+        await refetchMenu();
+      }
     },
     [refetchMenu],
   );
 
   /** Customer requests the bill for their table after food is served. */
   const requestTableBillOut = useCallback(
-    async (tableNumber) => {
-      const { error } = await supabase
+    async (tableNumber, paymentMethod = "cash") => {
+      // 1. Optimistic local update & localStorage persistence
+      setTableBillOutPayments((prev) => {
+        const next = { ...prev, [tableNumber]: paymentMethod };
+        try {
+          localStorage.setItem("servio_billout_payments", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 2. Realtime peer broadcast to open cashier tabs
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "bill-out-requested",
+          payload: { tableNumber, paymentMethod },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
+      // 3. Update restaurant_tables in Supabase
+      const { error: tableError } = await supabase
         .from("restaurant_tables")
         .update({ bill_out_requested: true })
         .eq("table_number", tableNumber);
-      if (error) console.error("Failed to set bill out request:", error);
+      if (tableError) console.error("Failed to set bill out request on table:", tableError);
+
+      // 4. Update customer_requests if present to persist the payment method
+      await supabase
+        .from("customer_requests")
+        .update({
+          bill_out_requested: true,
+          bill_out_requested_at: new Date().toISOString(),
+          rejection_reason: paymentMethod,
+        })
+        .eq("table_number", tableNumber);
+
       await refetchTables();
     },
     [refetchTables],
@@ -1258,6 +1478,14 @@ export function POSProvider({ children }) {
                 bill_out_requested: false,
               })
               .eq("table_number", order.table_number);
+            setTableBillOutPayments((prev) => {
+              const next = { ...prev };
+              delete next[order.table_number];
+              try {
+                localStorage.setItem("servio_billout_payments", JSON.stringify(next));
+              } catch {}
+              return next;
+            });
             // Also cancel any pending customer requests for this table
             await supabase
               .from("customer_requests")
@@ -1354,6 +1582,15 @@ export function POSProvider({ children }) {
           bill_out_requested: false,
         })
         .eq("table_number", tableNumber);
+
+      setTableBillOutPayments((prev) => {
+        const next = { ...prev };
+        delete next[tableNumber];
+        try {
+          localStorage.setItem("servio_billout_payments", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
 
       await Promise.all([refetchOrders(), refetchTables(), refetchCustomerRequests()]);
 
@@ -1723,6 +1960,8 @@ export function POSProvider({ children }) {
         rejectCustomerRequestKitchen,
         rejectCustomerRequestCashier,
         toggleMenuItemStock,
+        // Realtime sync states
+        tableBillOutPayments,
         requestTableBillOut,
         updateTableDetails,
         createOrder,
@@ -1738,6 +1977,12 @@ export function POSProvider({ children }) {
         updateProfile,
         deleteProfile,
         reserveTable,
+
+        // Best Sellers Tracking
+        itemSales,
+        recordItemSales,
+        resetBestSellers,
+        restoreDefaultBestSellers,
 
         // Utility getters
         getOrdersForTable,

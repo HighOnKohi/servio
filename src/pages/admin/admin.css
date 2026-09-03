@@ -51,6 +51,19 @@
   font-family: inherit;
 }
 
+/* ── UI Scale Rules: Font & Small Element Scaling (No Page Overflow) ── */
+.admin-page--scale-Std {
+  font-size: 0.94rem;
+}
+
+.admin-page--scale-Large {
+  font-size: 1.05rem;
+}
+
+.admin-page--scale-XL {
+  font-size: 1.18rem;
+}
+
 @media (max-width: 900px) {
   .admin-page > div[style*="gridTemplateColumns"] {
     grid-template-columns: 1fr !important;

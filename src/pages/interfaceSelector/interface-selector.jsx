@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProtocolAssistant from "../../components/ProtocolAssistant";
 import { usePOS } from "../../context/POSContext";
+import { useAuth } from "../../context/AuthContext";
+import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
 import "./interface-selector.css";
 
 const INTERFACE_GROUPS = {
@@ -80,31 +82,58 @@ function ArrowIcon({ direction = "right" }) {
 }
 
 function useFixedInterfaceCanvas() {
-  const [, refreshScale] = useState(0);
+  return { scale: 1, width: "100%", height: "100vh" };
+}
 
-  useEffect(() => {
-    const updateScale = () => refreshScale((version) => version + 1);
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, []);
-
-  if (typeof window === "undefined") return { scale: 1, width: "100%", height: "100vh" };
-
-  const pixelRatio = window.devicePixelRatio || 1;
-  return {
-    scale: 1 / pixelRatio,
-    width: `${Math.round(window.innerWidth * pixelRatio)}px`,
-    height: `${Math.round(window.innerHeight * pixelRatio)}px`,
-  };
+/* ── Confirmation Modal for Logout ──────────────────────────────────── */
+function SelectorLogoutModal({ onConfirm, onDismiss }) {
+  return (
+    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="selector-logout-title">
+      <div className="kitchen-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 28, height: 28 }} aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <h2 id="selector-logout-title">Log Out of SERVIO?</h2>
+        </div>
+        <p className="kitchen-modal-body">
+          Are you sure you want to log out of your session?
+        </p>
+        <div className="kitchen-modal-actions">
+          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
+            Cancel
+          </button>
+          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirm}>
+            Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function InterfaceSelector() {
   const navigate = useNavigate();
   const { tables, loading } = usePOS();
+  const { logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [activeGroup, setActiveGroup] = useState("FRONT OPS");
   const [showTablePicker, setShowTablePicker] = useState(false);
   const interfaceCanvas = useFixedInterfaceCanvas();
+
+  const handleLogoutConfirm = async () => {
+    setShowLogoutModal(false);
+    try {
+      if (logout) await logout();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    navigate("/login");
+  };
 
   const safeTables = Array.isArray(tables) ? tables : [];
   const sortedTables = useMemo(
@@ -151,14 +180,21 @@ export default function InterfaceSelector() {
 
   return (
     <div
-      className="interface-selector-page"
+      className={`interface-selector-page interface-selector-page--scale-${uiScale}`}
       style={{
-        "--interface-selector-scale": interfaceCanvas.scale,
+        "--servio-font-scale": fontScale,
+        "--servio-elem-scale": elementScale,
+        width: "100%",
+        height: "100vh",
+        maxHeight: "100vh",
+        overflow: "hidden",
       }}
     >
       <header className="interface-selector-header">
         <div className="interface-selector-brand">
-          <div className="interface-selector-brand-mark"><GridIcon /></div>
+          <div className="interface-selector-brand-mark">
+            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
+          </div>
           <span>Servio POS</span>
         </div>
         <nav className="interface-selector-group-nav" aria-label="Interface categories">
@@ -174,12 +210,15 @@ export default function InterfaceSelector() {
             </button>
           ))}
         </nav>
-        <div className="interface-selector-account">
-          <div>
-            <strong>Admin User</strong>
-            <span>System Administrator</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} isDark />
+          <div className="interface-selector-account">
+            <div>
+              <strong>Admin User</strong>
+              <span>System Administrator</span>
+            </div>
+            <div className="interface-selector-account-avatar"><UserIcon /></div>
           </div>
-          <div className="interface-selector-account-avatar"><UserIcon /></div>
         </div>
       </header>
 
@@ -226,11 +265,11 @@ export default function InterfaceSelector() {
         <button
           className="interface-selector-logout"
           type="button"
-          onClick={() => navigate("/login")}
+          onClick={() => setShowLogoutModal(true)}
         >
           <svg
-            width="14"
-            height="14"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -243,6 +282,13 @@ export default function InterfaceSelector() {
           Logout
         </button>
       </footer>
+
+      {showLogoutModal && (
+        <SelectorLogoutModal
+          onConfirm={handleLogoutConfirm}
+          onDismiss={() => setShowLogoutModal(false)}
+        />
+      )}
 
       {showTablePicker && (
         <div className="interface-selector-overlay" onClick={() => setShowTablePicker(false)}>
