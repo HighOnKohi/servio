@@ -819,25 +819,23 @@ export default function Customer() {
         </div>
       )}
 
-      {/* Pending banner when not in bill-out state */}
-      {hasPendingRequest && !showBillOut && (
+      {/* Pending banner */}
+      {hasPendingRequest && (
         <div className="customer-request-banner" role="status" aria-live="polite">
           ⏳ Your order is being verified — please wait.
         </div>
       )}
 
-      {/* Submit button — hidden when bill-out is visible or a pending request exists */}
-      {!showBillOut && (
-        <button
-          className={`customer-submit-button ${isInline ? 'customer-submit-button-inline' : ''}`}
-          onClick={submitRequest}
-          disabled={cart.length === 0 || submitting || hasPendingRequest || cartSoldOutIds.size > 0}
-          aria-label={submitting ? 'Sending order…' : 'Place order'}
-          type="button"
-        >
-          {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartSoldOutIds.size > 0 ? '⚠ Remove Sold-Out Items' : '✓ Mark Pending'}
-        </button>
-      )}
+      {/* Submit button — always visible so customers can order more items even after food is served */}
+      <button
+        className={`customer-submit-button ${isInline ? 'customer-submit-button-inline' : ''}`}
+        onClick={submitRequest}
+        disabled={cart.length === 0 || submitting || hasPendingRequest || cartSoldOutIds.size > 0}
+        aria-label={submitting ? 'Sending order…' : 'Place order'}
+        type="button"
+      >
+        {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartSoldOutIds.size > 0 ? '⚠ Remove Sold-Out Items' : '✓ Mark Pending'}
+      </button>
       </> : (
         <div className="customer-tracking-view">
           <p className="customer-kicker">Live Tracking</p>
