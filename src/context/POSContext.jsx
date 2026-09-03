@@ -803,8 +803,14 @@ export function POSProvider({ children }) {
           .single();
 
         if (!error) {
-          await refetchCustomerRequests();
-          await refetchOrders();
+          // Reset table back to OCCUPIED — it was set to REQUEST when the
+          // customer submitted. No more pending requests means guests are eating.
+          await supabase
+            .from("restaurant_tables")
+            .update({ status: "OCCUPIED" })
+            .eq("table_number", request.table_number);
+
+          await Promise.all([refetchCustomerRequests(), refetchOrders(), refetchTables()]);
         }
         return { data, error };
       } else {
@@ -869,11 +875,20 @@ export function POSProvider({ children }) {
           .select()
           .single();
 
-        if (!error) await Promise.all([refetchCustomerRequests(), refetchOrders(), refetchOrderItems()]);
+        if (!error) {
+          // Reset table back to OCCUPIED — it was set to REQUEST when the
+          // customer submitted. Accepted means the order is confirmed.
+          await supabase
+            .from("restaurant_tables")
+            .update({ status: "OCCUPIED" })
+            .eq("table_number", request.table_number);
+
+          await Promise.all([refetchCustomerRequests(), refetchOrders(), refetchOrderItems(), refetchTables()]);
+        }
         return { data, error };
       }
     },
-    [customerRequests, addItemsToOrder, createOrder, refetchCustomerRequests, refetchOrders, refetchOrderItems],
+    [customerRequests, addItemsToOrder, createOrder, refetchCustomerRequests, refetchOrders, refetchOrderItems, refetchTables],
   );
 
   /** Kitchen confirms stock is available and forwards the customer request to the cashier. */
@@ -948,16 +963,38 @@ export function POSProvider({ children }) {
    */
   const cancelCustomerRequest = useCallback(
     async (requestId) => {
+      // Fetch the request first so we know which table to update.
+      const request = customerRequests.find((r) => r.id === requestId);
+
       const { data, error } = await supabase
         .from("customer_requests")
         .update({ status: "CANCELLED" })
         .eq("id", requestId)
         .select()
         .single();
-      if (!error) await refetchCustomerRequests();
+
+      if (!error && request?.table_number) {
+        // Determine whether the table still has an active order.
+        // If it does, the customer is still sitting — keep the table OCCUPIED.
+        // If not, the cancellation cleared everything — set it back to EMPTY.
+        const activeOrder = orders.find(
+          (o) =>
+            o.table_number === request.table_number &&
+            o.status !== "COMPLETED" &&
+            o.status !== "CANCELLED",
+        );
+        await supabase
+          .from("restaurant_tables")
+          .update({ status: activeOrder ? "OCCUPIED" : "EMPTY" })
+          .eq("table_number", request.table_number);
+
+        await Promise.all([refetchCustomerRequests(), refetchTables()]);
+      } else if (!error) {
+        await refetchCustomerRequests();
+      }
       return { data, error };
     },
-    [refetchCustomerRequests],
+    [customerRequests, orders, refetchCustomerRequests, refetchTables],
   );
 
   /**

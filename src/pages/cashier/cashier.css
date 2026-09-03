@@ -112,6 +112,22 @@
   background: rgba(124, 58, 237, 0.14);
   color: #6d28d9;
 }
+.cashier-app .table-pax {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  opacity: .85;
+}
+.cashier-app .table-pax svg {
+  flex-shrink: 0;
+}
 .cashier-app .table-card-body { display: flex; flex-direction: column; gap: 4px; margin: auto 0 10px; padding-top: 14px; }
 .cashier-app .table-label { color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .cashier-app .table-total { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
@@ -290,7 +306,31 @@
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
 }
-.cashier-app .bill-title { font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+.cashier-app .bill-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.015em;
+}
+.cashier-app .sidebar-table-pax {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: .03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+.cashier-app .sidebar-table-pax svg {
+  flex-shrink: 0;
+}
 .cashier-app .status-legend { display: flex; align-items: center; gap: 16px; }
 .cashier-app .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: 600; }
 .cashier-app .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }

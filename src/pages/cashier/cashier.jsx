@@ -91,6 +91,7 @@ function Cashier() {
       label: String(t.table_number).padStart(2, '0'),
       dbId: t.id,
       status: t.status,
+      capacity: Number(t.capacity) || 4,
       table_number: t.table_number,
       occupied: t.status === 'OCCUPIED',
       reserved: t.status === 'RESERVED' || t.reserved === true,
@@ -850,6 +851,10 @@ function Cashier() {
                   <div className={`table-status ${isRequest ? 'request' : ''}`}>
                     {tableStatusLabel}
                   </div>
+                  <div className="table-pax" title={`Seating Capacity: ${table.capacity} PAX`}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    <span>{table.capacity} PAX</span>
+                  </div>
                 </div>
                 <div className="table-card-footer">
                   {elapsed && <span className="table-card-timer">{elapsed}</span>}
@@ -874,7 +879,13 @@ function Cashier() {
             <>
               <div className="sidebar-header">
                 <div>
-                  <div className="bill-title">Table {String(selected.label).padStart(2, '0')}</div>
+                  <div className="bill-title">
+                    Table {String(selected.label).padStart(2, '0')}
+                    <span className="sidebar-table-pax" title={`Seating Capacity: ${selected.capacity} PAX`}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                      {selected.capacity} PAX
+                    </span>
+                  </div>
                 </div>
                 <div className="status-legend">
                   <div className="legend-item">
