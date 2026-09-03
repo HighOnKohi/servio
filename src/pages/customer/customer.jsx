@@ -24,7 +24,7 @@ function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
 
   if (allItems.length === 0) return null;
 
-  const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
+  const servedCount = allItems.filter((i) => i.status === 'SERVED' || i.status === 'READY').length;
   const totalCount  = allItems.length;
   const allServed   = servedCount === totalCount;
 
@@ -55,7 +55,7 @@ function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
 
       <div className="cos-items" role="list">
         {allItems.map((item) => {
-          const isServed = item.status === 'SERVED';
+          const isServed = item.status === 'SERVED' || item.status === 'READY';
           return (
             <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
               <div className="cos-item-left">

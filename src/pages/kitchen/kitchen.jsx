@@ -214,6 +214,7 @@ function Kitchen() {
     categories,
     getItemsForOrder,
     updateOrderStatus,
+    updateOrderItemStatus,
     forwardCustomerRequestToCashier,
     rejectCustomerRequestKitchen,
     toggleMenuItemStock,
@@ -257,6 +258,25 @@ function Kitchen() {
       } else {
         kitchenStatus = 'ACTIVE'; // PENDING, IN_PROGRESS, IN_KITCHEN
       }
+
+      const mappedItems = items.map((oi) => {
+        const isReady = oi.status === 'READY' || oi.status === 'SERVED';
+        const isCancelled = oi.status === 'CANCELLED';
+        return {
+          id: oi.id,
+          name: oi.item_name,
+          qty: oi.quantity,
+          status: oi.status || 'PENDING',
+          isReady,
+          cancelled: isCancelled,
+          notes: Array.isArray(oi.modifiers) && oi.modifiers.length > 0 ? oi.modifiers : undefined,
+        };
+      });
+
+      const activeItems = mappedItems.filter((i) => !i.cancelled);
+      const readyItems = activeItems.filter((i) => i.isReady);
+      const allReady = activeItems.length > 0 && readyItems.length === activeItems.length;
+
       return {
         id: order.id,
         displayId: order.id.slice(0, 4).toUpperCase(),
@@ -267,15 +287,13 @@ function Kitchen() {
         createdAt: order.created_at,
         completedAt: order.updated_at,
         status: kitchenStatus,
-        items: items.map((oi) => ({
-          name: oi.item_name,
-          qty: oi.quantity,
-          notes: Array.isArray(oi.modifiers) && oi.modifiers.length > 0 ? oi.modifiers : undefined,
-          cancelled: oi.status === 'CANCELLED',
-        })),
+        items: mappedItems,
+        totalActiveCount: activeItems.length,
+        readyActiveCount: readyItems.length,
+        allReady,
       };
     });
-  }, [orders, orderItems, getItemsForOrder]);
+  }, [orders, getItemsForOrder]);
 
   const visibleTickets = useMemo(() => tickets.filter((t) => t.status === 'ACTIVE'), [tickets]);
 
@@ -314,6 +332,23 @@ function Kitchen() {
   const pagedTickets = visibleTickets.slice(ticketStart, ticketStart + ticketsPerPage);
 
   // ── Handlers ───────────────────────────────────────────────────────
+  const handleToggleItemReady = useCallback(async (orderItemId, currentStatus) => {
+    if (processingIds.has(orderItemId)) return;
+    setProcessingIds((prev) => new Set(prev).add(orderItemId));
+    const nextStatus = (currentStatus === 'READY' || currentStatus === 'SERVED') ? 'PENDING' : 'READY';
+    try {
+      await updateOrderItemStatus(orderItemId, nextStatus);
+    } catch (err) {
+      console.error('Failed to update item ready status:', err);
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderItemId);
+        return next;
+      });
+    }
+  }, [updateOrderItemStatus, processingIds]);
+
   const handleComplete = useCallback(async (orderId) => {
     if (processingIds.has(orderId)) return;
     setProcessingIds((prev) => new Set(prev).add(orderId));
@@ -321,7 +356,7 @@ function Kitchen() {
     setProcessingIds((prev) => { const next = new Set(prev); next.delete(orderId); return next; });
   }, [updateOrderStatus, processingIds]);
 
-  const handleCancelConfirm = useCallback(async (reason) => {
+  const handleCancelConfirm = useCallback(async (_reason) => {
     if (!cancelTarget) return;
     await updateOrderStatus(cancelTarget.id, 'CANCELLED');
     // Store reason on the order for cashier visibility (best-effort update)
@@ -503,11 +538,25 @@ function Kitchen() {
                   }
                   const isProcessing = processingIds.has(ticket.id);
                   return (
-                    <article className={`kitchen-ticket ${urgency !== 'normal' ? urgency : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
-                      <header className={`ticket-header ${urgency !== 'normal' ? urgency : ''}`}>
+                    <article className={`kitchen-ticket ${urgency !== 'normal' ? urgency : ''} ${ticket.allReady ? 'all-ready' : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
+                      <header className={`ticket-header ${urgency !== 'normal' ? urgency : ''} ${ticket.allReady ? 'all-ready' : ''}`}>
                         <div className="ticket-heading">
                           <strong className="ticket-table-title">Table {String(ticket.table).padStart(2, '0')}</strong>
                           {urgency === 'overtime' && <span className="overtime-badge">OVERTIME</span>}
+                          {ticket.totalActiveCount > 0 && (
+                            <span className={`ticket-ready-counter ${ticket.allReady ? 'all-ready' : ''}`}>
+                              {ticket.allReady ? (
+                                <>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="ready-counter-icon" aria-hidden="true">
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                  ALL READY
+                                </>
+                              ) : (
+                                `${ticket.readyActiveCount}/${ticket.totalActiveCount} Ready`
+                              )}
+                            </span>
+                          )}
                         </div>
                         <time aria-label={`Elapsed time ${formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}`}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -515,16 +564,61 @@ function Kitchen() {
                         </time>
                       </header>
                       <div className="ticket-items">
-                        {ticket.items.map((item, index) => (
-                          <div className={`ticket-item ${item.cancelled ? 'cancelled' : ''}`} key={`${ticket.id}-${index}`}>
-                            <div>
-                              <strong>{item.name}</strong>
-                              {item.cancelled && <small>Item cancelled</small>}
-                              {item.notes?.map((note) => <em key={note}>{note}</em>)}
+                        {ticket.items.map((item, index) => {
+                          const isItemProcessing = processingIds.has(item.id);
+                          return (
+                            <div
+                              className={`ticket-item ${item.cancelled ? 'cancelled' : ''} ${item.isReady ? 'is-ready' : ''}`}
+                              key={item.id || `${ticket.id}-${index}`}
+                            >
+                              <div className="ticket-item-main">
+                                <div className="ticket-item-header-line">
+                                  <strong className="ticket-item-name">{item.name}</strong>
+                                  {item.isReady && (
+                                    <span className="ticket-item-ready-tag" aria-label="Ready to serve">
+                                      Ready
+                                    </span>
+                                  )}
+                                </div>
+                                {item.cancelled && <small>Item cancelled</small>}
+                                {item.notes?.map((note) => <em key={note}>{note}</em>)}
+                              </div>
+                              <div className="ticket-item-aside">
+                                <span className="ticket-item-qty">×{item.qty}</span>
+                                {!item.cancelled && (
+                                  <button
+                                    type="button"
+                                    className={`ticket-item-ready-btn ${item.isReady ? 'is-ready' : ''}`}
+                                    onClick={() => handleToggleItemReady(item.id, item.status)}
+                                    disabled={isProcessing || isItemProcessing}
+                                    title={item.isReady ? 'Ready to serve (click to undo)' : 'Mark as ready to serve'}
+                                    aria-pressed={item.isReady}
+                                    aria-label={item.isReady ? `Mark ${item.name} as not ready` : `Mark ${item.name} as ready to serve`}
+                                  >
+                                    {isItemProcessing ? (
+                                      <span className="ticket-item-spinner" aria-hidden="true" />
+                                    ) : item.isReady ? (
+                                      <>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true">
+                                          <path d="M20 6L9 17l-5-5" />
+                                        </svg>
+                                        <span>Ready</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <path d="M12 8v4l3 3" />
+                                        </svg>
+                                        <span>Ready?</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <span>×{item.qty}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <footer className="ticket-actions">
                         <button
@@ -536,12 +630,13 @@ function Kitchen() {
                           Cancel
                         </button>
                         <button
-                          className="complete-ticket"
+                          className={`complete-ticket ${ticket.allReady ? 'all-ready' : ''}`}
                           onClick={() => handleComplete(ticket.id)}
                           disabled={isProcessing}
+                          title={ticket.allReady ? 'All items ready — Complete and serve order' : 'Complete and serve order'}
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
-                          {isProcessing ? 'Saving…' : 'Complete'}
+                          {isProcessing ? 'Saving…' : ticket.allReady ? 'Serve Order' : 'Complete'}
                         </button>
                       </footer>
                     </article>
