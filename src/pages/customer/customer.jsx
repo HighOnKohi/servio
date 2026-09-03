@@ -4,103 +4,103 @@ import { usePOS } from '../../context/POSContext';
 import './customer.css';
 
 /* ── Order Status Panel ────────────────────────────────────────────── */
-// Wrapped in memo with a custom comparator: only re-renders when item IDs or
-// statuses actually change — not on every 8-second polling reference refresh.
-// This prevents the entry animation from replaying on each poll cycle.
-const OrderStatusPanel = memo(
-  function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
-    // Flatten all items across non-cancelled orders for this table
-    const allItems = useMemo(() => {
-      return tableOrders.flatMap((order) =>
-        orderItems
-          .filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
-          .map((oi) => ({ ...oi, orderStatus: order.status }))
-      );
-    }, [tableOrders, orderItems]);
+// Implementation as a plain hoisted function declaration — immune to bundler
+// TDZ issues that affect `const` assignments.
+function OrderStatusPanelBase({ tableOrders, orderItems, formatPrice }) {
+  // Flatten all items across non-cancelled orders for this table.
+  // useMemo/useState/useEffect must all come before any early return (Rules of Hooks).
+  const allItems = useMemo(() => {
+    return tableOrders.flatMap((order) =>
+      orderItems
+        .filter((oi) => oi.order_id === order.id && oi.status !== 'CANCELLED')
+        .map((oi) => ({ ...oi, orderStatus: order.status }))
+    );
+  }, [tableOrders, orderItems]);
 
-    // One-shot mount flag — set true once on first mount only.
-    // The CSS animation class is applied via this flag so it never replays
-    // during subsequent data updates.
-    const [entering, setEntering] = useState(false);
-    useEffect(() => { setEntering(true); }, []);
+  // One-shot mount flag: set to true exactly once after first render.
+  // The CSS entry animation class is gated on this flag so it never replays
+  // during subsequent polling updates.
+  const [entering, setEntering] = useState(false);
+  useEffect(() => { setEntering(true); }, []);
 
-    if (allItems.length === 0) return null;
+  if (allItems.length === 0) return null;
 
-    const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
-    const totalCount  = allItems.length;
-    const allServed   = servedCount === totalCount;
+  const servedCount = allItems.filter((i) => i.status === 'SERVED').length;
+  const totalCount  = allItems.length;
+  const allServed   = servedCount === totalCount;
 
-    return (
-      <div
-        className={`cos-panel${entering ? ' cos-panel--entered' : ''}`}
-        aria-label="Your order status"
-        role="region"
-      >
-        <div className="cos-header">
-          <div className="cos-header-left">
-            <span className="cos-icon">{allServed ? '🍽️' : '🍳'}</span>
-            <div>
-              <p className="cos-kicker">Live Tracking</p>
-              <h3 className="cos-title">Order Status</h3>
-            </div>
-          </div>
-          <div className="cos-progress-wrap">
-            <div className="cos-progress-bar">
-              <div
-                className="cos-progress-fill"
-                style={{ width: `${totalCount > 0 ? (servedCount / totalCount) * 100 : 0}%` }}
-              />
-            </div>
-            <span className="cos-progress-label">{servedCount}/{totalCount} ready</span>
+  return (
+    <div
+      className={`cos-panel${entering ? ' cos-panel--entered' : ''}`}
+      aria-label="Your order status"
+      role="region"
+    >
+      <div className="cos-header">
+        <div className="cos-header-left">
+          <span className="cos-icon">{allServed ? '🍽️' : '🍳'}</span>
+          <div>
+            <p className="cos-kicker">Live Tracking</p>
+            <h3 className="cos-title">Order Status</h3>
           </div>
         </div>
-
-        <div className="cos-items" role="list">
-          {allItems.map((item) => {
-            const isServed = item.status === 'SERVED';
-            return (
-              <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
-                <div className="cos-item-left">
-                  <span className="cos-item-dot" aria-hidden="true" />
-                  <div>
-                    <span className="cos-item-name">{item.item_name}</span>
-                    {item.quantity > 1 && <span className="cos-item-qty"> ×{item.quantity}</span>}
-                  </div>
-                </div>
-                <span className={`cos-item-badge ${isServed ? 'cos-badge--ready' : 'cos-badge--preparing'}`}>
-                  {isServed ? '✓ Ready' : '🍳 Preparing'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {allServed && (
-          <div className="cos-all-ready" role="status">
-            🎉 All dishes are ready — enjoy your meal!
+        <div className="cos-progress-wrap">
+          <div className="cos-progress-bar">
+            <div
+              className="cos-progress-fill"
+              style={{ width: `${totalCount > 0 ? (servedCount / totalCount) * 100 : 0}%` }}
+            />
           </div>
-        )}
+          <span className="cos-progress-label">{servedCount}/{totalCount} ready</span>
+        </div>
       </div>
-    );
-  },
-  // Custom equality: skip re-render unless item count, IDs, or statuses changed.
-  (prev, next) => {
-    const prevItems = prev.tableOrders.flatMap((o) =>
-      prev.orderItems
+
+      <div className="cos-items" role="list">
+        {allItems.map((item) => {
+          const isServed = item.status === 'SERVED';
+          return (
+            <div key={item.id} className={`cos-item ${isServed ? 'cos-item--ready' : 'cos-item--preparing'}`} role="listitem">
+              <div className="cos-item-left">
+                <span className="cos-item-dot" aria-hidden="true" />
+                <div>
+                  <span className="cos-item-name">{item.item_name}</span>
+                  {item.quantity > 1 && <span className="cos-item-qty"> ×{item.quantity}</span>}
+                </div>
+              </div>
+              <span className={`cos-item-badge ${isServed ? 'cos-badge--ready' : 'cos-badge--preparing'}`}>
+                {isServed ? '✓ Ready' : '🍳 Preparing'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {allServed && (
+        <div className="cos-all-ready" role="status">
+          🎉 All dishes are ready — enjoy your meal!
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Memo wrapper assigned AFTER the function declaration is fully hoisted.
+// Custom comparator: skip re-render unless item count, IDs, or statuses changed.
+// This prevents the entry animation from replaying on every 8-second poll cycle.
+const OrderStatusPanel = memo(OrderStatusPanelBase, (prev, next) => {
+  const toKeys = (orders, items) =>
+    orders.flatMap((o) =>
+      items
         .filter((oi) => oi.order_id === o.id && oi.status !== 'CANCELLED')
         .map((oi) => `${oi.id}:${oi.status}`)
     );
-    const nextItems = next.tableOrders.flatMap((o) =>
-      next.orderItems
-        .filter((oi) => oi.order_id === o.id && oi.status !== 'CANCELLED')
-        .map((oi) => `${oi.id}:${oi.status}`)
-    );
-    return (
-      prevItems.length === nextItems.length &&
-      prevItems.every((v, i) => v === nextItems[i])
-    );
-  },
-);
+  const prevKeys = toKeys(prev.tableOrders, prev.orderItems);
+  const nextKeys = toKeys(next.tableOrders, next.orderItems);
+  return (
+    prevKeys.length === nextKeys.length &&
+    prevKeys.every((v, i) => v === nextKeys[i])
+  );
+});
+
 
 function MenuImagePlaceholderSVG() {
   return (
