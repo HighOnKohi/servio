@@ -6,7 +6,7 @@ const InterfaceSelector = () => {
   return (
     //  All of these are placeholders for testing.
     //  Keep this file and just rename it to a different name pag nag code ka
-    //  Cashier, Waiter, Kitchen, and Restaurant Management lang dapat yung lalabas dito
+    //  Cashier, Kitchen, and Restaurant Management lang dapat yung lalabas dito
     <div className="interface-selector-page">
       <h1>Interface Selector</h1>
       <p>Please select an interface to proceed.</p>
@@ -25,9 +25,6 @@ const InterfaceSelector = () => {
         </a>
         <a href="/restaurant-management" className="interface-button">
           Restaurant Management
-        </a>
-        <a href="/waiter" className="interface-button">
-          Waiter
         </a>
         <a href="/login" className="interface-button">
           Login

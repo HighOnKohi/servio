@@ -50,8 +50,7 @@ function Cashier() {
     orderItems,
     getOrdersForTable,
     getItemsForOrder,
-    addItemsToOrder,
-    createOrder,
+    createCustomerRequest,
     billOutTable,
     removeOrderItem,
     updateOrderStatus,
@@ -61,6 +60,7 @@ function Cashier() {
     applyItemDiscount,
     customerRequests,
     acceptCustomerRequest,
+    cancelCustomerRequest,
     rejectCustomerRequestCashier,
     loading,
     formatPrice,
@@ -78,6 +78,7 @@ function Cashier() {
       price: Number(m.price),
       category: m.category_id,
       image_url: m.image_url,
+      status: m.status,
     })),
     [dbMenuItems]
   );
@@ -195,6 +196,34 @@ function Cashier() {
     [customerRequests, selected],
   );
 
+  // Customer requests created by the cashier that are now pending kitchen verification
+  const selectedPendingKitchenRequests = useMemo(
+    () => customerRequests.filter(
+      (request) => request.table_number === selected?.table_number && request.status === 'PENDING_KITCHEN',
+    ),
+    [customerRequests, selected],
+  );
+
+  // Merge pending items by menu_item_id to avoid duplicates
+  const mergedPendingItems = useMemo(() => {
+    const itemMap = new Map();
+    selectedPendingKitchenRequests.forEach((request) => {
+      (Array.isArray(request.items) ? request.items : []).forEach((item) => {
+        const key = item.menu_item_id || item.id || item.name;
+        const existing = itemMap.get(key);
+        if (existing) {
+          existing.quantity += Number(item.quantity) || 1;
+        } else {
+          itemMap.set(key, {
+            ...item,
+            quantity: Number(item.quantity) || 1,
+          });
+        }
+      });
+    });
+    return Array.from(itemMap.values());
+  }, [selectedPendingKitchenRequests]);
+
   // Customer requests flagged as UNAVAILABLE by kitchen for the selected table
   const selectedUnavailableRequests = useMemo(
     () => customerRequests.filter(
@@ -217,8 +246,9 @@ function Cashier() {
 
   const cart = carts[selectedId] || [];
   const existingSubtotal = existingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const pendingSubtotal = mergedPendingItems.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1), 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const subtotal = existingSubtotal + cartSubtotal;
+  const subtotal = existingSubtotal + pendingSubtotal + cartSubtotal;
   const getItemDiscountBreakdown = (entry) => {
     const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
     const tablePwdRate = selected?.pwdDiscount ? 20 : 0;
@@ -336,6 +366,7 @@ function Cashier() {
   }
 
   function addMenuItem(item) {
+    if (item.status === 'SOLD OUT') return;
     setCarts((prev) => {
       const currentCart = prev[selectedId] || [];
       const existing = currentCart.find((ci) => ci.id === item.id);
@@ -438,26 +469,19 @@ function Cashier() {
 
   async function punchOrder() {
     if (!selected || cart.length === 0 || punchingOrder) return;
+    const availableCart = cart.filter((item) => item.status !== 'SOLD OUT');
+    if (availableCart.length === 0) return;
     setPunchingOrder(true);
     try {
-      if (selected?.occupied && existingOrders[0]) {
-        await addItemsToOrder(existingOrders[0].id, cart.map((item) => ({
-          id: item.id,
-          menu_item_id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.qty,
-        })));
-      } else {
-        await createOrder(selected.table_number, 'Cashier', cart.map((item) => ({
-          id: item.id,
-          menu_item_id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.qty,
-        })), 'DINE-IN');
-      }
+      await createCustomerRequest(selected.table_number, availableCart.map((item) => ({
+        id: item.id,
+        menu_item_id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.qty,
+      })));
 
+      // Clear the cart after successful punch
       setCarts((prev) => ({ ...prev, [selectedId]: [] }));
     } catch (err) {
       console.error('Error punching order:', err);
@@ -704,7 +728,7 @@ function Cashier() {
           className={`tab ${!isMenuOrdering ? 'active' : ''}`}
           onClick={requestOverview}
         >
-          OVERVIEW
+          TABLES
         </button>
         <button
           className={`tab ${isMenuOrdering ? 'active' : ''}`}
@@ -767,7 +791,12 @@ function Cashier() {
               </div>
               <div className="menu-item-grid">
                 {pagedMenuItems.map((item) => (
-                  <button key={item.id} className="menu-item-card" onClick={() => addMenuItem(item)}>
+                  <button
+                    key={item.id}
+                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''}`}
+                    onClick={() => addMenuItem(item)}
+                    disabled={item.status === 'SOLD OUT'}
+                  >
                     <span className="menu-item-image"><MenuImagePlaceholder /></span>
                     <span className="menu-item-name">{item.name}</span>
                     <span className="menu-item-bottom">
@@ -845,13 +874,26 @@ function Cashier() {
             <>
               <div className="sidebar-header">
                 <div>
-                  <div className="bill-title">Order details</div>
-                  <div className="bill-subtitle">Table #{selected.label}</div>
+                  <div className="bill-title">Table {String(selected.label).padStart(2, '0')}</div>
+                </div>
+                <div className="status-legend">
+                  <div className="legend-item">
+                    <span className="legend-dot legend-dot--yellow"></span>
+                    <span>New</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-dot legend-dot--orange"></span>
+                    <span>Pending</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-dot legend-dot--blue"></span>
+                    <span>Active</span>
+                  </div>
                 </div>
               </div>
 
               <div className="items-list">
-                {selectedCustomerRequests.length > 0 && (
+                {(selectedCustomerRequests.length > 0 || selectedUnavailableRequests.length > 0) && (
                   <div className="customer-requests-panel">
                     <div className="customer-requests-header">
                       <div>
@@ -868,9 +910,20 @@ function Cashier() {
                             <div>
                               <div className="customer-request-label">⚠️ Table #{String(request.table_number).padStart(2, '0')} — Items Unavailable</div>
                               <div className="customer-request-time" style={{ color: '#b91c1c' }}>
-                                Kitchen flagged: {(Array.isArray(request.unavailable_items) ? request.unavailable_items : []).map((i) => i.name || i.item_name).join(', ') || 'some items'}
+                                {request.rejection_reason || 'Kitchen flagged some items as unavailable'}
                               </div>
                             </div>
+                          </div>
+                          <div className="customer-request-items" style={{ marginTop: '10px' }}>
+                            {(Array.isArray(request.unavailable_items) ? request.unavailable_items : []).map((item, index) => (
+                              <div key={`unavail-${request.id}-${item.id || item.name || index}`} className="customer-request-item-row customer-request-item-row--unavailable">
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: '#dc2626', fontWeight: '700' }}>✕</span>
+                                  {item.name || item.item_name} × {Number(item.quantity) || 1}
+                                </span>
+                                <strong style={{ color: '#b91c1c' }}>{formatPrice((Number(item.price) || 0) * (Number(item.quantity) || 1))}</strong>
+                              </div>
+                            ))}
                           </div>
                           <button
                             className="customer-request-accept-button"
@@ -900,17 +953,27 @@ function Cashier() {
                           <div className="customer-request-items">
                             {(Array.isArray(request.items) ? request.items : []).map((item, index) => (
                               <div key={`${request.id}-${item.id || item.name || index}`} className="customer-request-item-row">
-                                <span>{item.name || item.item_name} x {Number(item.quantity) || 1}</span>
+                                <span>{item.name || item.item_name} × {Number(item.quantity) || 1}</span>
                                 <strong>{formatPrice((Number(item.price) || 0) * (Number(item.quantity) || 1))}</strong>
                               </div>
                             ))}
                           </div>
-                          <button
-                            className="customer-request-accept-button"
-                            onClick={() => handleAcceptCustomerRequest(request.id)}
-                          >
-                            Accept Request
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="customer-request-accept-button"
+                              onClick={() => handleAcceptCustomerRequest(request.id)}
+                              style={{ flex: 1 }}
+                            >
+                              Accept Request
+                            </button>
+                            <button
+                              className="customer-request-accept-button"
+                              onClick={() => cancelCustomerRequest(request.id)}
+                              style={{ flex: 1, background: '#6b7280', border: '0' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -931,7 +994,7 @@ function Cashier() {
                   const unitCount = Math.max(1, Number(item.quantity) || 1);
                   const itemUnits = item.rows.flatMap((entry) => Array.from({ length: Math.max(1, Number(entry.quantity) || 1) }, (_, index) => ({ entry, index })));
                   return (
-                    <div key={item.id} className="item-group">
+                    <div key={item.id} className={`item-group item-status-${String(item.status || 'PENDING').toLowerCase()}`}>
                       <div className="item-row">
                         <div className="item-content">
                           <div className="item-name">
@@ -941,7 +1004,6 @@ function Cashier() {
                               </button>
                             )}
                             <span className="item-name-text">{item.item_name} × {item.quantity}</span>
-                            <span className="item-status-pill" aria-label="Saved item" />
                           </div>
                         </div>
                         <div className="item-right">
@@ -1004,11 +1066,23 @@ function Cashier() {
                     </div>
                   );
                 })}
-                {cart.length === 0 && existingItems.length === 0 ? (
+                {/* Pending kitchen items — merged by item to avoid duplicates */}
+                {mergedPendingItems.map((item, index) => (
+                  <div key={`pending-${item.menu_item_id || item.id || item.name || index}`} className="item-row pending item-status-pending">
+                    <div>
+                      <div className="item-name">{item.name || item.item_name} × {item.quantity}</div>
+                    </div>
+                    <div className="item-right">
+                      <span>{formatPrice((Number(item.price) || 0) * item.quantity)}</span>
+                    </div>
+                  </div>
+                ))}
+                {/* Cart items — not yet punched */}
+                {cart.length === 0 && existingItems.length === 0 && selectedPendingKitchenRequests.length === 0 ? (
                   <div className="empty-items">No items yet. Add from below.</div>
                 ) : (
                   cart.map((item) => (
-                    <div key={item.id} className="item-row pending">
+                    <div key={item.id} className="item-row pending item-status-new">
                       <div>
                         <div className="item-name">{item.name} × {item.qty}</div>
                       </div>

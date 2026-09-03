@@ -1,55 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProtocolAssistant from "../../components/ProtocolAssistant";
 import { usePOS } from "../../context/POSContext";
 import "./interface-selector.css";
 
-const MAX_INTERFACES_PER_PAGE = 6;
-
-const INTERFACES = [
-  {
-    id: "resto",
-    label: "Restaurant Management Interface",
-    desc: "Manage menu items, categories, and restaurant tables.",
-    route: "/restaurant-management/edit-menu",
-  },
-  {
-    id: "cashier",
-    label: "Cashier Interface",
-    desc: "Check out customers and print receipts quickly.",
-    route: "/cashier/overview",
-  },
-  {
-    id: "waiter",
-    label: "Waiter Interface",
-    desc: "Send orders to the kitchen from the floor.",
-    route: "/waiter/menu-ordering",
-  },
-  {
-    id: "kitchen",
-    label: "Kitchen Interface",
-    desc: "View live orders and start cooking.",
-    route: "/kitchen/active-orders",
-  },
-  {
-    id: "admin",
-    label: "Admin Interface",
-    desc: "Gain administrative access to the system.",
-    route: "/admin",
-  },
-  {
-    id: "inventory",
-    label: "Inventory Interface",
-    desc: "Manage and track inventory levels.",
-    route: "/inventory",
-  },
-  {
-    id: "customer",
-    label: "Customer Interface",
-    desc: "Preview the QR ordering flow from the customer's side.",
-    route: null,
-  },
-];
+const INTERFACE_GROUPS = {
+  "FRONT OPS": [
+    { id: "kitchen", label: "Kitchen Interface", desc: "View live orders and start cooking.", route: "/kitchen/active-orders", icon: "kitchen" },
+    { id: "cashier", label: "Cashier Interface", desc: "Check out customers and print receipts quickly.", route: "/cashier/overview", icon: "cashier" },
+    { id: "customer", label: "Customer Interface (Debug)", desc: "Preview the QR ordering flow from the customer's side.", route: null, icon: "customer" },
+  ],
+  MANAGEMENT: [
+    { id: "table-manager", label: "Table Manager Interface", desc: "Manage restaurant tables, statuses, capacity, and QR codes.", route: "/table-manager", icon: "table" },
+    { id: "menu-manager", label: "Menu Manager Interface", desc: "Manage menu items, categories, prices, and availability.", route: "/menu-manager", icon: "menu" },
+    { id: "analytics", label: "Analytics Interface", desc: "Review sales, operations, inventory, and performance insights.", route: "/admin", icon: "analytics" },
+  ],
+  ADMIN: [
+    { id: "account-manager", label: "Account Manager Interface", desc: "Manage staff accounts and access permissions.", route: "/admin", icon: "account" },
+    { id: "order-logs", label: "Order Logs Interface", desc: "Review completed, active, and historical order activity.", route: "/admin", icon: "logs" },
+  ],
+};
 
 function GridIcon() {
   return (
@@ -67,6 +37,22 @@ function GridIcon() {
       <rect x="14" y="14" width="7" height="7" />
     </svg>
   );
+}
+
+function InterfaceIcon({ type }) {
+  const icons = {
+    tray: <><path d="M4 13h16" /><path d="M5 13a7 7 0 0 0 14 0" /><path d="M8 9V5m4 4V5m4 4V5" /></>,
+    kitchen: <><rect x="4" y="3" width="16" height="5" rx="1" /><path d="M6 8v3m4-3v3m4-3v3m4-3v3" /><path d="M4 14h16v5H4z" /></>,
+    cashier: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h10M7 13h2m3 0h2m3 0h0M7 16h10" /></>,
+    customer: <><path d="M3 7h13v10H3z" /><path d="M16 10h5v8h-5z" /><path d="M6 4h7M7 11h5m-5 3h3" /></>,
+    table: <><path d="M4 8h16v5H4z" /><path d="M6 13v6m12-6v6M8 8V5h8v3" /></>,
+    menu: <><path d="M6 3v18M6 3c3 0 4 2 4 5s-1 5-4 5" /><path d="M14 3v18M18 3v18M14 3c4 2 4 7 0 9" /></>,
+    analytics: <><path d="M4 19V5m0 14h16" /><path d="m7 15 3-4 3 2 5-7" /></>,
+    account: <><circle cx="12" cy="7" r="3" /><path d="M5 21a7 7 0 0 1 14 0M19 8v5m-2.5-2.5h5" /></>,
+    logs: <><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
+  };
+
+  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[type] || icons.analytics}</svg>;
 }
 
 function UserIcon() {
@@ -116,11 +102,8 @@ export default function InterfaceSelector() {
   const navigate = useNavigate();
   const { tables, loading } = usePOS();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [page, setPage] = useState(0);
-  const [slideDirection, setSlideDirection] = useState("right");
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [activeGroup, setActiveGroup] = useState("FRONT OPS");
   const [showTablePicker, setShowTablePicker] = useState(false);
-  const animationTimeoutRef = useRef(null);
   const interfaceCanvas = useFixedInterfaceCanvas();
 
   const safeTables = Array.isArray(tables) ? tables : [];
@@ -128,11 +111,7 @@ export default function InterfaceSelector() {
     () => [...safeTables].sort((a, b) => a.table_number - b.table_number),
     [safeTables],
   );
-  const totalPages = Math.max(1, Math.ceil(INTERFACES.length / MAX_INTERFACES_PER_PAGE));
-  const visibleInterfaces = INTERFACES.slice(
-    page * MAX_INTERFACES_PER_PAGE,
-    (page + 1) * MAX_INTERFACES_PER_PAGE,
-  );
+  const visibleInterfaces = INTERFACE_GROUPS[activeGroup];
 
   const time = currentDateTime.toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -154,12 +133,6 @@ export default function InterfaceSelector() {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    if (page > totalPages - 1) {
-      setPage(totalPages - 1);
-    }
-  }, [page, totalPages]);
-
   function handleInterfaceSelect(iface) {
     if (iface.id === "customer") {
       setShowTablePicker(true);
@@ -169,28 +142,6 @@ export default function InterfaceSelector() {
     if (iface.route) {
       navigate(iface.route);
     }
-  }
-
-  useEffect(() => () => {
-    if (animationTimeoutRef.current) {
-      window.clearTimeout(animationTimeoutRef.current);
-    }
-  }, []);
-
-  function changePage(nextPage, direction) {
-    if (isAnimating || nextPage === page) return;
-    setSlideDirection(direction);
-    setIsAnimating(true);
-    setPage(nextPage);
-
-    if (animationTimeoutRef.current) {
-      window.clearTimeout(animationTimeoutRef.current);
-    }
-
-    animationTimeoutRef.current = window.setTimeout(() => {
-      setIsAnimating(false);
-      animationTimeoutRef.current = null;
-    }, 320);
   }
 
   function openCustomerTable(tableNumber) {
@@ -203,74 +154,56 @@ export default function InterfaceSelector() {
       className="interface-selector-page"
       style={{
         "--interface-selector-scale": interfaceCanvas.scale,
-        width: interfaceCanvas.width,
-        height: interfaceCanvas.height,
-        minHeight: interfaceCanvas.height,
       }}
     >
-      {totalPages > 1 && (
-        <>
-          <button
-            type="button"
-            className="interface-selector-page-arrow left"
-            onClick={() => changePage((page - 1 + totalPages) % totalPages, "left")}
-            aria-label="Previous interface page"
-          >
-            <ArrowIcon direction="left" />
-          </button>
-          <button
-            type="button"
-            className="interface-selector-page-arrow right"
-            onClick={() => changePage((page + 1) % totalPages, "right")}
-            aria-label="Next interface page"
-          >
-            <ArrowIcon direction="right" />
-          </button>
-        </>
-      )}
-
-      <div className="interface-selector-center">
-        <h1 className="interface-selector-title">
-          What would you like to{" "}
-          <span className="interface-selector-title-mark">do</span>
-          <br />
-          <span className="interface-selector-title-mark">today</span>?
-        </h1>
-
-        <div className={`interface-selector-grid-frame ${isAnimating ? `is-animating slide-${slideDirection}` : ""}`}>
-          <div className="interface-selector-grid">
-          {visibleInterfaces.map((iface) => (
+      <header className="interface-selector-header">
+        <div className="interface-selector-brand">
+          <div className="interface-selector-brand-mark"><GridIcon /></div>
+          <span>Servio POS</span>
+        </div>
+        <nav className="interface-selector-group-nav" aria-label="Interface categories">
+          {Object.keys(INTERFACE_GROUPS).map((group) => (
             <button
-              key={iface.id}
-              onClick={() => handleInterfaceSelect(iface)}
-              className="interface-card interface-card-enabled"
+              key={group}
+              type="button"
+              className={`interface-selector-group-tab ${activeGroup === group ? "active" : ""}`}
+              onClick={() => setActiveGroup(group)}
             >
-              <div className="interface-card-icon">
-                <GridIcon />
-              </div>
-
-              <div className="interface-card-label">{iface.label}</div>
-
-              <div className="interface-card-desc">{iface.desc}</div>
+              <span className="interface-selector-group-icon"><GridIcon /></span>
+              {group}
             </button>
           ))}
+        </nav>
+        <div className="interface-selector-account">
+          <div>
+            <strong>Admin User</strong>
+            <span>System Administrator</span>
           </div>
+          <div className="interface-selector-account-avatar"><UserIcon /></div>
         </div>
+      </header>
 
-        {totalPages > 1 && (
-          <div className="interface-selector-pagination">
-            {Array.from({ length: totalPages }, (_, index) => (
-              <button
-                key={index}
-                type="button"
-                className={`interface-selector-page-dot ${index === page ? "active" : ""}`}
-                onClick={() => changePage(index, index > page ? "right" : "left")}
-                aria-label={`Go to interface page ${index + 1}`}
-              />
+      <main className="interface-selector-center">
+        <div key={`heading-${activeGroup}`} className="interface-selector-section-heading interface-selector-category-transition">
+          <span className="interface-selector-section-kicker">Operational Suite</span>
+          <h1>{activeGroup}</h1>
+        </div>
+        <div key={`grid-${activeGroup}`} className="interface-selector-grid-frame interface-selector-category-transition">
+          <div className="interface-selector-grid">
+            {visibleInterfaces.map((iface) => (
+              <button key={iface.id} onClick={() => handleInterfaceSelect(iface)} className="interface-card interface-card-enabled">
+                <div className="interface-card-topline">
+                  <div className={`interface-card-icon interface-card-icon-${iface.icon}`}><InterfaceIcon type={iface.icon} /></div>
+                </div>
+                <div className="interface-card-body">
+                  <div className="interface-card-label">{iface.label}</div>
+                  <div className="interface-card-desc">{iface.desc}</div>
+                </div>
+              </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
 
       <div className="interface-selector-assistant-wrap">
         <ProtocolAssistant />

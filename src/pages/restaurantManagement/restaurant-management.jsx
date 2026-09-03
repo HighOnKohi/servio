@@ -102,7 +102,7 @@ const TABLES_PER_PAGE = 12;
 const CUSTOMER_INTERFACE_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 const categorySlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const menuItemSlug = (item) => item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
-const menuPath = (category, item = null) => `/restaurant-management/edit-menu?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;
+const menuPath = (category, item = null) => `/menu-manager?category="${categorySlug(category.name)}"${item ? `&item="${menuItemSlug(item)}"` : ''}`;
 const withPage = (path, page) => (page > 1 ? `${path}${path.includes('?') ? '&' : '?'}page=${page}` : path);
 const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
 const normalizeName = (name) => categorySlug(name);
@@ -149,6 +149,16 @@ function ReturnIcon() {
   );
 }
 
+function HelpIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-.9.55-1.5 1-1.5 2.2" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
 function ImageIcon() {
   return (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -165,20 +175,20 @@ function StatusBadge({ status }) {
 }
 
 /* Panel used for Add/Edit/Delete of items and categories */
-function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteItem, onAddCategory, onEditCategory, onDeleteCategory }) {
+function MenuPanel({ mode, categories, activeCategoryId, onClose, onAddItem, onEditItem, onDeleteItem, onAddCategory, onEditCategory, onDeleteCategory }) {
   const [itemName, setItemName] = useState(mode?.type === 'editItem' ? mode.item.name : '');
   const [itemPrice, setItemPrice] = useState(mode?.type === 'editItem' ? String(mode.item.price) : '');
   const [itemDesc, setItemDesc] = useState(mode?.type === 'editItem' ? (mode.item.description || '') : '');
-  const [itemCat, setItemCat] = useState(mode?.type === 'editItem' ? String(mode.item.categoryId) : String(categories[0]?.id ?? ''));
+  const itemCat = mode?.type === 'editItem' ? String(mode.item.categoryId) : String(activeCategoryId ?? '');
   const [catName, setCatName] = useState(mode?.type === 'editCategory' ? mode.category.name : '');
   const [formError, setFormError] = useState('');
 
   if (!mode) return null;
 
   const title = {
-    addItem: 'Add Item',
-    editItem: 'Edit Item',
-    deleteItem: 'Delete Item',
+    addItem: 'Add Menu Item',
+    editItem: 'Edit Menu Item',
+    deleteItem: 'Delete Menu Item',
     addCategory: 'Add Category',
     editCategory: 'Edit Category',
     deleteCategory: 'Delete Category',
@@ -255,12 +265,18 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
     onClose();
   };
 
+  const isItemPanel = mode.type.includes('Item');
+  const isDeletePanel = mode.type.startsWith('delete');
+
   return (
-    <div className="rmc2" onClick={onClose}>
-      <div className="rmc3" onClick={(e) => e.stopPropagation()}>
-        <div className="rmc4">
-          <h2 className="rmc5">{title}</h2>
-          <button className="rmc6" onClick={onClose}>✕</button>
+    <div className="rmc2 menu-manager-modal-overlay" onClick={onClose}>
+      <div className={`rmc3 menu-manager-modal ${isItemPanel ? 'menu-manager-modal--item' : 'menu-manager-modal--category'} ${isDeletePanel ? 'menu-manager-modal--danger' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <div className="rmc4 menu-manager-modal-header">
+          <div>
+            <span className="menu-manager-modal-kicker">Menu Manager</span>
+            <h2 className="rmc5">{title}</h2>
+          </div>
+          <button type="button" className="rmc6 menu-manager-modal-close" onClick={onClose} aria-label="Close modal">✕</button>
         </div>
 
         {(mode.type === 'addItem' || mode.type === 'editItem') && (
@@ -277,17 +293,6 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
               <label className="rmc8">Description</label>
               <textarea required maxLength={120} className="restaurant-management-input restaurant-management-textarea" rows={3} value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} />
             </div>
-            {mode.type === 'addItem' && (
-              <div>
-                <label className="rmc8">Category</label>
-                <select required className="restaurant-management-input" value={itemCat} onChange={(e) => setItemCat(e.target.value)}>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div>
               <label className="rmc8">Upload Picture</label>
               <div className="restaurant-management-image-placeholder restaurant-management-image-placeholder--md">
@@ -299,7 +304,11 @@ function MenuPanel({ mode, categories, onClose, onAddItem, onEditItem, onDeleteI
             {formError && <p className="restaurant-management-form-error">{formError}</p>}
             <div className="rmc9">
               <button className="restaurant-management-button-primary" onClick={handleAddOrSave}>{mode.type === 'addItem' ? 'Add Item' : 'Save Changes'}</button>
-              <button className="restaurant-management-button-secondary" onClick={onClose}>Cancel</button>
+              {mode.type === 'editItem' ? (
+                <button className="restaurant-management-button-danger" onClick={() => { onDeleteItem(mode.item.id); onClose(); }}>Delete</button>
+              ) : (
+                <button className="restaurant-management-button-secondary" onClick={onClose}>Cancel</button>
+              )}
             </div>
           </div>
         )}
@@ -388,7 +397,6 @@ function MenuInterface() {
   const [search, setSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [panel, setPanel] = useState(null);
-  const PER_PAGE = 5;
 
   const categorySlugFromRoute = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
   const activeCategory = categories.find((cat) => categorySlug(cat.name) === categorySlugFromRoute) ?? categories[0];
@@ -399,12 +407,7 @@ function MenuInterface() {
   const selectedItem = selectedItemSlug ? items.find((item) => item.categoryId === activeCat && menuItemSlug(item) === selectedItemSlug) : null;
   const keywordMatches = searchTerm ? items.filter((item) => item.name.toLowerCase().includes(searchTerm)).slice(0, 6) : [];
   const filtered = selectedItem ? [selectedItem] : items.filter((it) => it.categoryId === activeCat);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const requestedPage = Number.parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
-  const currentPage = Math.min(Math.max(requestedPage || 1, 1), totalPages);
-  const visible = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
-  const pageStart = filtered.length === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1;
-  const pageEnd = Math.min(currentPage * PER_PAGE, filtered.length);
+  const visible = filtered;
 
   // CRUD wired to POSContext
   const addItem = async (item) => {
@@ -433,7 +436,7 @@ function MenuInterface() {
   const handleDeleteCategory = async (id) => {
     await posDeleteCategory(id);
     const remaining = categories.filter((c) => c.id !== id);
-    if (activeCat === id) navigate(remaining[0] ? menuPath(remaining[0]) : '/restaurant-management/edit-menu');
+    if (activeCat === id) navigate(remaining[0] ? menuPath(remaining[0]) : '/menu-manager');
   };
 
   const selectCategory = () => {
@@ -447,43 +450,38 @@ function MenuInterface() {
     setIsSearchOpen(false);
     navigate(menuPath(category, item));
   };
-  const goToMenuPage = (nextPage) => {
-    const category = categories.find((cat) => cat.id === activeCat);
-    if (!category) return;
-    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
-    navigate(withPage(menuPath(category), safePage));
-  };
-
   return (
-    <div className="rmc22">
-      <aside className="rmc29 restaurant-management-sidebar">
+    <div className="rmc22 menu-manager-layout">
+      <aside className="rmc29 restaurant-management-sidebar menu-manager-sidebar">
         <div className="rmc19 restaurant-management-sidebar-inner">
-          <p className="rmc20">Categories</p>
-          <div className="restaurant-management-category-divider" />
+          <div className="menu-manager-sidebar-heading">
+            <p className="rmc20">Categories</p>
+            <button type="button" className="menu-manager-add-category-icon" onClick={() => setPanel({ type: 'addCategory' })} aria-label="Add category">＋</button>
+          </div>
           <div className="rmc21 restaurant-management-category-list">
             {categories.map((cat) => (
               <div key={cat.id} className={`restaurant-management-category-row ${activeCat === cat.id ? 'restaurant-management-category-row-active' : ''}`}>
-                <Link to={menuPath(cat)} onClick={selectCategory} className={`restaurant-management-category-button ${activeCat === cat.id ? 'restaurant-management-category-button-active' : 'restaurant-management-category-button-inactive'}`}>
-                  {cat.name}
+                <Link to={menuPath(cat)} onClick={selectCategory} className="restaurant-management-category-button">
+                  <span>{cat.name}</span>
                 </Link>
                 <div className="restaurant-management-category-actions">
-                  <button type="button" className="restaurant-management-category-action" onClick={() => setPanel({ type: 'editCategory', category: cat })} aria-label={`Edit ${cat.name}`}>
-                    ✎
-                  </button>
-                  <button type="button" className="restaurant-management-category-action restaurant-management-category-action--delete" onClick={() => setPanel({ type: 'deleteCategory', category: cat })} aria-label={`Delete ${cat.name}`}>
-                    ✕
-                  </button>
+                  <button type="button" className="restaurant-management-category-action" onClick={() => setPanel({ type: 'editCategory', category: cat })} aria-label={`Edit ${cat.name}`}>✎</button>
+                  <button type="button" className="restaurant-management-category-action restaurant-management-category-action--delete" onClick={() => setPanel({ type: 'deleteCategory', category: cat })} aria-label={`Delete ${cat.name}`}>✕</button>
                 </div>
               </div>
             ))}
           </div>
-          <button type="button" className="restaurant-management-add-category" onClick={() => setPanel({ type: 'addCategory' })}>＋ Add Category</button>
         </div>
       </aside>
 
-      <main className="rmc30">
-        <div className="rmc31">
-          <div className="rmc33">
+      <main className="rmc30 menu-manager-main">
+        <div className="menu-manager-content-header">
+          <h1>{activeCategory?.name || 'Menu Items'}</h1>
+        </div>
+
+        <div className="menu-manager-toolbar">
+          <div className="rmc33 menu-manager-search">
+            <span className="menu-manager-search-icon" aria-hidden="true">⌕</span>
             <input
               className="rmc35"
               placeholder="Search menu items..."
@@ -509,55 +507,57 @@ function MenuInterface() {
               </div>
             )}
           </div>
-          <button className="rmc36" onClick={() => setPanel({ type: 'addItem' })}>＋ New Item</button>
+          <span className="menu-manager-result-count">{filtered.length} {filtered.length === 1 ? 'item' : 'items'}</span>
+          <button className="rmc36 menu-manager-new-item" onClick={() => setPanel({ type: 'addItem' })}>＋ New Item</button>
         </div>
 
-        <div className="rmc41">
-          {visible.length === 0 ? (
-            <div className="rmc42"><GridIcon /><p className="rmc43">No items found</p></div>
-          ) : (
-            <>
-              <div className="rmc53">
-                <table className="rmc54">
-                  <thead>
-                    <tr className="rmc55">
-                      <th className="rmc56">Image</th>
-                      <th className="rmc57">Item Details</th>
-                      <th className="rmc58">Price</th>
-                      <th className="rmc59">Status</th>
-                      <th className="rmc60">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((item, idx) => (
-                      <tr key={item.id} className={`restaurant-management-table-row ${idx === visible.length - 1 ? 'restaurant-management-table-row-last' : ''}`}>
-                        <td className="rmc61"><div className="rmc62"><ImageIcon /></div></td>
-                        <td className="rmc61"><div className="rmc63">{item.name}</div><div className="rmc40">{item.description}</div></td>
-                        <td className="rmc64">₱{item.price.toFixed(2)}</td>
-                        <td className="rmc61"><span className="rmc65">{item.status || 'Active'}</span></td>
-                        <td className="rmc66"><div className="rmc67"><button className="rmc51" onClick={() => setPanel({ type: 'editItem', item })} aria-label="Edit item">✎</button><button className="rmc52" onClick={() => setPanel({ type: 'deleteItem', item })} aria-label="Delete item">✕</button></div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+        <div className="menu-manager-items-area">
+          <div key={activeCat} className="menu-manager-category-transition">
+            {visible.length === 0 ? (
+              <div className="rmc42 menu-manager-empty"><GridIcon /><p className="rmc43">No items found</p></div>
+            ) : (
+              <div className="menu-manager-card-grid">
+              {visible.map((item) => {
+                const isInactive = String(item.status || '').toUpperCase() === 'INACTIVE';
+                return (
+                  <article
+                    key={item.id}
+                    className={`menu-manager-card ${isInactive ? 'inactive' : ''}`}
+                    onClick={() => setPanel({ type: 'editItem', item })}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setPanel({ type: 'editItem', item });
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit ${item.name}`}
+                  >
+                    <div className="menu-manager-card-image">
+                      <ImageIcon />
+                      <span className={`menu-manager-status ${isInactive ? 'inactive' : 'active'}`}>{isInactive ? 'Inactive' : 'Active'}</span>
+                    </div>
+                    <div className="menu-manager-card-body">
+                      <div className="menu-manager-card-title-row">
+                        <h2>{item.name}</h2>
+                      </div>
+                      <p>{item.description || 'No description provided.'}</p>
+                      <div className="menu-manager-card-footer">
+                        <span className="menu-manager-card-price">₱{item.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
-        </div>
-
-        <div className="rmc105">
-          <span className="rmc14">{pageStart}–{pageEnd} of {filtered.length}</span>
-          <div className="rmc69">
-            <button className="rmc106" disabled={currentPage <= 1} onClick={() => goToMenuPage(currentPage - 1)}>◀ Previous</button>
-            <span className="rmc107">{currentPage} / {totalPages}</span>
-            <button className="rmc106" disabled={currentPage >= totalPages} onClick={() => goToMenuPage(currentPage + 1)}>Next ▶</button>
           </div>
         </div>
-
       </main>
 
       {panel && (
-        <MenuPanel mode={panel} categories={categories} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={handleDeleteCategory} />
+        <MenuPanel mode={panel} categories={categories} activeCategoryId={activeCat} onClose={() => setPanel(null)} onAddItem={addItem} onEditItem={editItem} onDeleteItem={deleteItem} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={handleDeleteCategory} />
       )}
     </div>
   );
@@ -660,7 +660,7 @@ function TableInterface() {
         if (sorted[i]) await posRemoveTable(sorted[i].id);
       }
     }
-    navigate('/restaurant-management/table-list');
+    navigate('/table-manager');
   };
 
   const cycleStatus = async (tableNum) => {
@@ -680,12 +680,12 @@ function TableInterface() {
   const countByStatus = (s) => tables.filter((t) => t.status === s).length;
   const goToTablePage = (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
-    navigate(withPage('/restaurant-management/table-list', safePage));
+    navigate(withPage('/table-manager', safePage));
   };
   const selectStatusFilter = (status) => {
     setStatusFilter(status);
     setIsFilterOpen(false);
-    navigate('/restaurant-management/table-list');
+    navigate('/table-manager');
   };
 
   return (
@@ -818,15 +818,10 @@ function TableInterface() {
   );
 }
 
-export default function RestaurantManagement() {
-  const navigate = useNavigate();
-  const location = useLocation();
+export default function RestaurantManagement({ managerType = 'menu' }) {
   const interfaceCanvas = useFixedInterfaceCanvas();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const tab = location.pathname.includes('/table-list') ? 'tables' : 'menu';
-  const menuRoute = location.pathname.includes('/edit-menu')
-    ? `/restaurant-management/edit-menu${location.search || '?category="meals"'}`
-    : '/restaurant-management/edit-menu?category="meals"';
+  const isTableManager = managerType === 'tables';
 
   useEffect(() => {
     const intervalId = setInterval(() => setCurrentDateTime(new Date()), 1000);
@@ -836,20 +831,17 @@ export default function RestaurantManagement() {
   const time = currentDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: "2-digit" });
   const date = currentDateTime.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   return (
-    <div className="rmc108 restaurant-management-root" style={{ '--restaurant-scale': interfaceCanvas.scale, '--restaurant-canvas-height': interfaceCanvas.height, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height }}>
+    <div className={`rmc108 restaurant-management-root ${isTableManager ? 'table-manager-root' : 'menu-manager-root'}`} style={{ '--restaurant-scale': interfaceCanvas.scale, '--restaurant-canvas-height': interfaceCanvas.height, width: interfaceCanvas.width, height: interfaceCanvas.height, minHeight: interfaceCanvas.height }}>
       <header className="rmc109">
-        <div className="rmc110"><div className="rmc111"><GridIcon /></div><span className="rmc112">Restaurant Management Interface</span></div>
+        <div className="rmc110"><div className="rmc111"><GridIcon /></div><span className="rmc112">{isTableManager ? 'Table Manager' : 'Menu Manager'}</span></div>
         <div className="rmc113">
           <div className="restaurant-management-date-time">{date}, {time}</div>
+          {!isTableManager && <button type="button" className="restaurant-management-help" aria-label="Menu Manager help" title="Help"><HelpIcon /></button>}
           <Link to="/" className="rmc114" aria-label="Return to interface selector" title="Return to interface selector"><ReturnIcon /></Link>
         </div>
       </header>
 
-      <div className="rmc119">
-        <div className="rmc120">{['menu', 'tables'].map((t) => (<button key={t} onClick={() => navigate(t === 'menu' ? menuRoute : '/restaurant-management/table-list')} className={`restaurant-management-tab ${tab === t ? 'restaurant-management-tab-active' : 'restaurant-management-tab-inactive'}`}>{t === 'menu' ? 'EDIT MENU' : 'MANAGE TABLES'}</button>))}</div>
-      </div>
-
-      <div className="rmc121">{tab === 'menu' ? <MenuInterface /> : <TableInterface />}</div>
+      <div className="rmc121">{isTableManager ? <TableInterface /> : <MenuInterface />}</div>
     </div>
   );
 }

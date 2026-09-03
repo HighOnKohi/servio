@@ -307,7 +307,7 @@ function Kitchen() {
   }, [visibleTickets.length, activeTab]);
 
   // ── Pagination ─────────────────────────────────────────────────────
-  const ticketsPerPage = 8;
+  const ticketsPerPage = 12;
   const totalPages = Math.max(1, Math.ceil(visibleTickets.length / ticketsPerPage));
   const activePage = Math.min(currentPage, totalPages);
   const ticketStart = (activePage - 1) * ticketsPerPage;
@@ -505,17 +505,15 @@ function Kitchen() {
                   return (
                     <article className={`kitchen-ticket ${urgency !== 'normal' ? urgency : ''} ${ticket.status.toLowerCase()}`} key={ticket.id}>
                       <header className={`ticket-header ${urgency !== 'normal' ? urgency : ''}`}>
-                        <div>
-                          <strong>#{ticket.displayId}</strong>
-                          <span>Table #{ticket.table}</span>
+                        <div className="ticket-heading">
+                          <strong className="ticket-table-title">Table {String(ticket.table).padStart(2, '0')}</strong>
                           {urgency === 'overtime' && <span className="overtime-badge">OVERTIME</span>}
                         </div>
-                        <time>◷ {formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}</time>
+                        <time aria-label={`Elapsed time ${formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}`}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                          {formatElapsed(ticket.createdAt, ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED' ? new Date(ticket.completedAt).getTime() : currentTime)}
+                        </time>
                       </header>
-                      <div className="ticket-meta">
-                        <span>{ticket.server}</span>
-                        <span>{ticket.orderType}</span>
-                      </div>
                       <div className="ticket-items">
                         {ticket.items.map((item, index) => (
                           <div className={`ticket-item ${item.cancelled ? 'cancelled' : ''}`} key={`${ticket.id}-${index}`}>

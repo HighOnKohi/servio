@@ -1,4 +1,59 @@
-/* Styles for Admin page */
+/* Menu Manager visual language, scoped to the Admin page. */
 .admin-page {
-  padding: 20px;
+  padding: 0 !important;
+  background-color: #f4f6ff !important;
+  background-image: linear-gradient(#e6ebf4 1px, transparent 1px), linear-gradient(90deg, #e6ebf4 1px, transparent 1px) !important;
+  background-size: 55px 55px !important;
+  color: #172033 !important;
+}
+
+.admin-page > header {
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 0 22px !important;
+  border-bottom-color: #31445a !important;
+  background: #1f3044 !important;
+  color: #f1f5f9;
+}
+
+.admin-page > header button[aria-label="Return to Interface Selector"] {
+  border-color: #52657b !important;
+  color: #d9e4ef !important;
+}
+
+.admin-page > header button:last-child {
+  border-color: #087f63 !important;
+  background: #087f63 !important;
+  color: #fff !important;
+}
+
+.admin-page > div[style*="gridTemplateColumns"] > div,
+.admin-page > div[style*="gridTemplateColumns"] > section {
+  border-radius: 8px !important;
+}
+
+.admin-page table thead tr {
+  background: #f7f9ff !important;
+}
+
+.admin-page table tbody tr:hover {
+  background: #f7f9ff;
+}
+
+.admin-page input,
+.admin-page select {
+  border-color: #c6d3df !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+}
+
+.admin-page button {
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .admin-page > div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+    overflow: auto !important;
+  }
 }

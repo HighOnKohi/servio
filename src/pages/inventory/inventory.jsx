@@ -247,7 +247,7 @@ const Inventory = () => {
           <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Inventory Interface</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontSize: "0.82rem", color: "#64748b" }}>{date}, {time}</span>
+          <span style={{ fontSize: "0.82rem", color: "#b8c5d6" }}>{date}, {time}</span>
           <button
             onClick={() => navigate("/")}
             style={{
@@ -414,8 +414,8 @@ const Inventory = () => {
                     flex: 1,
                     padding: "10px",
                     borderRadius: 8,
-                    border: "none",
-                    background: "#111827",
+                    border: "1px solid #087f63",
+                    background: "#087f63",
                     color: "#ffffff",
                     fontWeight: 600,
                     cursor: "pointer",

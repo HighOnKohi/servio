@@ -173,3 +173,35 @@ body,
 .login-meta-version {
   text-align: right;
 }
+
+/* Menu Manager visual language */
+:root {
+  --login-bg: #f4f6ff;
+  --card-bg: #ffffff;
+  --input-bg: #f8fbff;
+  --input-border: #cfd8e3;
+  --text: #1f3044;
+  --muted: #64748b;
+  --accent: #087f63;
+  --button-bg: #087f63;
+  --button-text: #ffffff;
+  --panel-border: #cfd8e3;
+}
+body,
+#root {
+  background-color: #f4f6ff;
+  background-image: linear-gradient(rgba(216,225,239,.58) 1px, transparent 1px), linear-gradient(90deg, rgba(216,225,239,.58) 1px, transparent 1px);
+  background-size: 55px 55px;
+}
+.login-card {
+  border-radius: 6px;
+  border-color: #cfd8e3;
+  box-shadow: 0 12px 28px rgba(31,48,68,.12);
+}
+.login-brand-icon { border-radius: 4px; background: #1f3044; }
+.login-card h1 { color: #1f3044; }
+.login-label input { border-radius: 4px; background: #f8fbff; padding: 12px 14px; }
+.show-password { color: #64748b; }
+.login-submit { border-radius: 4px; background: #087f63; padding: 13px 0; }
+.login-submit:hover { box-shadow: 0 10px 20px rgba(8,127,99,.2); }
+.forgot-link { color: #087f63; }

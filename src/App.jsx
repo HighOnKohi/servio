@@ -8,7 +8,6 @@ import Login from "./pages/login/login";
 import InterfaceSelector from "./pages/interfaceSelector/interface-selector";
 import RestaurantManagement from "./pages/restaurantManagement/restaurant-management";
 import Cashier from "./pages/cashier/cashier";
-import Waiter from "./pages/waiter/waiter";
 import Kitchen from "./pages/kitchen/kitchen";
 import Admin from "./pages/admin/admin";
 import Inventory from "./pages/inventory/inventory";
@@ -26,9 +25,9 @@ function App() {
           {/* All other routes are protected — requires authentication */}
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<InterfaceSelector />} />
-            <Route path="/restaurant-management/*" element={<RestaurantManagement />} />
+            <Route path="/menu-manager/*" element={<RestaurantManagement managerType="menu" />} />
+            <Route path="/table-manager/*" element={<RestaurantManagement managerType="tables" />} />
             <Route path="/cashier/*" element={<Cashier />} />
-            <Route path="/waiter/*" element={<Waiter />} />
             <Route path="/kitchen/*" element={<Kitchen />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/inventory" element={<Inventory />} />

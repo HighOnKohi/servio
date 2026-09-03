@@ -535,7 +535,7 @@ const Admin = () => {
           <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Admin Dashboard</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "0.82rem", color: "#64748b" }}>{date}, {time}</span>
+          <span style={{ fontSize: "0.82rem", color: "#b8c5d6" }}>{date}, {time}</span>
           <button onClick={() => navigate("/")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 10px", color: "#374151", cursor: "pointer" }} aria-label="Return to Interface Selector">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
@@ -695,7 +695,7 @@ const Admin = () => {
             <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: 0, color: "#111827" }}>Staff Profiles</h2>
             <button
               onClick={() => setShowRegisterModal(true)}
-              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}
+              style={{ background: "#087f63", color: "#fff", border: "1px solid #087f63", borderRadius: 7, padding: "6px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}
             >
               + Register Staff
             </button>

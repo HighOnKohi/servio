@@ -319,6 +319,8 @@ export default function Customer() {
     try { return sessionStorage.getItem(storageKey('billout')) === 'true'; } catch { return false; }
   });
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [menuSearch, setMenuSearch] = useState('');
+  const [activeOrderTab, setActiveOrderTab] = useState('order');
   const [showMobileCart, setShowMobileCart] = useState(false);
 
   // ── Persist state to sessionStorage whenever it changes ──
@@ -430,7 +432,11 @@ export default function Customer() {
   }, [menuItems, cart]);
 
   const activeCategory = selectedCategory || categories[0]?.id;
-  const visibleItems = menuItems.filter((item) => item.category === activeCategory);
+  const normalizedMenuSearch = menuSearch.trim().toLowerCase();
+  const visibleItems = menuItems.filter((item) =>
+    item.category === activeCategory &&
+    (!normalizedMenuSearch || item.name.toLowerCase().includes(normalizedMenuSearch))
+  );
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const now = new Date(currentTime);
@@ -552,6 +558,11 @@ export default function Customer() {
   // ── Cart panel (shared between desktop sidebar and mobile bottom panel) ──
   const CartPanel = ({ isInline = false }) => (
     <div className="customer-sidebar-card" role="complementary" aria-label="Your order">
+      <div className="customer-order-tabs" role="tablist" aria-label="Order sidebar sections">
+        <button type="button" className={`customer-order-tab ${activeOrderTab === 'order' ? 'active' : ''}`} onClick={() => setActiveOrderTab('order')} role="tab" aria-selected={activeOrderTab === 'order'}>Order</button>
+        <button type="button" className={`customer-order-tab ${activeOrderTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveOrderTab('tracking')} role="tab" aria-selected={activeOrderTab === 'tracking'}>Order Tracking</button>
+      </div>
+      {activeOrderTab === 'order' ? <>
       <div className="customer-sidebar-heading">
         <div>
           <p className="customer-kicker">Current Selection</p>
@@ -661,6 +672,13 @@ export default function Customer() {
           {submitting ? 'Sending…' : hasPendingRequest ? '⏳ Order Pending…' : cartSoldOutIds.size > 0 ? '⚠ Remove Sold-Out Items' : '✓ Mark Pending'}
         </button>
       )}
+      </> : (
+        <div className="customer-tracking-view">
+          <p className="customer-kicker">Live Tracking</p>
+          <h2>Order Tracking</h2>
+          <OrderStatusPanel tableOrders={tableOrders} orderItems={safeOrderItems} formatPrice={formatPrice} />
+        </div>
+      )}
     </div>
   );
 
@@ -735,6 +753,17 @@ export default function Customer() {
             ))}
           </nav>
 
+          <div className="customer-menu-search-row">
+            <input
+              className="customer-menu-search"
+              type="search"
+              placeholder="Search menu items..."
+              aria-label="Search menu items"
+              value={menuSearch}
+              onChange={(event) => setMenuSearch(event.target.value)}
+            />
+          </div>
+
           {/* Menu grid */}
           <div
             className="customer-menu-grid"
@@ -749,6 +778,7 @@ export default function Customer() {
                 <article
                   key={item.id}
                   className="customer-menu-card"
+                  onClick={() => !isDisabled && addItem(item)}
                   role="listitem"
                   aria-label={`${item.name}, ${formatPrice(item.price)}${isDisabled ? ', unavailable' : ''}`}
                   style={isDisabled ? { opacity: .5 } : {}}
@@ -775,7 +805,7 @@ export default function Customer() {
                     </span>
                     <button
                       className="customer-menu-add-btn"
-                      onClick={() => addItem(item)}
+                      onClick={(event) => { event.stopPropagation(); addItem(item); }}
                       aria-label={`Add ${item.name} to order`}
                       type="button"
                       disabled={isDisabled}
@@ -798,11 +828,6 @@ export default function Customer() {
         {/* ── Desktop Sidebar ── */}
         <aside className="customer-sidebar">
           <CartPanel isInline />
-          <OrderStatusPanel
-            tableOrders={tableOrders}
-            orderItems={safeOrderItems}
-            formatPrice={formatPrice}
-          />
         </aside>
       </main>
 

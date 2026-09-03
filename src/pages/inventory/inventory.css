@@ -1,4 +1,71 @@
-/* Styles for Inventory page */
+/* Menu Manager visual language, scoped to the Inventory page. */
 .inventory-page {
-  padding: 20px;
+  padding: 0 !important;
+  background-color: #f4f6ff !important;
+  background-image: linear-gradient(#e6ebf4 1px, transparent 1px), linear-gradient(90deg, #e6ebf4 1px, transparent 1px) !important;
+  background-size: 55px 55px !important;
+  color: #172033 !important;
+}
+
+.inventory-page > header {
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 0 22px !important;
+  border-bottom-color: #31445a !important;
+  background: #1f3044 !important;
+  color: #f1f5f9;
+}
+
+.inventory-page > header button {
+  border-color: #52657b !important;
+  color: #d9e4ef !important;
+  background: transparent !important;
+}
+
+.inventory-page > div[style*="padding: 16px 24px"] > div,
+.inventory-page > div[style*="padding: 16px 24px"] > div > div {
+  border-radius: 8px !important;
+}
+
+.inventory-page > div[style*="padding: 0 24px 12px"] input {
+  border-radius: 999px !important;
+}
+
+.inventory-page > div[style*="padding: 0 24px 12px"] button,
+.inventory-page > div[style*="padding: 16px 24px"] button {
+  border-radius: 7px !important;
+}
+
+.inventory-page table thead tr {
+  background: #f7f9ff !important;
+}
+
+.inventory-page table tbody tr:hover {
+  background: #f7f9ff;
+}
+
+.inventory-page input,
+.inventory-page select {
+  border-color: #c6d3df !important;
+  background: #fff !important;
+}
+
+@media (max-width: 760px) {
+  .inventory-page > div[style*="padding: 16px 24px"] {
+    flex-wrap: wrap;
+  }
+
+  .inventory-page > div[style*="padding: 0 24px 12px"] {
+    align-items: stretch !important;
+    flex-wrap: wrap;
+  }
+
+  .inventory-page > div[style*="padding: 0 24px 12px"] > div:last-child {
+    width: 100%;
+  }
+
+  .inventory-page > div[style*="padding: 0 24px 12px"] input {
+    flex: 1;
+    width: auto !important;
+  }
 }

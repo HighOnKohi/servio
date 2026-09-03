@@ -686,7 +686,7 @@ export function POSProvider({ children }) {
             quantity: nextQuantity,
             price: Number(i.price),
             modifiers: i.modifiers || [],
-            status: "PENDING",
+            status: "ACTIVE",
           });
         }
       }
@@ -747,44 +747,107 @@ export function POSProvider({ children }) {
       const request = customerRequests.find((entry) => entry.id === requestId);
       if (!request) return { error: new Error("Customer request not found") };
 
-      const normalizedItems = Array.isArray(request.items)
-        ? request.items.map((item) => ({
-          id: item.id || item.menu_item_id || null,
-          menu_item_id: item.id || item.menu_item_id || null,
-          name: item.name || item.item_name,
-          item_name: item.name || item.item_name,
-          price: Number(item.price) || 0,
-          quantity: Number(item.quantity) || 1,
-        }))
-        : [];
+      // Check if this is a cashier request (PENDING_KITCHEN) or customer request (PENDING)
+      if (request.status === "PENDING_KITCHEN") {
+        // Cashier request: Add items directly to order as ACTIVE
+        const activeOrder = orders.find(
+          (order) =>
+            order.table_number === request.table_number &&
+            order.status !== "COMPLETED" &&
+            order.status !== "CANCELLED",
+        );
 
-      const activeOrder = orders.find(
-        (order) =>
-          order.table_number === request.table_number &&
-          order.status !== "COMPLETED" &&
-          order.status !== "CANCELLED",
-      );
+        if (!activeOrder) {
+          return { error: new Error("No active order found for this table") };
+        }
 
-      if (activeOrder) {
-        await addItemsToOrder(activeOrder.id, normalizedItems);
+        // Get request items
+        const { data: requestItems, error: itemsError } = await supabase
+          .from("customer_request_items")
+          .select("*, menu_items(*)")
+          .eq("request_id", requestId);
+
+        if (itemsError || !requestItems) {
+          return { error: itemsError || new Error("Failed to fetch request items") };
+        }
+
+        // Insert order items with status ACTIVE
+        const orderItemsToInsert = requestItems.map((item) => ({
+          order_id: activeOrder.id,
+          menu_item_id: item.menu_item_id,
+          item_name: item.menu_items?.name || item.item_name,
+          quantity: item.quantity,
+          price: Number(item.menu_items?.price || item.price || 0),
+          status: "ACTIVE",
+          notes: item.notes,
+          created_at: new Date().toISOString(),
+        }));
+
+        const { error: insertError } = await supabase
+          .from("order_items")
+          .insert(orderItemsToInsert);
+
+        if (insertError) {
+          return { error: insertError };
+        }
+
+        // Mark request as accepted
+        const { data, error } = await supabase
+          .from("customer_requests")
+          .update({
+            status: "ACCEPTED",
+            accepted_at: new Date().toISOString(),
+          })
+          .eq("id", requestId)
+          .select()
+          .single();
+
+        if (!error) {
+          await refetchCustomerRequests();
+          await refetchOrders();
+        }
+        return { data, error };
       } else {
-        await createOrder(request.table_number, "Customer", normalizedItems, "DINE-IN");
+        // Customer request: Normal flow
+        const normalizedItems = Array.isArray(request.items)
+          ? request.items.map((item) => ({
+            id: item.id || item.menu_item_id || null,
+            menu_item_id: item.id || item.menu_item_id || null,
+            name: item.name || item.item_name,
+            item_name: item.name || item.item_name,
+            price: Number(item.price) || 0,
+            quantity: Number(item.quantity) || 1,
+          }))
+          : [];
+
+        const activeOrder = orders.find(
+          (order) =>
+            order.table_number === request.table_number &&
+            order.status !== "COMPLETED" &&
+            order.status !== "CANCELLED",
+        );
+
+        if (activeOrder) {
+          await addItemsToOrder(activeOrder.id, normalizedItems);
+        } else {
+          await createOrder(request.table_number, "Customer", normalizedItems, "DINE-IN");
+        }
+
+        const { data, error } = await supabase
+          .from("customer_requests")
+          .update({
+            status: "ACCEPTED",
+            accepted_at: new Date().toISOString(),
+          })
+          .eq("id", requestId)
+          .select()
+          .single();
+
+        if (!error) await refetchCustomerRequests();
+        return { data, error };
       }
-
-      const { data, error } = await supabase
-        .from("customer_requests")
-        .update({
-          status: "ACCEPTED",
-          accepted_at: new Date().toISOString(),
-        })
-        .eq("id", requestId)
-        .select()
-        .single();
-
-      if (!error) await refetchCustomerRequests();
-      return { data, error };
     },
-    [customerRequests, orders, addItemsToOrder, createOrder, refetchCustomerRequests],
+    [customerRequests, orders, addItemsToOrder, createOrder, refetchCustomerRequests, refetchOrders],
   );
 
   /** Kitchen confirms stock is available and forwards the customer request to the cashier. */
