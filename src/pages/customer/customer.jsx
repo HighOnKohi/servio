@@ -1042,8 +1042,7 @@ export default function Customer() {
             ✓ Bill requested — Staff is heading to your table
           </div>
         )}
-        {!showBillOut && (
-          <button
+        <button
             className="customer-submit-button"
             onClick={submitRequest}
             disabled={cart.length === 0 || submitting || hasPendingRequest || cartSoldOutIds.size > 0}
@@ -1060,7 +1059,6 @@ export default function Customer() {
               ? `✓ Mark Pending (${cartCount})`
               : 'Select Items to Order'}
           </button>
-        )}
       </div>
     </div>
   );

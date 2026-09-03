@@ -829,6 +829,14 @@ export function POSProvider({ children }) {
 
         if (activeOrder) {
           await addItemsToOrder(activeOrder.id, normalizedItems);
+          // If the order was already SERVED, reset it to PENDING so the kitchen
+          // ticket reappears for the new items to be cooked.
+          if (activeOrder.status === "SERVED" || activeOrder.status === "READY" || activeOrder.status === "COMPLETED") {
+            await supabase
+              .from("orders")
+              .update({ status: "PENDING" })
+              .eq("id", activeOrder.id);
+          }
         } else {
           await createOrder(request.table_number, "Customer", normalizedItems, "DINE-IN");
         }
@@ -843,7 +851,7 @@ export function POSProvider({ children }) {
           .select()
           .single();
 
-        if (!error) await refetchCustomerRequests();
+        if (!error) await Promise.all([refetchCustomerRequests(), refetchOrders()]);
         return { data, error };
       }
     },
