@@ -245,14 +245,37 @@ function stepClassFor(stepIndex, requestStatus) {
   return '';
 }
 
-/* ── Pending Order Modal ───────────────────────────────────────────── */
-function CustomerPendingModal({ request }) {
+/* ── Pending Order Modal (supports minimized floating-chip mode) ─────── */
+function CustomerPendingModal({ request, isMinimized, onToggleMinimize }) {
   const status = request?.status;
   const statusLabel =
     status === 'PENDING_KITCHEN' ? 'Waiting for kitchen to verify stock…' :
     status === 'PENDING_CASHIER' ? 'Waiting for cashier to confirm your order…' :
     'Your order is being processed…';
 
+  // ── Minimized: floating non-blocking chip ──
+  if (isMinimized) {
+    return (
+      <div className="cpending-chip" role="status" aria-label="Order pending — tap to expand">
+        <span className="cpending-chip-pulse" aria-hidden="true" />
+        <span className="cpending-chip-text">
+          {status === 'PENDING_KITCHEN' ? '🍳 Kitchen verifying…' :
+           status === 'PENDING_CASHIER' ? '💳 Awaiting cashier…' :
+           '⏳ Order pending…'}
+        </span>
+        <button
+          type="button"
+          className="cpending-chip-expand"
+          onClick={onToggleMinimize}
+          aria-label="Expand order status"
+        >
+          ↑ Details
+        </button>
+      </div>
+    );
+  }
+
+  // ── Full blocking modal ──
   return (
     <div className="cpending-overlay" role="dialog" aria-modal="true" aria-label="Order pending confirmation">
       <div className="cpending-card">
@@ -260,13 +283,21 @@ function CustomerPendingModal({ request }) {
           <span className="cpending-icon">⏳</span>
           <h2>Order Pending Verification</h2>
           <p>{statusLabel}</p>
+          <button
+            type="button"
+            className="cpending-minimize-btn"
+            onClick={onToggleMinimize}
+            aria-label="Minimize — continue browsing while we process your order"
+          >
+            − Minimize &amp; Keep Browsing
+          </button>
         </div>
 
         <div className="cpending-notice">
           <span className="cpending-notice-icon">📌</span>
           <span>
-            <strong>Please keep this tab open!</strong> The kitchen is checking ingredient availability,
-            and the cashier will confirm your order shortly. Do not close or refresh this page.
+            <strong>Keep this tab open.</strong> You can minimize this dialog and keep adding
+            items while we verify your order. Do not close or refresh the page.
           </span>
         </div>
 
@@ -453,6 +484,7 @@ export default function Customer() {
   const [detailItem, setDetailItem] = useState(null);        // item open in detail modal
   const [cartBadgePop, setCartBadgePop] = useState(false);   // triggers cart badge pop
   const [debouncedSearch, setDebouncedSearch] = useState(''); // debounced menu search text
+  const [isPendingMinimized, setIsPendingMinimized] = useState(false); // pending modal minimize toggle
 
   // ── Persist state to sessionStorage whenever it changes ──
   useEffect(() => {
@@ -795,9 +827,9 @@ export default function Customer() {
         </div>
       </div>
 
-      {/* Served state / Bill Out */}
+      {/* Served state / Bill Out — hidden on mobile (mobile bar handles it) */}
       {showBillOut && (
-        <div className="customer-served-state">
+        <div className={`customer-served-state${isInline ? ' customer-sidebar-mobile-hidden' : ''}`}>
           <span className="customer-served-emoji">🍽️</span>
           <p className="customer-served-title">Food has been served!</p>
           <p className="customer-served-subtitle">Enjoy your meal. Ready to pay?</p>
@@ -819,14 +851,14 @@ export default function Customer() {
         </div>
       )}
 
-      {/* Pending banner */}
+      {/* Pending banner — hidden on mobile (mobile bar handles it) */}
       {hasPendingRequest && (
-        <div className="customer-request-banner" role="status" aria-live="polite">
+        <div className={`customer-request-banner${isInline ? ' customer-sidebar-mobile-hidden' : ''}`} role="status" aria-live="polite">
           ⏳ Your order is being verified — please wait.
         </div>
       )}
 
-      {/* Submit button — always visible so customers can order more items even after food is served */}
+      {/* Submit button — hidden on mobile via customer-submit-button-inline (mobile bar handles it) */}
       <button
         className={`customer-submit-button ${isInline ? 'customer-submit-button-inline' : ''}`}
         onClick={submitRequest}
@@ -857,8 +889,14 @@ export default function Customer() {
         />
       )}
 
-      {/* ── Pending Verification Modal (blocks screen) ── */}
-      {hasPendingRequest && <CustomerPendingModal request={activeRequest} />}
+      {/* ── Pending Verification Modal (minimizable) ── */}
+      {hasPendingRequest && (
+        <CustomerPendingModal
+          request={activeRequest}
+          isMinimized={isPendingMinimized}
+          onToggleMinimize={() => setIsPendingMinimized((v) => !v)}
+        />
+      )}
 
       {/* ── Unavailable Alert Modal (blocks screen) ── */}
       {hasUnavailableRequest && (

@@ -769,6 +769,11 @@
   .customer-submit-button-inline {
     display: none;
   }
+
+  /* Hide sidebar-only actions when mobile bar is active */
+  .customer-sidebar-mobile-hidden {
+    display: none !important;
+  }
 }
 
 /* Extra small (iPhone SE, 375px) */
@@ -853,6 +858,25 @@
   font-size: .82rem;
   color: #94a3b8;
   line-height: 1.5;
+}
+
+/* Minimize button inside the full pending modal */
+.cpending-minimize-btn {
+  margin-top: 14px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.10);
+  color: #e2e8f0;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s, border-color .18s;
+  letter-spacing: .02em;
+}
+.cpending-minimize-btn:hover {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.4);
 }
 
 .cpending-notice {
@@ -946,6 +970,77 @@
 
 .cpending-step.done .cpending-step-label { color: #16a34a; }
 .cpending-step.active .cpending-step-label { color: #b45309; font-weight: 700; }
+
+/* ─── Pending Order: Minimized floating chip ─────────────────────────────── */
+.cpending-chip {
+  position: fixed;
+  bottom: 80px;           /* sits above the mobile bar on small screens */
+  left: 16px;
+  z-index: 8500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f1f5f9;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  font-size: .82rem;
+  font-weight: 600;
+  animation: chip-slide-in .28s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: auto;
+  max-width: calc(100vw - 32px);
+}
+
+@media (min-width: 681px) {
+  .cpending-chip {
+    bottom: 24px;
+    left: 24px;
+  }
+}
+
+@keyframes chip-slide-in {
+  from { opacity: 0; transform: translateY(16px) scale(.92); }
+  to   { opacity: 1; transform: none; }
+}
+
+.cpending-chip-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: chip-pulse .9s ease-in-out infinite;
+}
+
+@keyframes chip-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); }
+  50%      { box-shadow: 0 0 0 7px rgba(245,158,11,0); }
+}
+
+.cpending-chip-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cpending-chip-expand {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.1);
+  color: #e2e8f0;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s;
+  flex-shrink: 0;
+}
+.cpending-chip-expand:hover {
+  background: rgba(255,255,255,.2);
+}
 
 /* ─── Unavailable Alert Modal ─────────────────────────────────────────────── */
 .cunavail-overlay {

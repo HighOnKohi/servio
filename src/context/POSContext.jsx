@@ -820,22 +820,40 @@ export function POSProvider({ children }) {
           }))
           : [];
 
-        const activeOrder = orders.find(
-          (order) =>
-            order.table_number === request.table_number &&
-            order.status !== "COMPLETED" &&
-            order.status !== "CANCELLED",
-        );
+        // Fetch the order fresh from DB — the closure `orders` may be stale
+        // if the table's order was already marked SERVED by the kitchen.
+        const { data: freshOrders } = await supabase
+          .from("orders")
+          .select("id, status, table_number")
+          .eq("table_number", request.table_number)
+          .not("status", "eq", "CANCELLED")
+          .not("status", "eq", "COMPLETED")
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-        if (activeOrder) {
-          await addItemsToOrder(activeOrder.id, normalizedItems);
-          // If the order was already SERVED, reset it to PENDING so the kitchen
-          // ticket reappears for the new items to be cooked.
-          if (activeOrder.status === "SERVED" || activeOrder.status === "READY" || activeOrder.status === "COMPLETED") {
+        const freshOrder = freshOrders?.[0] || null;
+
+        if (freshOrder) {
+          await addItemsToOrder(freshOrder.id, normalizedItems);
+
+          // Always reset the order to PENDING so the kitchen ticket reappears.
+          await supabase
+            .from("orders")
+            .update({ status: "PENDING" })
+            .eq("id", freshOrder.id);
+
+          // Reset SERVED/READY order_items that match the new request back to
+          // PENDING so the kitchen knows to cook them again.
+          const newItemIds = normalizedItems
+            .map((i) => i.id || i.menu_item_id)
+            .filter(Boolean);
+          if (newItemIds.length > 0) {
             await supabase
-              .from("orders")
+              .from("order_items")
               .update({ status: "PENDING" })
-              .eq("id", activeOrder.id);
+              .eq("order_id", freshOrder.id)
+              .in("menu_item_id", newItemIds)
+              .in("status", ["SERVED", "READY"]);
           }
         } else {
           await createOrder(request.table_number, "Customer", normalizedItems, "DINE-IN");
@@ -851,11 +869,11 @@ export function POSProvider({ children }) {
           .select()
           .single();
 
-        if (!error) await Promise.all([refetchCustomerRequests(), refetchOrders()]);
+        if (!error) await Promise.all([refetchCustomerRequests(), refetchOrders(), refetchOrderItems()]);
         return { data, error };
       }
     },
-    [customerRequests, orders, addItemsToOrder, createOrder, refetchCustomerRequests, refetchOrders],
+    [customerRequests, addItemsToOrder, createOrder, refetchCustomerRequests, refetchOrders, refetchOrderItems],
   );
 
   /** Kitchen confirms stock is available and forwards the customer request to the cashier. */
