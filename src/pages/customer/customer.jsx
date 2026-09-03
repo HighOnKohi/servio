@@ -1,14 +1,15 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import './customer.css';
 
 /* ── Order Status Panel ────────────────────────────────────────────── */
-// Implementation as a plain hoisted function declaration — immune to bundler
-// TDZ issues that affect `const` assignments.
-function OrderStatusPanelBase({ tableOrders, orderItems, formatPrice }) {
-  // Flatten all items across non-cancelled orders for this table.
-  // useMemo/useState/useEffect must all come before any early return (Rules of Hooks).
+// Plain hoisted function declaration — no module-level `const`, no TDZ risk.
+// The `entering` state (set once on mount, never reset) keeps the animation
+// class on the element for all subsequent re-renders from polling, so the
+// entry animation only ever plays once regardless of how often data refreshes.
+function OrderStatusPanel({ tableOrders, orderItems, formatPrice }) {
+  // All hooks must come before any early return (Rules of Hooks).
   const allItems = useMemo(() => {
     return tableOrders.flatMap((order) =>
       orderItems
@@ -17,9 +18,7 @@ function OrderStatusPanelBase({ tableOrders, orderItems, formatPrice }) {
     );
   }, [tableOrders, orderItems]);
 
-  // One-shot mount flag: set to true exactly once after first render.
-  // The CSS entry animation class is gated on this flag so it never replays
-  // during subsequent polling updates.
+  // Set to true on first mount; never resets — animation class stays applied.
   const [entering, setEntering] = useState(false);
   useEffect(() => { setEntering(true); }, []);
 
@@ -82,25 +81,6 @@ function OrderStatusPanelBase({ tableOrders, orderItems, formatPrice }) {
     </div>
   );
 }
-
-// Memo wrapper assigned AFTER the function declaration is fully hoisted.
-// Custom comparator: skip re-render unless item count, IDs, or statuses changed.
-// This prevents the entry animation from replaying on every 8-second poll cycle.
-const OrderStatusPanel = memo(OrderStatusPanelBase, (prev, next) => {
-  const toKeys = (orders, items) =>
-    orders.flatMap((o) =>
-      items
-        .filter((oi) => oi.order_id === o.id && oi.status !== 'CANCELLED')
-        .map((oi) => `${oi.id}:${oi.status}`)
-    );
-  const prevKeys = toKeys(prev.tableOrders, prev.orderItems);
-  const nextKeys = toKeys(next.tableOrders, next.orderItems);
-  return (
-    prevKeys.length === nextKeys.length &&
-    prevKeys.every((v, i) => v === nextKeys[i])
-  );
-});
-
 
 function MenuImagePlaceholderSVG() {
   return (
@@ -511,7 +491,7 @@ export default function Customer() {
     if (activeCategoryRef.current) {
       activeCategoryRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
-  }, [activeCategory]);
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory) {
