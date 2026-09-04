@@ -496,3 +496,66 @@ INSERT INTO protocols (title, content) VALUES
 4. Perform supervisor drops whenever drawer exceeds maximum cash limit.')
 ON CONFLICT (title) DO UPDATE SET
   content = EXCLUDED.content;
+
+-- 8. Supabase Storage Configuration for Menu Item Images
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'menu-items',
+  'menu-items',
+  TRUE,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = TRUE,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Public Access for menu-items bucket'
+  ) THEN
+    CREATE POLICY "Public Access for menu-items bucket"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'menu-items');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Allow upload to menu-items bucket'
+  ) THEN
+    CREATE POLICY "Allow upload to menu-items bucket"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'menu-items');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Allow update to menu-items bucket'
+  ) THEN
+    CREATE POLICY "Allow update to menu-items bucket"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'menu-items')
+    WITH CHECK (bucket_id = 'menu-items');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'objects' AND schemaname = 'storage' AND policyname = 'Allow delete from menu-items bucket'
+  ) THEN
+    CREATE POLICY "Allow delete from menu-items bucket"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'menu-items');
+  END IF;
+END $$;

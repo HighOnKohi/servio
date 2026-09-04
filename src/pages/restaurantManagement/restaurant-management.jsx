@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../lib/supabaseClient';
+import { uploadMenuItemImage } from '../../lib/imageUpload';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
@@ -168,6 +169,10 @@ function MenuPanel({ mode, categories, activeCategoryId, onClose, onAddItem, onE
   const [itemDesc, setItemDesc] = useState(mode?.type === 'editItem' ? (mode.item.description || '') : '');
   const itemCat = mode?.type === 'editItem' ? String(mode.item.categoryId) : String(activeCategoryId ?? '');
   const [catName, setCatName] = useState(mode?.type === 'editCategory' ? mode.category.name : '');
+  const [itemImage, setItemImage] = useState(mode?.type === 'editItem' ? (mode.item.imageUrl || mode.item.image_url || '') : '');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(mode?.type === 'editItem' ? (mode.item.imageUrl || mode.item.image_url || '') : '');
+  const [isUploading, setIsUploading] = useState(false);
   const [formError, setFormError] = useState('');
 
   if (!mode) return null;
@@ -181,75 +186,127 @@ function MenuPanel({ mode, categories, activeCategoryId, onClose, onAddItem, onE
     deleteCategory: 'Delete Category',
   }[mode.type] || 'Panel';
 
-  const handleAddOrSave = async () => {
-    if (mode.type === 'addItem') {
-      if (!itemName.trim() || !itemPrice.trim() || !itemDesc.trim() || !itemCat) {
-        setFormError('Please complete every item field.');
-        return;
-      }
-      if (itemDesc.trim().length < 20) {
-        setFormError('Description must contain at least 20 characters.');
-        return;
-      }
-      if (itemDesc.trim().length > 120) {
-        setFormError('Description cannot exceed 120 characters.');
-        return;
-      }
-      if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
-        setFormError('Price must be between ₱0.01 and ₱10,000.00.');
-        return;
-      }
-      const formattedName = toTitleCase(itemName);
-      const result = await onAddItem({ name: formattedName, price: parseFloat(itemPrice), description: toSentenceCase(itemDesc), category_id: itemCat });
-      if (result === false) {
-        setFormError('An item with this name already exists.');
-        return;
-      }
-    } else if (mode.type === 'editItem') {
-      if (!itemName.trim() || !itemPrice.trim() || !itemDesc.trim()) {
-        setFormError('Please complete every item field.');
-        return;
-      }
-      if (itemDesc.trim().length < 20) {
-        setFormError('Description must contain at least 20 characters.');
-        return;
-      }
-      if (itemDesc.trim().length > 120) {
-        setFormError('Description cannot exceed 120 characters.');
-        return;
-      }
-      if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
-        setFormError('Price must be between ₱0.01 and ₱10,000.00.');
-        return;
-      }
-      const result = await onEditItem(mode.item.id, { name: toTitleCase(itemName), price: parseFloat(itemPrice), description: toSentenceCase(itemDesc) });
-      if (result === false) {
-        setFormError('An item with this name already exists.');
-        return;
-      }
-    } else if (mode.type === 'addCategory') {
-      if (!catName.trim()) {
-        setFormError('Please enter a category name.');
-        return;
-      }
-      const formattedName = toTitleCase(catName);
-      const result = await onAddCategory(formattedName);
-      if (result === false) {
-        setFormError('A category with this name already exists.');
-        return;
-      }
-    } else if (mode.type === 'editCategory') {
-      if (!catName.trim()) {
-        setFormError('Please enter a category name.');
-        return;
-      }
-      const result = await onEditCategory(mode.category.id, { name: toTitleCase(catName) });
-      if (result === false) {
-        setFormError('A category with this name already exists.');
-        return;
-      }
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setFormError('Please select a valid image file (PNG, JPG, WebP, GIF).');
+      return;
     }
-    onClose();
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError('Image file is too large (maximum 10MB).');
+      return;
+    }
+    setFormError('');
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target.result);
+      setItemImage(event.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setItemImage('');
+  };
+
+  const handleAddOrSave = async () => {
+    setIsUploading(true);
+    setFormError('');
+    try {
+      let finalImageUrl = itemImage || null;
+      if (imageFile) {
+        finalImageUrl = await uploadMenuItemImage(imageFile);
+      }
+
+      if (mode.type === 'addItem') {
+        if (!itemName.trim() || !itemPrice.trim() || !itemDesc.trim() || !itemCat) {
+          setFormError('Please complete every item field.');
+          return;
+        }
+        if (itemDesc.trim().length < 20) {
+          setFormError('Description must contain at least 20 characters.');
+          return;
+        }
+        if (itemDesc.trim().length > 120) {
+          setFormError('Description cannot exceed 120 characters.');
+          return;
+        }
+        if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
+          setFormError('Price must be between ₱0.01 and ₱10,000.00.');
+          return;
+        }
+        const formattedName = toTitleCase(itemName);
+        const result = await onAddItem({
+          name: formattedName,
+          price: parseFloat(itemPrice),
+          description: toSentenceCase(itemDesc),
+          category_id: itemCat,
+          image_url: finalImageUrl || null,
+        });
+        if (result === false) {
+          setFormError('An item with this name already exists.');
+          return;
+        }
+      } else if (mode.type === 'editItem') {
+        if (!itemName.trim() || !itemPrice.trim() || !itemDesc.trim()) {
+          setFormError('Please complete every item field.');
+          return;
+        }
+        if (itemDesc.trim().length < 20) {
+          setFormError('Description must contain at least 20 characters.');
+          return;
+        }
+        if (itemDesc.trim().length > 120) {
+          setFormError('Description cannot exceed 120 characters.');
+          return;
+        }
+        if (Number(itemPrice) <= 0 || Number(itemPrice) > 10000) {
+          setFormError('Price must be between ₱0.01 and ₱10,000.00.');
+          return;
+        }
+        const result = await onEditItem(mode.item.id, {
+          name: toTitleCase(itemName),
+          price: parseFloat(itemPrice),
+          description: toSentenceCase(itemDesc),
+          image_url: finalImageUrl || null,
+        });
+        if (result === false) {
+          setFormError('An item with this name already exists.');
+          return;
+        }
+      } else if (mode.type === 'addCategory') {
+        if (!catName.trim()) {
+          setFormError('Please enter a category name.');
+          return;
+        }
+        const formattedName = toTitleCase(catName);
+        const result = await onAddCategory(formattedName);
+        if (result === false) {
+          setFormError('A category with this name already exists.');
+          return;
+        }
+      } else if (mode.type === 'editCategory') {
+        if (!catName.trim()) {
+          setFormError('Please enter a category name.');
+          return;
+        }
+        const result = await onEditCategory(mode.category.id, { name: toTitleCase(catName) });
+        if (result === false) {
+          setFormError('A category with this name already exists.');
+          return;
+        }
+      }
+      onClose();
+    } catch (err) {
+      console.error('Error saving item:', err);
+      setFormError('An error occurred while saving the item. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const isItemPanel = mode.type.includes('Item');
@@ -281,20 +338,63 @@ function MenuPanel({ mode, categories, activeCategoryId, onClose, onAddItem, onE
               <textarea required maxLength={120} className="restaurant-management-input restaurant-management-textarea" rows={3} value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} />
             </div>
             <div>
-              <label className="rmc8">Upload Picture</label>
-              <div className="restaurant-management-image-placeholder restaurant-management-image-placeholder--md">
-                <ImageIcon />
-                <span className="rmc1">Image</span>
+              <label className="rmc8">Item Picture</label>
+              <div className="menu-manager-image-uploader">
+                {imagePreview ? (
+                  <div className="menu-manager-image-preview-box">
+                    <img src={imagePreview} alt="Item preview" className="menu-manager-image-preview-img" />
+                    <div className="menu-manager-image-preview-actions">
+                      <label className="menu-manager-image-btn change-btn">
+                        Change Picture
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          onChange={handleFileChange}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="menu-manager-image-btn remove-btn"
+                        onClick={handleRemoveImage}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="menu-manager-image-dropzone">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={handleFileChange}
+                      style={{ display: 'none' }}
+                    />
+                    <div className="menu-manager-dropzone-content">
+                      <div className="menu-manager-dropzone-icon">
+                        <ImageIcon />
+                      </div>
+                      <span className="dropzone-text-primary">Click or drag image to upload</span>
+                      <span className="dropzone-text-secondary">PNG, JPG, WebP up to 10MB</span>
+                    </div>
+                  </label>
+                )}
               </div>
             </div>
 
             {formError && <p className="restaurant-management-form-error">{formError}</p>}
             <div className="rmc9">
-              <button className="restaurant-management-button-primary" onClick={handleAddOrSave}>{mode.type === 'addItem' ? 'Add Item' : 'Save Changes'}</button>
+              <button
+                className="restaurant-management-button-primary"
+                onClick={handleAddOrSave}
+                disabled={isUploading}
+              >
+                {isUploading ? 'Saving...' : (mode.type === 'addItem' ? 'Add Item' : 'Save Changes')}
+              </button>
               {mode.type === 'editItem' ? (
-                <button className="restaurant-management-button-danger" onClick={() => { onDeleteItem(mode.item.id); onClose(); }}>Delete</button>
+                <button className="restaurant-management-button-danger" onClick={() => { onDeleteItem(mode.item.id); onClose(); }} disabled={isUploading}>Delete</button>
               ) : (
-                <button className="restaurant-management-button-secondary" onClick={onClose}>Cancel</button>
+                <button className="restaurant-management-button-secondary" onClick={onClose} disabled={isUploading}>Cancel</button>
               )}
             </div>
           </div>
@@ -304,7 +404,17 @@ function MenuPanel({ mode, categories, activeCategoryId, onClose, onAddItem, onE
           <div className="rmc7">
             <p className="rmc10">Are you sure you want to delete this item?</p>
             <div className="rmc11">
-              <div className="rmc12"><ImageIcon /></div>
+              <div className="rmc12">
+                {mode.item.imageUrl || mode.item.image_url ? (
+                  <img
+                    src={mode.item.imageUrl || mode.item.image_url}
+                    alt={mode.item.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
+                  />
+                ) : (
+                  <ImageIcon />
+                )}
+              </div>
               <div>
                 <div className="rmc13">{mode.item.name}</div>
                 <div className="rmc14">₱{mode.item.price}</div>
@@ -377,6 +487,8 @@ function MenuInterface() {
       description: m.description || '',
       categoryId: m.category_id,
       status: m.status,
+      imageUrl: m.image_url || null,
+      image_url: m.image_url || null,
     })),
     [dbMenuItems]
   );
@@ -486,7 +598,13 @@ function MenuInterface() {
                   const category = categories.find((cat) => cat.id === item.categoryId);
                   return (
                     <button key={item.id} type="button" className="restaurant-management-keyword-option" onClick={() => selectKeyword(item)}>
-                      <span className="restaurant-management-keyword-image"><ImageIcon /></span>
+                      <span className="restaurant-management-keyword-image">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="restaurant-management-keyword-img" />
+                        ) : (
+                          <ImageIcon />
+                        )}
+                      </span>
                       <span className="restaurant-management-keyword-details"><strong>{item.name}</strong><small>{category?.name ?? 'Uncategorized'}</small></span>
                     </button>
                   );
@@ -522,7 +640,11 @@ function MenuInterface() {
                     aria-label={`Edit ${item.name}`}
                   >
                     <div className="menu-manager-card-image">
-                      <ImageIcon />
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.name} className="menu-manager-card-img" />
+                      ) : (
+                        <ImageIcon />
+                      )}
                       <span className={`menu-manager-status ${isInactive ? 'inactive' : 'active'}`}>{isInactive ? 'Inactive' : 'Active'}</span>
                     </div>
                     <div className="menu-manager-card-body">
@@ -580,6 +702,13 @@ function EditTableForm({ table, onSave, onCancel }) {
           <button type="button" onClick={() => setCapacity((c) => Math.min(30, c + 1))} aria-label="Increase capacity">+</button>
         </div>
       </div>
+      {table.isAssistanceRequested && (
+        <div className="edit-table-assistance-notice">
+          <strong>🛎️ Customer Requested Assistance</strong>
+          <p>{table.assistanceDetails?.type || 'Assistance requested'}</p>
+          {table.assistanceDetails?.note && <em>"{table.assistanceDetails.note}"</em>}
+        </div>
+      )}
       <div className="edit-table-form-row">
         <label htmlFor={`edit-status-${table.id}`}>Table Status</label>
         <select
@@ -590,6 +719,7 @@ function EditTableForm({ table, onSave, onCancel }) {
           <option value="EMPTY">Available (Empty)</option>
           <option value="OCCUPIED">Occupied</option>
           <option value="RESERVED">Reserved</option>
+          <option value="REQUEST">Request (Needs Assistance)</option>
         </select>
       </div>
       <div className="edit-table-form-actions">
@@ -612,9 +742,9 @@ function TableInterface() {
     removeTable: posRemoveTable,
     refetchTables,
     updateTableDetails,
+    tableAssistanceRequests,
+    resolveTableAssistance,
   } = usePOS();
-
-
 
   const [statusFilter, setStatusFilter] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -627,8 +757,13 @@ function TableInterface() {
       status: STATUS_MAP[t.status] || 'Available',
       dbStatus: t.status,
       capacity: Number(t.capacity) || 4,
+      isAssistanceRequested: Boolean(
+        tableAssistanceRequests?.[t.table_number]?.requested ||
+        t.status === 'REQUEST'
+      ),
+      assistanceDetails: tableAssistanceRequests?.[t.table_number] || null,
     })),
-    [dbTables]
+    [dbTables, tableAssistanceRequests]
   );
 
   const [editTableTarget, setEditTableTarget] = useState(null); // { table } | null
@@ -714,6 +849,35 @@ function TableInterface() {
         </div>
       </aside>
       <main className="rmc30 table-management-area">
+        {tables.some((t) => t.isAssistanceRequested) && (
+          <div className="table-assistance-banner" role="alert">
+            <div className="table-assistance-banner-left">
+              <span className="table-assistance-bell-ring">🛎️</span>
+              <div className="table-assistance-banner-content">
+                <strong>Table Assistance Alert ({tables.filter((t) => t.isAssistanceRequested).length} Active)</strong>
+                <p>The following tables have requested staff assistance:</p>
+                <div className="table-assistance-pills">
+                  {tables.filter((t) => t.isAssistanceRequested).map((t) => (
+                    <div key={t.id} className="table-assistance-pill-item">
+                      <span className="table-assistance-pill-text">
+                        Table #{t.id}: <strong>{t.assistanceDetails?.type || 'Assistance Needed'}</strong>
+                        {t.assistanceDetails?.note && <small> — "{t.assistanceDetails.note}"</small>}
+                      </span>
+                      <button
+                        type="button"
+                        className="table-assistance-resolve-btn"
+                        onClick={() => resolveTableAssistance(t.id)}
+                      >
+                        ✓ Mark Assisted
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="rmc93">
           <div className="table-management-summary" aria-label="Table status summary">
             {STATUSES.map((status) => <span key={status}><strong>{countByStatus(status)}</strong> {status.toLowerCase()}</span>)}
@@ -724,18 +888,24 @@ function TableInterface() {
           {visible.length === 0 ? (
             <div className="table-management-empty"><GridIcon /><p>No tables found</p></div>
           ) : visible.map((table) => {
-            const normalizedStatus = table.status === 'EMPTY' ? 'AVAILABLE' : table.status;
+            const isAssistance = table.isAssistanceRequested;
+            const normalizedStatus = isAssistance ? 'REQUEST' : (table.status === 'EMPTY' ? 'AVAILABLE' : table.status);
             const statusClass = normalizedStatus.toLowerCase();
             return (
               <div
                 key={table.id}
-                className={`table-management-card ${statusClass}`}
-                title={`Table ${table.id} — ${normalizedStatus}`}
+                className={`table-management-card ${statusClass} ${isAssistance ? 'assistance-alert' : ''}`}
+                title={`Table ${table.id} — ${normalizedStatus}${table.assistanceDetails?.type ? ` (${table.assistanceDetails.type})` : ''}`}
                 onClick={() => setEditTableTarget(table)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => e.key === 'Enter' && setEditTableTarget(table)}
               >
+                {isAssistance && (
+                  <div className="table-management-card-badge" title="Customer requested assistance">
+                    🛎️ {table.assistanceDetails?.type || 'Assistance'}
+                  </div>
+                )}
                 <div className="table-management-card-center">
                   <div className="table-management-number">{table.id}</div>
                   <div className="table-management-status-text">{normalizedStatus}</div>

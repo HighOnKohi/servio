@@ -269,6 +269,129 @@ function CustomerBillOutModal({
   );
 }
 
+/* ── Customer Ask for Assistance Modal ────────────────────────────── */
+function CustomerAssistanceModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  submitting,
+  tableNumber,
+  isAlreadyRequested,
+  onCancelRequest,
+}) {
+  const [selectedType, setSelectedType] = useState('Call Waiter / Staff');
+  const [note, setNote] = useState('');
+
+  const assistanceTypes = [
+    { id: 'Call Waiter / Staff', icon: '🙋‍♂️', label: 'Call Waiter / Staff', desc: 'A team member will come right to your table' },
+    { id: 'Water Refill', icon: '💧', label: 'Water Refill', desc: 'Request complimentary drinking water' },
+    { id: 'Utensils & Napkins', icon: '🍽️', label: 'Utensils & Napkins', desc: 'Extra forks, spoons, or napkins' },
+    { id: 'Bill Inquiry', icon: '🧾', label: 'Bill Inquiry', desc: 'Question about your bill or payment' },
+    { id: 'Other', icon: '💬', label: 'Other Request', desc: 'Custom note or assistance' },
+  ];
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && !submitting) onClose();
+    };
+    if (isOpen) document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isOpen, onClose, submitting]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="cbillout-overlay" onClick={() => !submitting && onClose()} role="dialog" aria-modal="true" aria-label="Ask for assistance">
+      <div className="cbillout-modal cassistance-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cbillout-header">
+          <div className="cbillout-header-text">
+            <span className="cbillout-kicker" style={{ color: '#087f63' }}>TABLE #{String(tableNumber).padStart(2, '0')} ASSISTANCE</span>
+            <h2 className="cbillout-title">Ask for Assistance</h2>
+            <p className="cbillout-subtitle">How can our staff help you today? Tap an option below.</p>
+          </div>
+          <button className="cbillout-close-btn" onClick={onClose} disabled={submitting} aria-label="Close" type="button">×</button>
+        </div>
+
+        {isAlreadyRequested && (
+          <div className="cassistance-active-alert">
+            <div className="cassistance-active-pulse" />
+            <div className="cassistance-active-text">
+              <strong>Assistance Already Requested</strong>
+              <p>Our team has been notified and is heading to your table.</p>
+            </div>
+            {onCancelRequest && (
+              <button
+                type="button"
+                className="cassistance-cancel-btn"
+                onClick={onCancelRequest}
+                disabled={submitting}
+              >
+                Cancel Request
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="cassistance-options" role="radiogroup" aria-label="Assistance types">
+          {assistanceTypes.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`cassistance-option ${selectedType === item.id ? 'active' : ''}`}
+              onClick={() => setSelectedType(item.id)}
+            >
+              <span className="cassistance-icon">{item.icon}</span>
+              <div className="cassistance-details">
+                <span className="cassistance-label">{item.label}</span>
+                <span className="cassistance-desc">{item.desc}</span>
+              </div>
+              <span className="cassistance-radio-circle">
+                {selectedType === item.id && <span className="cassistance-radio-dot" />}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {selectedType === 'Other' && (
+          <div className="cassistance-note-wrap">
+            <label htmlFor="assistance-note">Special Instructions (optional):</label>
+            <input
+              id="assistance-note"
+              type="text"
+              className="cassistance-note-input"
+              placeholder="e.g. Extra hot sauce, high chair needed, etc."
+              maxLength={80}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        )}
+
+        <div className="cbillout-actions">
+          <button
+            type="button"
+            className="cbillout-cancel-btn"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            className="cbillout-confirm-btn"
+            onClick={() => onConfirm({ type: selectedType, note: note.trim() })}
+            disabled={submitting}
+            style={{ background: '#087f63' }}
+          >
+            {submitting ? 'Sending Request…' : isAlreadyRequested ? 'Update Request' : '🛎️ Call Staff Now'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 /* ── Item Detail Modal ────────────────────────────────────────────────────── */
 function ItemDetailModal({ item, formatPrice, onClose, onAdd }) {
   const [qty, setQty] = useState(1);
@@ -544,6 +667,9 @@ export default function Customer() {
     createCustomerRequest,
     cancelCustomerRequest,
     requestTableBillOut,
+    tableAssistanceRequests,
+    requestTableAssistance,
+    resolveTableAssistance,
     formatPrice,
     itemSales,
     loading,
@@ -664,6 +790,15 @@ export default function Customer() {
   const [cartBadgePop, setCartBadgePop] = useState(false);   // triggers cart badge pop
   const [debouncedSearch, setDebouncedSearch] = useState(''); // debounced menu search text
   const [isPendingMinimized, setIsPendingMinimized] = useState(false); // pending modal minimize toggle
+  const [showAssistanceModal, setShowAssistanceModal] = useState(false);
+  const [assistanceSubmitting, setAssistanceSubmitting] = useState(false);
+  const [assistanceFeedback, setAssistanceFeedback] = useState(null);
+
+  const isAssistanceRequested = Boolean(
+    tableAssistanceRequests?.[parsedTableId]?.requested ||
+    (dbTable?.status === 'REQUEST' && !dbTable?.bill_out_requested)
+  );
+  const assistanceDetails = tableAssistanceRequests?.[parsedTableId] || null;
 
   // ── Persist state to sessionStorage whenever it changes ──
   useEffect(() => {
@@ -997,6 +1132,26 @@ export default function Customer() {
     setShowBillOutModal(false);
   }
 
+  async function handleConfirmAssistance(details) {
+    if (assistanceSubmitting || !selectedTable) return;
+    setAssistanceSubmitting(true);
+    await requestTableAssistance(selectedTable.table_number, details);
+    setAssistanceSubmitting(false);
+    setShowAssistanceModal(false);
+    setAssistanceFeedback('✓ Staff has been notified and is heading to your table!');
+    setTimeout(() => setAssistanceFeedback(null), 4000);
+  }
+
+  async function handleCancelAssistance() {
+    if (assistanceSubmitting || !selectedTable) return;
+    setAssistanceSubmitting(true);
+    await resolveTableAssistance(selectedTable.table_number);
+    setAssistanceSubmitting(false);
+    setShowAssistanceModal(false);
+    setAssistanceFeedback('Assistance request cancelled.');
+    setTimeout(() => setAssistanceFeedback(null), 3000);
+  }
+
   function openDetailModal(item) {
     if (!item.soldOut && item.status !== 'SOLD OUT') setDetailItem(item);
   }
@@ -1189,6 +1344,17 @@ export default function Customer() {
         submitting={billOutRequesting}
         totalAmount={tableOrders.reduce((s, o) => s + Number(o.total || o.subtotal || 0), 0) || Number(dbTable?.total_bill ?? dbTable?.current_bill ?? 0)}
         formatPrice={formatPrice}
+      />
+
+      {/* ── Table Assistance Modal ── */}
+      <CustomerAssistanceModal
+        isOpen={showAssistanceModal}
+        onClose={() => setShowAssistanceModal(false)}
+        onConfirm={handleConfirmAssistance}
+        submitting={assistanceSubmitting}
+        tableNumber={selectedTable?.table_number || parsedTableId}
+        isAlreadyRequested={isAssistanceRequested}
+        onCancelRequest={handleCancelAssistance}
       />
 
       {/* ── Item Detail Modal ── */}
@@ -1385,6 +1551,7 @@ export default function Customer() {
             ✓ Bill requested ({selectedBillOutMethod === 'qr' ? 'InstaPay QR' : selectedBillOutMethod === 'credit' ? 'Credit Card' : 'Cash'}) — Staff is heading to your table
           </div>
         )}
+
         <button
             className="customer-submit-button"
             onClick={submitRequest}
@@ -1403,6 +1570,28 @@ export default function Customer() {
               : 'Select Items to Order'}
           </button>
       </div>
+
+      {/* ── Floating Ask for Assistance Button ── */}
+      <button
+        type="button"
+        className={`customer-assistance-fab ${isAssistanceRequested ? 'active' : ''} ${showBillOut && !billOutRequested ? 'has-billout' : ''}`}
+        onClick={() => setShowAssistanceModal(true)}
+        aria-label={isAssistanceRequested ? 'Assistance requested. Click to view or cancel' : 'Ask for assistance'}
+        title={isAssistanceRequested ? 'Assistance requested · Staff notified' : 'Ask for assistance'}
+      >
+        <span className="customer-assistance-fab-bell">🛎️</span>
+        <span className="customer-assistance-fab-text">
+          {isAssistanceRequested ? 'Assistance Requested' : 'Ask for Assistance'}
+        </span>
+        {isAssistanceRequested && <span className="customer-assistance-fab-pulse" />}
+      </button>
+
+      {/* ── Assistance Toast Notification ── */}
+      {assistanceFeedback && (
+        <div className="customer-assistance-toast" role="status" aria-live="polite">
+          {assistanceFeedback}
+        </div>
+      )}
     </div>
   );
 }

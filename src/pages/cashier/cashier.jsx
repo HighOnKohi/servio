@@ -96,6 +96,8 @@ function Cashier() {
     loading,
     formatPrice,
     tableBillOutPayments,
+    tableAssistanceRequests,
+    resolveTableAssistance,
     itemSales,
   } = usePOS();
 
@@ -110,7 +112,7 @@ function Cashier() {
       BEST_SELLERS_CATEGORY,
       ...dbCategories.map((c) => ({ id: c.id, name: c.name })),
     ],
-    [dbCategories],
+    [dbCategories]
   );
 
   const menuItems = useMemo(() =>
@@ -148,8 +150,13 @@ function Cashier() {
       currentBill: Number(t.current_bill ?? 0),
       billOutRequested: t.bill_out_requested === true,
       billOutPaymentMethod: tableBillOutPayments?.[t.table_number] || null,
+      isAssistanceRequested: Boolean(
+        tableAssistanceRequests?.[t.table_number]?.requested ||
+        t.status === 'REQUEST'
+      ),
+      assistanceDetails: tableAssistanceRequests?.[t.table_number] || null,
     })),
-    [dbTables, tableBillOutPayments]
+    [dbTables, tableBillOutPayments, tableAssistanceRequests]
   );
 
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -1227,7 +1234,13 @@ function Cashier() {
                     <div className="menu-keyword-dropdown" role="listbox" aria-label="Matching menu items">
                       {menuKeywordMatches.map((item) => (
                         <button key={item.id} type="button" className="menu-keyword-option" onClick={() => selectMenuKeyword(item)}>
-                          <span className="menu-keyword-image"><MenuImagePlaceholder /></span>
+                          <span className="menu-keyword-image">
+                            {item.image_url ? (
+                              <img src={item.image_url} alt={item.name} className="menu-keyword-photo" />
+                            ) : (
+                              <MenuImagePlaceholder />
+                            )}
+                          </span>
                           <span className="menu-keyword-details"><strong>{item.name}</strong><small>{menuCategories.find((category) => category.id === item.category)?.name ?? 'Uncategorized'}</small></span>
                         </button>
                       ))}
@@ -1243,7 +1256,13 @@ function Cashier() {
                     onClick={() => addMenuItem(item)}
                     disabled={item.status === 'SOLD OUT'}
                   >
-                    <span className="menu-item-image"><MenuImagePlaceholder /></span>
+                    <span className="menu-item-image">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} className="menu-item-photo" />
+                      ) : (
+                        <MenuImagePlaceholder />
+                      )}
+                    </span>
                     <span className="menu-item-name">{item.name}</span>
                     <span className="menu-item-bottom">
                       <span className="menu-item-price">{formatPrice(item.price)}</span>
@@ -1273,6 +1292,30 @@ function Cashier() {
           </section>
         ) : (
         <section className="cashier-table-area">
+          {tables.some((t) => t.isAssistanceRequested) && (
+            <div className="cashier-assistance-banner" role="alert">
+              <div className="cashier-assistance-banner-left">
+                <span className="cashier-assistance-bell-ring">🛎️</span>
+                <div>
+                  <strong>Assistance Requested ({tables.filter((t) => t.isAssistanceRequested).length} {tables.filter((t) => t.isAssistanceRequested).length === 1 ? 'Table' : 'Tables'})</strong>
+                  <div className="cashier-assistance-banner-pills">
+                    {tables.filter((t) => t.isAssistanceRequested).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="cashier-assistance-pill"
+                        onClick={() => selectTable(t.id)}
+                        title={`Go to Table #${t.id}`}
+                      >
+                        Table #{t.label}: {t.assistanceDetails?.type || 'Assistance'}
+                        <span className="pill-action-arrow">→</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="action-row">
             <div className="table-summary">
               <span><strong>{tables.filter((table) => !table.occupied && !table.request && !table.reserved).length}</strong> available</span>
@@ -1312,6 +1355,14 @@ function Cashier() {
                     title={`Customer requested bill out${table.billOutPaymentMethod ? ` (${table.billOutPaymentMethod === 'qr' ? 'InstaPay QR' : table.billOutPaymentMethod === 'credit' ? 'Credit Card' : 'Cash'})` : ''}`}
                   >
                     🧾{table.billOutPaymentMethod ? ` ${table.billOutPaymentMethod === 'qr' ? 'QR' : table.billOutPaymentMethod === 'credit' ? 'Card' : 'Cash'}` : ''}
+                  </div>
+                )}
+                {table.isAssistanceRequested && (
+                  <div
+                    className="table-card-assistance-badge"
+                    title={`Assistance requested: ${table.assistanceDetails?.type || 'Staff Needed'}${table.assistanceDetails?.note ? ` - ${table.assistanceDetails.note}` : ''}`}
+                  >
+                    🛎️ {table.assistanceDetails?.type || 'Assistance'}
                   </div>
                 )}
                 <div className="table-card-center">
@@ -1370,6 +1421,28 @@ function Cashier() {
                   </div>
                 </div>
               </div>
+
+              {selected.isAssistanceRequested && (
+                <div className="cashier-assistance-callout">
+                  <div className="cashier-assistance-callout-header">
+                    <span className="cashier-assistance-callout-icon">🛎️</span>
+                    <div className="cashier-assistance-callout-info">
+                      <strong>Assistance Requested</strong>
+                      <span className="cashier-assistance-type">{selected.assistanceDetails?.type || 'Assistance Needed'}</span>
+                      {selected.assistanceDetails?.note && (
+                        <p className="cashier-assistance-note">"{selected.assistanceDetails.note}"</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="cashier-assistance-resolve-btn"
+                    onClick={() => resolveTableAssistance(selected.table_number)}
+                  >
+                    ✓ Acknowledge &amp; Clear Assistance
+                  </button>
+                </div>
+              )}
 
               <div className="items-list">
                 {groupedExistingItems.map((item) => {

@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { POSProvider } from "./context/POSContext.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 import "./App.css";
@@ -15,8 +16,9 @@ import Customer from "./pages/customer/customer";
 
 function App() {
   return (
-    <AuthProvider>
-      <POSProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <POSProvider>
         <Routes>
           {/* Public route — accessible without login */}
           <Route path="/login" element={<Login />} />
@@ -39,6 +41,7 @@ function App() {
         </Routes>
       </POSProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

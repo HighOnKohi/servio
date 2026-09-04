@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useUIScale } from '../../components/ScaleSelector';
 import ServioHeader from '../../components/ServioHeader';
 import './interface-selector.css';
@@ -8,6 +9,7 @@ import './interface-selector.css';
 export default function InterfaceSelector() {
   const navigate = useNavigate();
   const { user, profile, isAdmin } = useAuth();
+  const { theme, isDark } = useTheme();
   const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
 
   const staffName = profile?.full_name || user?.email?.split('@')[0] || 'Staff User';
@@ -84,7 +86,7 @@ export default function InterfaceSelector() {
 
   return (
     <div
-      className={`servio-welcome-page servio-welcome-page--scale-${uiScale}`}
+      className={`servio-welcome-page servio-welcome-page--${theme} servio-welcome-page--scale-${uiScale}`}
       style={{
         '--servio-font-scale': fontScale,
         '--servio-elem-scale': elementScale,

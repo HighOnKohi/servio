@@ -227,3 +227,111 @@ A permanent, system-generated menu category titled **`🔥 Best Sellers`** is re
    - Positioned cleanly at the top of the stacked sidebar directly below the menu, with zero gap above it.
    - A sticky header badge (`🍳 [count]/[total] ready ↓`) appears in the topbar on mobile when active orders exist, allowing customers to tap and scroll smoothly to live tracking.
    - The stacked sidebar has dynamic bottom padding (`max(220px, calc(180px + env(safe-area-inset-bottom)))`) ensuring the fixed bottom bar never overlaps cart items or order tracking details.
+
+---
+
+## 12. Menu Item Image Upload & Storage Architecture
+
+### Overview
+Servio features a resilient, high-performance dish image uploading pipeline embedded directly inside the **Menu Manager** (`/menu-manager`). Managers can upload dish photos via drag-and-drop or file selection, which are automatically compressed, persisted to the database/storage, and rendered across all customer and cashier ordering views.
+
+### Architectural Workflow
+1. **Client-Side Compression & Optimization (`src/lib/imageUpload.js`)**:
+   - High-resolution camera photos (often 5MB–15MB) are automatically downsampled and compressed in the browser using HTML5 Canvas (`compressImage`).
+   - Images are resized to a maximum bounding box of `800x800` pixels at `0.82` JPEG quality.
+   - File sizes are reduced to ~40KB–90KB, eliminating upload latency, preventing network timeouts, and ensuring rapid rendering across mobile devices.
+
+2. **Dual-Mode Persistence Strategy (`uploadMenuItemImage`)**:
+   - **Primary (Supabase Storage)**: Uploads the compressed image file to the `menu-items` public storage bucket in Supabase Storage (`supabase.storage.from('menu-items').upload(...)`), returning a persistent public CDN URL (`getPublicUrl`).
+   - **Automatic Fallback (Data URI)**: If the Supabase Storage bucket has not yet been created, or if Row Level Security (RLS) policies prevent access, the system automatically falls back to embedding the compressed Base64 Data URL directly into `menu_items.image_url`. This guarantees zero downtime and enables image uploading out-of-the-box without requiring immediate database migration execution.
+
+3. **Multi-Interface Rendering**:
+   - **Menu Manager (`/menu-manager`)**:
+     - Drag-and-drop file upload zone with hover state and live file validation.
+     - Live image preview box with instant **Change Picture** and **Remove Picture** controls.
+     - Card grid preview showing actual dish photos with status overlay (`Active` / `Inactive`).
+     - Fast keyword search autosuggest dropdown displaying dish thumbnails.
+     - Delete confirmation dialog with dish photo preview.
+   - **Customer QR Ordering (`/customer/:tableId`)**:
+     - Displays dish images in the customer menu grid via `<MenuImageDisplay />` with shimmering skeleton placeholder during loading and error fallback.
+   - **Cashier Counter Ordering (`/cashier/overview`)**:
+     - Renders dish photos in the 12-item paged menu card grid (`.menu-item-photo`) and interactive search dropdown (`.menu-keyword-photo`).
+
+### Database & Storage SQL Migration
+To configure Supabase Storage for production, execute the migration script located at `supabase/migrations/20260904_menu_item_images_storage.sql` in the Supabase SQL Editor:
+
+```sql
+-- 1. Ensure image_url column exists
+ALTER TABLE public.menu_items ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+-- 2. Create public 'menu-items' bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'menu-items',
+  'menu-items',
+  TRUE,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = TRUE,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- 3. Storage Policies for public read and authorized upload
+CREATE POLICY "Public Access for menu-items bucket"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'menu-items');
+
+CREATE POLICY "Allow upload to menu-items bucket"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'menu-items');
+
+CREATE POLICY "Allow update to menu-items bucket"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'menu-items')
+WITH CHECK (bucket_id = 'menu-items');
+
+CREATE POLICY "Allow delete from menu-items bucket"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'menu-items');
+```
+
+---
+
+## 13. Customer Table Assistance System
+
+Servio provides an instant, bidirectional table assistance workflow connecting dining guests directly with the Cashier terminal and Table Management (`/table-manager`).
+
+### Architecture & Real-Time Synchronization
+1. **Customer Request Dispatch**:
+   - Customers trigger assistance requests from `/customer/:tableId` via the persistent **Floating Action Button (FAB)** that stays pinned on the screen during scrolling.
+   - A modal allows selecting common presets:
+     - 🛎️ *Call Waiter / Staff*
+     - 💧 *Water Refill*
+     - 🍴 *Utensils & Napkins*
+     - 💳 *Bill Inquiry*
+     - 💬 *Other* (with custom note input)
+   - When submitted:
+     - Local state tracks the request with active pulsing badges and an auto-dismiss feedback toast.
+     - A Supabase Realtime broadcast event (`table-assistance-requested`) is dispatched across all connected terminals.
+     - The table record in `restaurant_tables` is updated with `status = 'REQUEST'`.
+     - Customers can cancel or resolve the request at any time directly from their screen.
+
+2. **Cashier Terminal Alerting (`/cashier/overview`)**:
+   - The Cashier overview displays an alert banner at the top of the table management area whenever any table has an active assistance request.
+   - The banner summarizes the table number, request type, note, and provides a direct shortcut to select the table.
+   - Table cards display a pulsating `🛎️ Assistance` badge.
+   - Selecting the table displays an assistance callout in the inspector panel with a **✓ Acknowledge & Clear Assistance** action.
+
+3. **Table Management Screen (`/table-manager`)**:
+   - An alert banner displays all pending table assistance requests with a quick **✓ Mark Assisted** resolution button.
+   - Table cards glow with an animated pulse and display an assistance badge.
+   - The Status Key count for `REQUEST` updates in real time.
+   - Editing a table displays a customer assistance notice and allows adjusting status.
+
+4. **Resolution & State Restoration**:
+   - When staff resolve the assistance request (from either Cashier, Table Management, or Customer interface):
+     - Supabase Realtime broadcasts `table-assistance-resolved`.
+     - The table status is restored intelligently: if the table still has active, unfinished orders, it reverts to `OCCUPIED`; otherwise, it returns to `EMPTY`.
+     - All banners and pulsing indicators clear instantly across all devices without requiring page refreshes.

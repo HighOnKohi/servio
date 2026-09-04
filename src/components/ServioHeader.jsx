@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { ScaleSelector, useUIScale } from './ScaleSelector';
 import InterfaceSidebar from './InterfaceSidebar';
 import Logo from '../../public/Servio-Logo-B-Icon-Transparent.png';
@@ -18,6 +19,7 @@ export default function ServioHeader({
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+  const { theme, isDark } = useTheme();
   const internalScale = useUIScale();
 
   const currentScale = propUiScale || internalScale.scale;
@@ -174,7 +176,7 @@ export default function ServioHeader({
 
         {/* ── Right: Scale Selector, Custom Actions, Clock, Logout ── */}
         <div className="servio-topbar-right">
-          <ScaleSelector currentScale={currentScale} onScaleChange={handleScaleChange} isDark />
+          <ScaleSelector currentScale={currentScale} onScaleChange={handleScaleChange} isDark={isDark} />
 
           {customActions}
           {children}

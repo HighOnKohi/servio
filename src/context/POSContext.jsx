@@ -126,6 +126,14 @@ export function POSProvider({ children }) {
       return {};
     }
   });
+  const [tableAssistanceRequests, setTableAssistanceRequests] = useState(() => {
+    try {
+      const saved = localStorage.getItem("servio_table_assistance");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // All-time sales counter for the permanent Best Sellers category
   const [itemSales, setItemSales] = useState(() => {
@@ -463,6 +471,47 @@ export function POSProvider({ children }) {
               } catch {}
               return updated;
             });
+          }
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "table-assistance-requested" },
+        ({ payload }) => {
+          if (payload?.tableNumber) {
+            setTableAssistanceRequests((prev) => {
+              const updated = {
+                ...prev,
+                [payload.tableNumber]: {
+                  requested: true,
+                  type: payload.type || "General Assistance",
+                  note: payload.note || "",
+                  requestedAt: payload.requestedAt || new Date().toISOString(),
+                },
+              };
+              try {
+                localStorage.setItem("servio_table_assistance", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+            refetchTables();
+          }
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "table-assistance-resolved" },
+        ({ payload }) => {
+          if (payload?.tableNumber) {
+            setTableAssistanceRequests((prev) => {
+              const updated = { ...prev };
+              delete updated[payload.tableNumber];
+              try {
+                localStorage.setItem("servio_table_assistance", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+            refetchTables();
           }
         },
       )
@@ -1335,6 +1384,89 @@ export function POSProvider({ children }) {
     [refetchTables],
   );
 
+  /** Customer requests assistance for their table. */
+  const requestTableAssistance = useCallback(
+    async (tableNumber, details = {}) => {
+      const type = details.type || "General Assistance";
+      const note = details.note || "";
+      const requestedAt = new Date().toISOString();
+
+      // 1. Optimistic local update & localStorage persistence
+      setTableAssistanceRequests((prev) => {
+        const next = {
+          ...prev,
+          [tableNumber]: { requested: true, type, note, requestedAt },
+        };
+        try {
+          localStorage.setItem("servio_table_assistance", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 2. Realtime peer broadcast to cashier & table management tabs
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "table-assistance-requested",
+          payload: { tableNumber, type, note, requestedAt },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
+      // 3. Update restaurant_tables in Supabase setting status to 'REQUEST'
+      const { error } = await supabase
+        .from("restaurant_tables")
+        .update({ status: "REQUEST" })
+        .eq("table_number", tableNumber);
+      if (error) console.error("Failed to set assistance request status on table:", error);
+
+      await refetchTables();
+    },
+    [refetchTables],
+  );
+
+  /** Staff (cashier or table manager) resolves/acknowledges a table's assistance request. */
+  const resolveTableAssistance = useCallback(
+    async (tableNumber) => {
+      // 1. Optimistic local update & localStorage persistence
+      setTableAssistanceRequests((prev) => {
+        const next = { ...prev };
+        delete next[tableNumber];
+        try {
+          localStorage.setItem("servio_table_assistance", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 2. Realtime peer broadcast
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "table-assistance-resolved",
+          payload: { tableNumber },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
+      // 3. Determine whether table should revert to OCCUPIED or EMPTY
+      const hasActiveOrder = orders.some(
+        (o) =>
+          o.table_number === tableNumber &&
+          o.status !== "COMPLETED" &&
+          o.status !== "CANCELLED",
+      );
+
+      const targetStatus = hasActiveOrder ? "OCCUPIED" : "EMPTY";
+
+      const { error } = await supabase
+        .from("restaurant_tables")
+        .update({ status: targetStatus })
+        .eq("table_number", tableNumber);
+      if (error) console.error("Failed to revert table status after assistance:", error);
+
+      await refetchTables();
+    },
+    [orders, refetchTables],
+  );
+
   /** Updates table details (capacity, status) from Restaurant Management. */
   const updateTableDetails = useCallback(
     async (tableId, updates) => {
@@ -1673,6 +1805,14 @@ export function POSProvider({ children }) {
         delete next[tableNumber];
         try {
           localStorage.setItem("servio_billout_payments", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setTableAssistanceRequests((prev) => {
+        const next = { ...prev };
+        delete next[tableNumber];
+        try {
+          localStorage.setItem("servio_table_assistance", JSON.stringify(next));
         } catch {}
         return next;
       });
@@ -2048,6 +2188,9 @@ export function POSProvider({ children }) {
         // Realtime sync states
         tableBillOutPayments,
         requestTableBillOut,
+        tableAssistanceRequests,
+        requestTableAssistance,
+        resolveTableAssistance,
         updateTableDetails,
         createOrder,
         addItemsToOrder,

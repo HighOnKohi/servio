@@ -177,3 +177,11 @@ create table public.customer_requests (
 create index IF not exists idx_customer_requests_table on public.customer_requests using btree (table_number) TABLESPACE pg_default;
 
 create index IF not exists idx_customer_requests_status on public.customer_requests using btree (status) TABLESPACE pg_default;
+ 
+-- ==============================================================================
+-- STORAGE BUCKETS & POLICIES
+-- ==============================================================================
+-- Bucket: menu-items (public)
+-- insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+-- values ('menu-items', 'menu-items', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'])
+-- on conflict (id) do update set public = true;

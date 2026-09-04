@@ -13,8 +13,19 @@ Servio is a real-time, touch-optimized web Point of Sale (POS) and restaurant ma
   - **🍽️ Waiter Terminal**: Mobile and tablet table-side order entry and item punching.
   - **📊 Admin Dashboard**: Daily sales metrics, active table metrics, inventory low-stock alerts, and staff account management.
   - **📦 Inventory Management**: Ingredient tracking, unit costs, and low-stock threshold monitoring.
-  - **📋 Restaurant Management**: Menu catalog editor, item pricing, category management, and physical table layout configuration.
+  - **📋 Restaurant Management**: Menu catalog editor, dish photo uploading (with client compression and Supabase Storage / Data URI fallback), item pricing, category management, and physical table layout configuration.
   - **🤖 AI Protocol Assistant**: Natural language assistant providing instant guidance on restaurant safety, hygiene, and emergency protocols.
+
+- **Resilient Dish Image Uploads**:
+  - In-browser client-side image compression (down to 800x800 @ 0.82 quality) for ultra-fast uploads.
+  - Dual-mode persistence: uploads to Supabase Storage bucket `menu-items`, with an automatic fallback to base64 Data URLs if storage is unconfigured.
+  - Synced and rendered across Menu Manager, Customer QR ordering, and Cashier counter ordering.
+
+- **Customer Table Assistance System**:
+  - Direct customer-to-staff communication from the QR self-service interface (`/customer/:tableId`).
+  - Predefined assistance categories (Call Staff, Water Refill, Utensils, Bill Inquiry, Custom Note) with live status indicators and cancellation.
+  - Real-time notification banners and table card alerts on both the **Cashier Terminal** (`/cashier/overview`) and **Table Management** (`/table-manager`).
+  - One-click acknowledgement/resolution with intelligent status restoration (`OCCUPIED` vs `EMPTY`).
 
 - **Touch Screen UI Scaling (`SIZE: Std | Large | XL`)**:
   - Universal size selector built for POS hardware and touch screens.
@@ -38,7 +49,7 @@ Servio is a real-time, touch-optimized web Point of Sale (POS) and restaurant ma
 - **Frontend**: React 18, Vite
 - **Styling**: Vanilla CSS with CSS custom properties, container queries, and responsive grid layouts
 - **Routing**: `react-router-dom` v6
-- **Backend & Database**: Supabase (PostgreSQL, Realtime WebSockets, Authentication)
+- **Backend & Database**: Supabase (PostgreSQL, Realtime WebSockets, Storage, Authentication)
 - **Serverless API**: Vercel Serverless Functions (`/api/protocol-assistant`)
 - **Hosting**: Vercel
 
@@ -50,7 +61,7 @@ Servio is a real-time, touch-optimized web Point of Sale (POS) and restaurant ma
 
 - [Node.js](https://nodejs.org/) (v18 or higher recommended)
 - [npm](https://www.npmjs.com/)
-- A [Supabase](https://supabase.com/) project with the Servio schema applied
+- A [Supabase](https://supabase.com/) project with the Servio schema applied (`supabase/schema.sql` and `supabase/migrations/20260904_menu_item_images_storage.sql` for storage bucket configuration)
 
 ### Environment Configuration
 
