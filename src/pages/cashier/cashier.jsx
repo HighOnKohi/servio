@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
@@ -98,7 +98,7 @@ function Cashier() {
 
   const BEST_SELLERS_CATEGORY = {
     id: 'best-sellers',
-    name: '🔥 Best Sellers',
+    name: 'Best Sellers',
     isBestSeller: true,
   };
 
@@ -183,6 +183,9 @@ function Cashier() {
   const [percentDiscountValue, setPercentDiscountValue] = useState('');
   const [floatDiscountValue, setFloatDiscountValue] = useState('');
   const [carts, setCarts] = useState({});
+  const [showRequestsDrawer, setShowRequestsDrawer] = useState(false);
+  const requestsDrawerRef = useRef(null);
+  const toggleButtonRef = useRef(null);
 
   const routeCategory = unquoteQueryValue(new URLSearchParams(location.search).get('category'));
   const routeItem = unquoteQueryValue(new URLSearchParams(location.search).get('item'));
@@ -340,7 +343,7 @@ function Cashier() {
   const discount = +(individualDiscount + tableDiscount).toFixed(2);
   const total = +Math.max(0, subtotal - discount).toFixed(2);
 
-  const tablesPerPage = 12;
+  const tablesPerPage = 9;
   const totalTablePages = Math.max(1, Math.ceil(tables.length / tablesPerPage));
   const requestedPage = Number(new URLSearchParams(location.search).get('page')) || 1;
   const currentTablePage = Math.min(Math.max(requestedPage, 1), totalTablePages);
@@ -440,7 +443,7 @@ function Cashier() {
         !menuSearchTerm || item.name.toLowerCase().includes(menuSearchTerm)
       );
   }, [menuItems, dbCategories, activeMenuCategory, isBestSellerCategory, menuSearchTerm, itemSales]);
-  const menuItemsPerPage = 8;
+  const menuItemsPerPage = 6;
   const totalMenuPages = Math.max(1, Math.ceil(visibleMenuItems.length / menuItemsPerPage));
   const requestedMenuPage = Number(new URLSearchParams(location.search).get('page')) || 1;
   const currentMenuPage = Math.min(Math.max(requestedMenuPage, 1), totalMenuPages);
@@ -1056,6 +1059,39 @@ function Cashier() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (selected) {
+      if (selectedCustomerRequests.length > 0 || selectedUnavailableRequests.length > 0) {
+        const timer = setTimeout(() => setShowRequestsDrawer(true), 150);
+        return () => clearTimeout(timer);
+      } else {
+        setShowRequestsDrawer(false);
+      }
+    } else {
+      setShowRequestsDrawer(false);
+    }
+  }, [selected?.id, selectedCustomerRequests.length, selectedUnavailableRequests.length]);
+
+  // Close drawer when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        showRequestsDrawer &&
+        requestsDrawerRef.current &&
+        toggleButtonRef.current &&
+        !requestsDrawerRef.current.contains(event.target) &&
+        !toggleButtonRef.current.contains(event.target)
+      ) {
+        setShowRequestsDrawer(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showRequestsDrawer]);
+
   const now = new Date(currentTime);
   const formattedDate = now.toLocaleDateString('en-US', {
     month: 'long',
@@ -1094,19 +1130,17 @@ function Cashier() {
         </div>
         <div className="topbar-right">
           <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
-          <span className="date-time">{formattedDate}, {formattedTime}</span>
           <button
             type="button"
-            className="cashier-logout-btn"
-            onClick={() => setShowLogoutModal(true)}
-            aria-label="Exit or Log Out"
+            className="cashier-return-btn"
+            onClick={() => navigate('/')}
+            aria-label="Return to Interface Selector"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
-            <span>Log Out</span>
+            <span>Return to Selector</span>
           </button>
         </div>
       </div>
@@ -1201,19 +1235,17 @@ function Cashier() {
                 {pagedMenuItems.map((item, idx) => (
                   <button
                     key={item.id}
-                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''} ${item.isTopBestSeller ? 'menu-item-card--bestseller' : ''}`}
+                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''}`}
                     onClick={() => addMenuItem(item)}
                     disabled={item.status === 'SOLD OUT'}
                   >
                     <span className="menu-item-image"><MenuImagePlaceholder /></span>
-                    {item.isTopBestSeller && item.soldCount > 0 && (
-                      <span className="cashier-menu-bestseller-rank">
-                        🔥 #1 Best Seller · {item.soldCount} sold
-                      </span>
-                    )}
                     <span className="menu-item-name">{item.name}</span>
                     <span className="menu-item-bottom">
                       <span className="menu-item-price">{formatPrice(item.price)}</span>
+                      {item.isTopBestSeller && item.soldCount > 0 && (
+                        <span className="menu-item-bestseller-badge">Best Seller</span>
+                      )}
                     </span>
                   </button>
                 ))}
@@ -1336,92 +1368,6 @@ function Cashier() {
               </div>
 
               <div className="items-list">
-                {(selectedCustomerRequests.length > 0 || selectedUnavailableRequests.length > 0) && (
-                  <div className="customer-requests-panel">
-                    <div className="customer-requests-header">
-                      <div>
-                        <div className="customer-requests-title">Customer Requests</div>
-                        <div className="customer-requests-subtitle">Pending cashier approval</div>
-                      </div>
-                      <span className="customer-requests-count">{selectedCustomerRequests.length}</span>
-                    </div>
-                    <div className="customer-requests-list">
-                      {/* Unavailable requests from kitchen */}
-                      {selectedUnavailableRequests.map((request) => (
-                        <div key={request.id} className="customer-request-card customer-request-card--unavailable">
-                          <div className="customer-request-card-header">
-                            <div>
-                              <div className="customer-request-label">⚠️ Table #{String(request.table_number).padStart(2, '0')} — Items Unavailable</div>
-                              <div className="customer-request-time" style={{ color: '#b91c1c' }}>
-                                {request.rejection_reason || 'Kitchen flagged some items as unavailable'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="customer-request-items" style={{ marginTop: '10px' }}>
-                            {(Array.isArray(request.unavailable_items) ? request.unavailable_items : []).map((item, index) => (
-                              <div key={`unavail-${request.id}-${item.id || item.name || index}`} className="customer-request-item-row customer-request-item-row--unavailable">
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ color: '#dc2626', fontWeight: '700' }}>✕</span>
-                                  {item.name || item.item_name} × {Number(item.quantity) || 1}
-                                </span>
-                                <strong style={{ color: '#b91c1c' }}>{formatPrice((Number(item.price) || 0) * (Number(item.quantity) || 1))}</strong>
-                              </div>
-                            ))}
-                          </div>
-                          <button
-                            className="customer-request-accept-button"
-                            style={{ background: '#dc2626', border: '0' }}
-                            onClick={() => rejectCustomerRequestCashier(request.id, request.table_number)}
-                          >
-                            Notify Customer to Modify Order
-                          </button>
-                        </div>
-                      ))}
-                      {/* Normal pending requests */}
-                      {selectedCustomerRequests.map((request) => (
-                        <div key={request.id} className="customer-request-card">
-                          <div className="customer-request-card-header">
-                            <div>
-                              <div className="customer-request-label">Table #{String(request.table_number).padStart(2, '0')}</div>
-                              <div className="customer-request-time">
-                                {new Date(request.created_at).toLocaleTimeString('en-US', {
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                })}
-                              </div>
-                            </div>
-                            <div className="customer-request-total">{formatPrice(request.subtotal)}</div>
-                          </div>
-                          <div className="customer-request-items">
-                            {(Array.isArray(request.items) ? request.items : []).map((item, index) => (
-                              <div key={`${request.id}-${item.id || item.name || index}`} className="customer-request-item-row">
-                                <span>{item.name || item.item_name} × {Number(item.quantity) || 1}</span>
-                                <strong>{formatPrice((Number(item.price) || 0) * (Number(item.quantity) || 1))}</strong>
-                              </div>
-                            ))}
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              className="customer-request-accept-button"
-                              onClick={() => handleAcceptCustomerRequest(request.id)}
-                              style={{ flex: 1 }}
-                            >
-                              Accept Request
-                            </button>
-                            <button
-                              className="customer-request-accept-button"
-                              onClick={() => cancelCustomerRequest(request.id)}
-                              style={{ flex: 1, background: '#6b7280', border: '0' }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {groupedExistingItems.map((item) => {
                   const calculateItemTotal = (entry) => {
                     const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
@@ -1609,6 +1555,113 @@ function Cashier() {
             </>
           )}
         </aside>
+
+        {/* Floating Customer Requests Drawer */}
+        {selected && !isMenuOrdering && (
+          <>
+            {/* Toggle button always visible */}
+            <button 
+              ref={toggleButtonRef}
+              className={`requests-drawer-toggle-top ${showRequestsDrawer ? 'active' : ''}`}
+              onClick={() => setShowRequestsDrawer(!showRequestsDrawer)}
+              title={showRequestsDrawer ? 'Hide Requests' : 'Show Requests'}
+            >
+              {showRequestsDrawer ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                  </svg>
+                  {(selectedCustomerRequests.length > 0 || selectedUnavailableRequests.length > 0) && (
+                    <span className="requests-badge-top">!</span>
+                  )}
+                </>
+              )}
+            </button>
+            
+            <aside ref={requestsDrawerRef} className={`requests-drawer ${showRequestsDrawer ? 'open' : ''}`}>
+              <div className="requests-drawer-header">
+                <div>
+                  <div className="requests-drawer-title">Customer Requests</div>
+                  <div className="requests-drawer-subtitle">Pending cashier approval</div>
+                </div>
+              </div>
+              
+              <div className="requests-drawer-content">
+                {selectedCustomerRequests.length === 0 && selectedUnavailableRequests.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✓</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>No Pending Requests</div>
+                    <div style={{ fontSize: '0.85rem' }}>This table has no customer requests at the moment.</div>
+                  </div>
+                ) : (
+                  <>
+                    {selectedUnavailableRequests.map((request) => (
+                      <div key={request.id} className="request-section">
+                        <div className="request-message">{request.rejection_reason || 'Kitchen flagged some items as unavailable'}</div>
+                        <div className="request-items">
+                          {(Array.isArray(request.unavailable_items) ? request.unavailable_items : []).map((item, index) => (
+                            <div key={`unavail-${request.id}-${item.id || item.name || index}`} className="request-item request-item--error">
+                              <span className="request-item-icon">✕</span>
+                              <span className="request-item-name">{item.name || item.item_name}</span>
+                              <span className="request-item-qty">× {Number(item.quantity) || 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="request-divider"></div>
+                      </div>
+                    ))}
+                    
+                    {selectedCustomerRequests.map((request, idx) => (
+                      <div key={request.id} className="request-section">
+                        <div className="request-items">
+                          {(Array.isArray(request.items) ? request.items : []).map((item, index) => (
+                            <div key={`${request.id}-${item.id || item.name || index}`} className="request-item">
+                              <span className="request-item-name">{item.name || item.item_name}</span>
+                              <span className="request-item-qty">× {Number(item.quantity) || 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {idx < selectedCustomerRequests.length - 1 && <div className="request-divider"></div>}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+              
+              {(selectedCustomerRequests.length > 0 || selectedUnavailableRequests.length > 0) && (
+                <div className="requests-drawer-footer">
+                  {selectedUnavailableRequests.length > 0 ? (
+                    <button
+                      className="request-footer-button request-footer-button--danger"
+                      onClick={() => rejectCustomerRequestCashier(selectedUnavailableRequests[0].id, selectedUnavailableRequests[0].table_number)}
+                    >
+                      Notify Customer to Modify Order
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="request-footer-button request-footer-button--accept"
+                        onClick={() => handleAcceptCustomerRequest(selectedCustomerRequests[0].id)}
+                      >
+                        Accept Request
+                      </button>
+                      <button
+                        className="request-footer-button request-footer-button--cancel"
+                        onClick={() => cancelCustomerRequest(selectedCustomerRequests[0].id)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </aside>
+          </>
+        )}
       </div>
 
       {showPunchOrderModal && (
