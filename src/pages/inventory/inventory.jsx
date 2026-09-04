@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePOS } from "../../context/POSContext";
 import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
+import ServioHeader from "../../components/ServioHeader";
 import "./inventory.css";
 
 function useFixedInterfaceCanvas() {
@@ -214,48 +215,13 @@ const Inventory = () => {
         overflow: "hidden",
       }}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "12px 24px",
-          borderBottom: "1px solid #e5e7eb",
-          background: "#ffffff",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-          </svg>
-          <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>Inventory Interface</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
-          <span style={{ fontSize: "0.92rem", color: "#64748b", fontWeight: 600 }}>{date}, {time}</span>
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              ...secondaryButtonStyle,
-              height: 44,
-              padding: "0 16px",
-              borderRadius: 10,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            aria-label="Return"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M19 12H5" />
-              <path d="m12 19-7-7 7-7" />
-            </svg>
-          </button>
-        </div>
-      </header>
+      {/* ── Unified Kitchen-Style Header ── */}
+      <ServioHeader
+        title="Inventory Interface"
+        group="ADMIN"
+        uiScale={uiScale}
+        onScaleChange={handleScaleChange}
+      />
 
       <div style={{ display: "flex", gap: 16, padding: "16px 24px", flexShrink: 0 }}>
         <div style={summaryCardStyle}>

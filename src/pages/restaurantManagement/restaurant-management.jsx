@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
+import ServioHeader from '../../components/ServioHeader';
 import './restaurant-management.css';
 
 const STATUSES = ['Available', 'Occupied', 'Reserved', 'Request'];
@@ -819,15 +820,35 @@ export default function RestaurantManagement({ managerType = 'menu' }) {
   const date = currentDateTime.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   return (
     <div className={`rmc108 restaurant-management-root ${isTableManager ? 'table-manager-root' : 'menu-manager-root'} restaurant-management-root--scale-${uiScale}`} style={{ '--servio-font-scale': fontScale, '--servio-elem-scale': elementScale, width: '100%', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
-      <header className="rmc109">
-        <div className="rmc110"><div className="rmc111"><GridIcon /></div><span className="rmc112">{isTableManager ? 'Table Manager' : 'Menu Manager'}</span></div>
-        <div className="rmc113">
-          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
-          <div className="restaurant-management-date-time">{date}, {time}</div>
-          {!isTableManager && <button type="button" className="restaurant-management-help" aria-label="Menu Manager help" title="Help"><HelpIcon /></button>}
-          <Link to="/" className="rmc114" aria-label="Return to interface selector" title="Return to interface selector"><ReturnIcon /></Link>
-        </div>
-      </header>
+      <ServioHeader
+        title={isTableManager ? 'Table Manager' : 'Menu Manager'}
+        group="MANAGEMENT"
+        uiScale={uiScale}
+        onScaleChange={handleScaleChange}
+        customActions={
+          !isTableManager ? (
+            <button
+              type="button"
+              className="restaurant-management-help"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid #475569',
+                borderRadius: 10,
+                color: '#94a3b8',
+                cursor: 'pointer',
+                display: 'grid',
+                placeItems: 'center',
+                width: 44,
+                height: 44,
+              }}
+              aria-label="Menu Manager help"
+              title="Help"
+            >
+              <HelpIcon />
+            </button>
+          ) : null
+        }
+      />
 
       <div className="rmc121">{isTableManager ? <TableInterface /> : <MenuInterface />}</div>
     </div>

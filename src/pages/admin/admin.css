@@ -7,25 +7,7 @@
   color: #172033 !important;
 }
 
-.admin-page > header {
-  min-height: 56px;
-  box-sizing: border-box;
-  padding: 0 22px !important;
-  border-bottom-color: #31445a !important;
-  background: #1f3044 !important;
-  color: #f1f5f9;
-}
-
-.admin-page > header button[aria-label="Return to Interface Selector"] {
-  border-color: #52657b !important;
-  color: #d9e4ef !important;
-}
-
-.admin-page > header button:last-child {
-  border-color: #087f63 !important;
-  background: #087f63 !important;
-  color: #fff !important;
-}
+/* Unified header is managed by ServioHeader */
 
 .admin-page > div[style*="gridTemplateColumns"] > div,
 .admin-page > div[style*="gridTemplateColumns"] > section {

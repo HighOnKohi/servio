@@ -9,8 +9,8 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, authLoading } = useAuth();
+export default function ProtectedRoute({ children, adminOnly = false }) {
+  const { isAuthenticated, authLoading, isAdmin } = useAuth();
 
   // Wait for Supabase to restore the session before making a redirect decision.
   // Without this, the app would always flash a redirect to /login on page refresh.
@@ -48,6 +48,11 @@ export default function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Admin-only guard: redirect non-admin users to the welcome page
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   // Supports both wrapper usage (<ProtectedRoute><Page /></ProtectedRoute>)

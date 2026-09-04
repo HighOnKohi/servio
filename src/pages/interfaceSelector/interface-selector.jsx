@@ -1,336 +1,150 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import ProtocolAssistant from "../../components/ProtocolAssistant";
-import { usePOS } from "../../context/POSContext";
-import { useAuth } from "../../context/AuthContext";
-import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
-import "./interface-selector.css";
-import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
-
-const INTERFACE_GROUPS = {
-  "FRONT OPS": [
-    { id: "kitchen", label: "Kitchen Interface", desc: "View live orders and start cooking.", route: "/kitchen/active-orders", icon: "kitchen" },
-    { id: "cashier", label: "Cashier Interface", desc: "Check out customers and print receipts quickly.", route: "/cashier/overview", icon: "cashier" },
-    { id: "customer", label: "Customer Interface (Debug)", desc: "Preview the QR ordering flow from the customer's side.", route: null, icon: "customer" },
-  ],
-  MANAGEMENT: [
-    { id: "table-manager", label: "Table Manager Interface", desc: "Manage restaurant tables, statuses, capacity, and QR codes.", route: "/table-manager", icon: "table" },
-    { id: "menu-manager", label: "Menu Manager Interface", desc: "Manage menu items, categories, prices, and availability.", route: "/menu-manager", icon: "menu" },
-    { id: "analytics", label: "Analytics Interface", desc: "Review sales, operations, inventory, and performance insights.", route: "/admin", icon: "analytics" },
-  ],
-  ADMIN: [
-    { id: "account-manager", label: "Account Manager Interface", desc: "Manage staff accounts and access permissions.", route: "/admin", icon: "account" },
-    { id: "order-logs", label: "Order Logs Interface", desc: "Review completed, active, and historical order activity.", route: "/admin", icon: "logs" },
-  ],
-};
-
-function GridIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-    </svg>
-  );
-}
-
-function InterfaceIcon({ type }) {
-  const icons = {
-    tray: <><path d="M4 13h16" /><path d="M5 13a7 7 0 0 0 14 0" /><path d="M8 9V5m4 4V5m4 4V5" /></>,
-    kitchen: <><rect x="4" y="3" width="16" height="5" rx="1" /><path d="M6 8v3m4-3v3m4-3v3m4-3v3" /><path d="M4 14h16v5H4z" /></>,
-    cashier: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h10M7 13h2m3 0h2m3 0h0M7 16h10" /></>,
-    customer: <><path d="M3 7h13v10H3z" /><path d="M16 10h5v8h-5z" /><path d="M6 4h7M7 11h5m-5 3h3" /></>,
-    table: <><path d="M4 8h16v5H4z" /><path d="M6 13v6m12-6v6M8 8V5h8v3" /></>,
-    menu: <><path d="M6 3v18M6 3c3 0 4 2 4 5s-1 5-4 5" /><path d="M14 3v18M18 3v18M14 3c4 2 4 7 0 9" /></>,
-    analytics: <><path d="M4 19V5m0 14h16" /><path d="m7 15 3-4 3 2 5-7" /></>,
-    account: <><circle cx="12" cy="7" r="3" /><path d="M5 21a7 7 0 0 1 14 0M19 8v5m-2.5-2.5h5" /></>,
-    logs: <><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
-  };
-
-  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[type] || icons.analytics}</svg>;
-}
-
-function UserIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function ArrowIcon({ direction = "right" }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      {direction === "left" ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
-    </svg>
-  );
-}
-
-function useFixedInterfaceCanvas() {
-  return { scale: 1, width: "100%", height: "100vh" };
-}
-
-/* ── Confirmation Modal for Logout ──────────────────────────────────── */
-function SelectorLogoutModal({ onConfirm, onDismiss }) {
-  return (
-    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="selector-logout-title">
-      <div className="kitchen-modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="kitchen-modal-header danger">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 28, height: 28 }} aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          <h2 id="selector-logout-title">Log Out of SERVIO?</h2>
-        </div>
-        <p className="kitchen-modal-body">
-          Are you sure you want to log out of your session?
-        </p>
-        <div className="kitchen-modal-actions">
-          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
-            Cancel
-          </button>
-          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirm}>
-            Log Out
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useUIScale } from '../../components/ScaleSelector';
+import ServioHeader from '../../components/ServioHeader';
+import './interface-selector.css';
 
 export default function InterfaceSelector() {
   const navigate = useNavigate();
-  const { tables, loading } = usePOS();
-  const { logout } = useAuth();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { user, profile, isAdmin } = useAuth();
   const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
-  const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [activeGroup, setActiveGroup] = useState("FRONT OPS");
-  const [showTablePicker, setShowTablePicker] = useState(false);
-  const interfaceCanvas = useFixedInterfaceCanvas();
 
-  const handleLogoutConfirm = async () => {
-    setShowLogoutModal(false);
-    try {
-      if (logout) await logout();
-    } catch (err) {
-      console.error("Logout error:", err);
+  const staffName = profile?.full_name || user?.email?.split('@')[0] || 'Staff User';
+  const staffRole = isAdmin ? 'System Administrator' : (profile?.role || 'Staff Employee');
+
+  // Main operational pages
+  const mainCards = useMemo(() => {
+    const cards = [
+      {
+        id: 'kitchen',
+        title: 'Kitchen Interface',
+        badge: 'Food Ops',
+        desc: 'Live incoming orders, kitchen ticket queue, food preparation & ready notifications.',
+        route: '/kitchen/active-orders',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="3" width="16" height="5" rx="1" />
+            <path d="M6 8v3m4-3v3m4-3v3" />
+            <path d="M4 14h16v5H4z" />
+          </svg>
+        ),
+        color: '#10b981',
+      },
+      {
+        id: 'table-manager',
+        title: 'Table Management',
+        badge: 'Floor Ops',
+        desc: 'Restaurant floor plan, table status tracking, customer capacity & QR code generation.',
+        route: '/table-manager',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8h16v5H4z" />
+            <path d="M6 13v6m12-6v6M8 8V5h8v3" />
+          </svg>
+        ),
+        color: '#38bdf8',
+      },
+      {
+        id: 'cashier',
+        title: 'Cashier Interface',
+        badge: 'POS Terminal',
+        desc: 'Order billing, PWD/Senior discounts, table checkout, receipt printing & cash drawer.',
+        route: '/cashier/overview',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 9h10M7 13h2m3 0h2m3 0h0M7 16h10" />
+          </svg>
+        ),
+        color: '#f59e0b',
+      },
+    ];
+
+    // Admin accounts only: reveal the 4th main card (Admin Dashboard)
+    if (isAdmin) {
+      cards.push({
+        id: 'admin',
+        title: 'Admin Dashboard',
+        badge: 'Admin Only',
+        desc: 'Staff account management, revenue reporting, order history audit logs & protocols.',
+        route: '/admin',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="7" r="3" />
+            <path d="M5 21a7 7 0 0 1 14 0M19 8v5m-2.5-2.5h5" />
+          </svg>
+        ),
+        color: '#a855f7',
+      });
     }
-    navigate("/login");
-  };
 
-  const safeTables = Array.isArray(tables) ? tables : [];
-  const sortedTables = useMemo(
-    () => [...safeTables].sort((a, b) => a.table_number - b.table_number),
-    [safeTables],
-  );
-  const visibleInterfaces = INTERFACE_GROUPS[activeGroup];
-
-  const time = currentDateTime.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-
-  const date = currentDateTime.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(id);
-  }, []);
-
-  function handleInterfaceSelect(iface) {
-    if (iface.id === "customer") {
-      setShowTablePicker(true);
-      return;
-    }
-
-    if (iface.route) {
-      navigate(iface.route);
-    }
-  }
-
-  function openCustomerTable(tableNumber) {
-    setShowTablePicker(false);
-    navigate(`/customer/${tableNumber}`);
-  }
+    return cards;
+  }, [isAdmin]);
 
   return (
     <div
-      className={`interface-selector-page interface-selector-page--scale-${uiScale}`}
+      className={`servio-welcome-page servio-welcome-page--scale-${uiScale}`}
       style={{
-        "--servio-font-scale": fontScale,
-        "--servio-elem-scale": elementScale,
-        width: "100%",
-        height: "100vh",
-        maxHeight: "100vh",
-        overflow: "hidden",
+        '--servio-font-scale': fontScale,
+        '--servio-elem-scale': elementScale,
       }}
     >
-      <header className="interface-selector-header">
-        <div className="interface-selector-brand">
-          <div className="interface-selector-brand-mark"> 
-            <img src={Logo} alt="SERVIO Logo" />
+      <ServioHeader
+        title="SERVIO POS"
+        group="SYSTEM PORTAL"
+        uiScale={uiScale}
+        onScaleChange={handleScaleChange}
+      />
+
+      <main className="servio-welcome-main">
+        <div className="servio-welcome-hero">
+          <div className="servio-welcome-kicker-row">
+            <span className="servio-welcome-kicker">Operational Suite</span>
+            <span className={`servio-role-tag ${isAdmin ? 'admin' : 'employee'}`}>
+              {isAdmin ? '👑 Administrator' : '👤 Staff Employee'}
+            </span>
           </div>
-          <span>Servio POS</span>
+          <h1 className="servio-welcome-title">
+            Welcome back, <span className="servio-welcome-name">{staffName}</span>
+          </h1>
+          <p className="servio-welcome-desc">
+            Select one of the {mainCards.length} operational interfaces below to begin your shift, or toggle the logo burger menu at any time.
+          </p>
         </div>
-        <nav className="interface-selector-group-nav" aria-label="Interface categories">
-          {Object.keys(INTERFACE_GROUPS).map((group) => (
+
+        <div className={`servio-welcome-grid ${isAdmin ? 'cols-4' : 'cols-3'}`}>
+          {mainCards.map((card) => (
             <button
-              key={group}
+              key={card.id}
               type="button"
-              className={`interface-selector-group-tab ${activeGroup === group ? "active" : ""}`}
-              onClick={() => setActiveGroup(group)}
+              className="servio-main-card"
+              onClick={() => {
+                try {
+                  localStorage.setItem('servio_last_interface', card.route);
+                } catch {}
+                navigate(card.route);
+              }}
+              style={{ '--card-accent': card.color }}
             >
-              <span className="interface-selector-group-icon"><GridIcon /></span>
-              {group}
+              <div className="servio-main-card-top">
+                <div className="servio-main-card-icon">{card.icon}</div>
+                <span className="servio-main-card-badge">{card.badge}</span>
+              </div>
+              <div className="servio-main-card-body">
+                <h2 className="servio-main-card-title">{card.title}</h2>
+                <p className="servio-main-card-desc">{card.desc}</p>
+              </div>
+              <div className="servio-main-card-footer">
+                <span>Launch Interface</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </div>
             </button>
           ))}
-        </nav>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} isDark />
-          <div className="interface-selector-account">
-            <div>
-              <strong>Admin User</strong>
-              <span>System Administrator</span>
-            </div>
-            <div className="interface-selector-account-avatar"><UserIcon /></div>
-          </div>
-        </div>
-      </header>
-
-      <main className="interface-selector-center">
-        <div key={`heading-${activeGroup}`} className="interface-selector-section-heading interface-selector-category-transition">
-          <span className="interface-selector-section-kicker">Operational Suite</span>
-          <h1>{activeGroup}</h1>
-        </div>
-        <div key={`grid-${activeGroup}`} className="interface-selector-grid-frame interface-selector-category-transition">
-          <div className="interface-selector-grid">
-            {visibleInterfaces.map((iface) => (
-              <button key={iface.id} onClick={() => handleInterfaceSelect(iface)} className="interface-card interface-card-enabled">
-                <div className="interface-card-topline">
-                  <div className={`interface-card-icon interface-card-icon-${iface.icon}`}><InterfaceIcon type={iface.icon} /></div>
-                </div>
-                <div className="interface-card-body">
-                  <div className="interface-card-label">{iface.label}</div>
-                  <div className="interface-card-desc">{iface.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
       </main>
-
-      <div className="interface-selector-assistant-wrap">
-        <ProtocolAssistant />
-      </div>
-
-      <footer className="interface-selector-footer">
-        <div className="interface-selector-user">
-          <div className="interface-selector-user-avatar">
-            <UserIcon />
-          </div>
-
-          <div>
-            <div className="interface-selector-user-name">Admin User</div>
-            <div className="interface-selector-user-role">Administrator</div>
-          </div>
-        </div>
-
-        <div className="interface-selector-status">{date}, {time}</div>
-
-        <button
-          className="interface-selector-logout"
-          type="button"
-          onClick={() => setShowLogoutModal(true)}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16,17 21,12 16,7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Logout
-        </button>
-      </footer>
-
-      {showLogoutModal && (
-        <SelectorLogoutModal
-          onConfirm={handleLogoutConfirm}
-          onDismiss={() => setShowLogoutModal(false)}
-        />
-      )}
-
-      {showTablePicker && (
-        <div className="interface-selector-overlay" onClick={() => setShowTablePicker(false)}>
-          <section className="interface-selector-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="interface-selector-modal-header">
-              <div>
-                <div className="interface-selector-modal-kicker">Customer Preview</div>
-                <h2>Choose Table</h2>
-              </div>
-              <button
-                type="button"
-                className="interface-selector-modal-close"
-                onClick={() => setShowTablePicker(false)}
-                aria-label="Close table picker"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="interface-selector-table-grid">
-              {loading ? (
-                <div className="interface-selector-table-empty">Loading tables...</div>
-              ) : sortedTables.length === 0 ? (
-                <div className="interface-selector-table-empty">No tables available.</div>
-              ) : (
-                sortedTables.map((table) => (
-                  <button
-                    key={table.id || table.table_number}
-                    type="button"
-                    className="interface-selector-table-card"
-                    onClick={() => openCustomerTable(table.table_number)}
-                  >
-                    <span className="interface-selector-table-label">Table {String(table.table_number).padStart(2, "0")}</span>
-                    <span className="interface-selector-table-status">{table.status}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

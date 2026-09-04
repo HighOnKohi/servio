@@ -7,20 +7,7 @@
   color: #172033 !important;
 }
 
-.inventory-page > header {
-  min-height: 56px;
-  box-sizing: border-box;
-  padding: 0 22px !important;
-  border-bottom-color: #31445a !important;
-  background: #1f3044 !important;
-  color: #f1f5f9;
-}
-
-.inventory-page > header button {
-  border-color: #52657b !important;
-  color: #d9e4ef !important;
-  background: transparent !important;
-}
+/* Unified header is managed by ServioHeader */
 
 .inventory-page > div[style*="padding: 16px 24px"] > div,
 .inventory-page > div[style*="padding: 16px 24px"] > div > div {

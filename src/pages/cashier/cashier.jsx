@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
+import ServioHeader from '../../components/ServioHeader';
 import './cashier.css';
 import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
 
@@ -1121,29 +1122,13 @@ function Cashier() {
         overflow: 'hidden',
       }}
     >
-      <div className="topbar">
-        <div className="brand">
-          <div className="brand-logo" aria-hidden="true">
-            <img src={Logo} alt="SERVIO Logo" />
-          </div>
-          <div className="brand-text">Cashier Interface</div>
-        </div>
-        <div className="topbar-right">
-          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} />
-          <button
-            type="button"
-            className="cashier-return-btn"
-            onClick={() => navigate('/')}
-            aria-label="Return to Interface Selector"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span>Return to Selector</span>
-          </button>
-        </div>
-      </div>
+      {/* ── Unified Kitchen-Style Header ── */}
+      <ServioHeader
+        title="Cashier Interface"
+        group="FRONT OPS"
+        uiScale={uiScale}
+        onScaleChange={handleScaleChange}
+      />
       {/* ── Kitchen Cancellation Alert Banners ── */}
       {cancelledOrderAlerts.length > 0 && (
         <div className="cashier-cancel-alerts" role="alert" aria-live="polite">

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
+import ServioHeader from '../../components/ServioHeader';
 import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
 import './kitchen.css';
 
@@ -478,17 +479,12 @@ function Kitchen() {
       )}
 
       {/* ── Header ── */}
-      <header className="kitchen-topbar">
-        <div className="kitchen-brand">
-          <span className="kitchen-brand-logo" aria-hidden="true">
-            <img src={Logo} alt="SERVIO Logo" />
-          </span>
-          <div className="kitchen-brand-text">
-            <span className="kitchen-brand-title">Kitchen Interface</span>
-          </div>
-        </div>
-        <div className="kitchen-topbar-right">
-          <ScaleSelector currentScale={uiScale} onScaleChange={handleScaleChange} isDark />
+      <ServioHeader
+        title="Kitchen Interface"
+        group="FRONT OPS"
+        uiScale={uiScale}
+        onScaleChange={handleScaleChange}
+        customActions={
           <button
             type="button"
             className="kitchen-stock-manage-btn"
@@ -498,22 +494,8 @@ function Kitchen() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z" /></svg>
             <span>Manage Stock</span>
           </button>
-          <div className="kitchen-clock" aria-label="Current date and time">
-            <span className="kitchen-clock-date">{new Date(currentTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-            <span className="kitchen-clock-time">{new Date(currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</span>
-          </div>
-          <button
-            type="button"
-            className="kitchen-logout-btn"
-            onClick={() => setShowLogoutModal(true)}
-            aria-label="Log out or exit kitchen interface"
-            title="Log out or exit kitchen interface"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
-            <span>Log Out</span>
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {/* ── Tab Navigation ── */}
       <nav className="kitchen-tab-group" aria-label="Kitchen sections">

@@ -29,8 +29,12 @@ function App() {
             <Route path="/table-manager/*" element={<RestaurantManagement managerType="tables" />} />
             <Route path="/cashier/*" element={<Cashier />} />
             <Route path="/kitchen/*" element={<Kitchen />} />
-            <Route path="/admin" element={<Admin />} />
             <Route path="/inventory" element={<Inventory />} />
+
+            {/* Admin only route — inaccessible to regular employees */}
+            <Route element={<ProtectedRoute adminOnly />}>
+              <Route path="/admin" element={<Admin />} />
+            </Route>
           </Route>
         </Routes>
       </POSProvider>
