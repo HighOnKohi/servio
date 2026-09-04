@@ -17,40 +17,26 @@ function formatElapsed(createdAt, now) {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-/* ── Confirmation Modal for Logout ──────────────────────────────────── */
-function LogoutConfirmModal({ onConfirmLogout, onSwitchInterface, onDismiss }) {
+/* ── Confirmation Modal for Return to Interface Selector ──────────────────────────────────── */
+function ReturnToInterfaceModal({ onConfirm, onDismiss }) {
   return (
-    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="logout-modal-title">
-      <div className="kitchen-modal-card kitchen-modal-card--lg" onClick={(e) => e.stopPropagation()}>
-        <div className="kitchen-modal-header danger">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="return-modal-title">
+      <div className="kitchen-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 11l-4 4 4 4m0 0l-4-4m4 4H3m18-4a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
           </svg>
-          <h2 id="logout-modal-title">Log Out of Kitchen?</h2>
+          <h2 id="return-modal-title">Return to Interface Selector?</h2>
         </div>
         <p className="kitchen-modal-body">
-          Are you sure you want to leave the Kitchen interface? Any active tickets and cooking items will remain safely in the queue.
+          You will be returned to the interface selection screen. Your session will remain active.
         </p>
-        <div className="kitchen-modal-actions kitchen-modal-actions--stacked">
-          <button type="button" className="kitchen-modal-btn danger" onClick={onConfirmLogout}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22, marginRight: 10 }} aria-hidden="true">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Log Out Completely
-          </button>
-          <button type="button" className="kitchen-modal-btn switch-interface" onClick={onSwitchInterface}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22, marginRight: 10 }} aria-hidden="true">
-              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-            </svg>
-            Switch Interface
-          </button>
+        <div className="kitchen-modal-actions">
           <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>
             Stay in Kitchen
+          </button>
+          <button type="button" className="kitchen-modal-btn primary" onClick={onConfirm}>
+            Return to Selector
           </button>
         </div>
       </div>
@@ -163,6 +149,75 @@ function UnavailableItemModal({ request, onConfirm, onDismiss }) {
   );
 }
 
+/* ── Order Item Unavailability Modal ──────────────────────────────────────── */
+function UnavailableOrderItemModal({ order, onConfirm, onDismiss }) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const [selected, setSelected] = useState(() => new Set());
+  const [reason, setReason] = useState('Out of stock');
+
+  function toggleItem(itemId) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  const unavailableItemIds = Array.from(selected);
+
+  return (
+    <div className="kitchen-modal-overlay" onClick={onDismiss} role="dialog" aria-modal="true" aria-labelledby="unavail-order-modal-title">
+      <div className="kitchen-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="kitchen-modal-header warning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /></svg>
+          <h2 id="unavail-order-modal-title">Mark Items Unavailable</h2>
+        </div>
+        <p className="kitchen-modal-body">
+          Select which items from Table #{String(order?.table_number).padStart(2, '0')}'s order cannot be served:
+        </p>
+        <div className="kitchen-modal-item-list">
+          {items.map((item) => {
+            const isSelected = selected.has(item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`kitchen-modal-item-toggle ${isSelected ? 'selected' : ''}`}
+                onClick={() => toggleItem(item.id)}
+              >
+                <span className="kitchen-modal-item-name">{item.item_name} ×{item.quantity}</span>
+                <span className="kitchen-modal-item-check">{isSelected ? '✕ Unavailable' : 'Available'}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="kitchen-modal-field">
+          <label htmlFor="unavail-order-reason">Reason</label>
+          <input
+            id="unavail-order-reason"
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Out of stock, Equipment issue"
+          />
+        </div>
+        <div className="kitchen-modal-actions">
+          <button type="button" className="kitchen-modal-btn secondary" onClick={onDismiss}>Cancel</button>
+          <button
+            type="button"
+            className="kitchen-modal-btn warning"
+            disabled={selected.size === 0}
+            onClick={() => onConfirm(unavailableItemIds, reason)}
+          >
+            Mark Unavailable ({selected.size} item{selected.size !== 1 ? 's' : ''})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Stock Management Drawer ────────────────────────────────────────── */
 function StockDrawer({ menuItems, categories, onToggle, onClose }) {
   const [search, setSearch] = useState('');
@@ -251,14 +306,14 @@ function Kitchen() {
     getItemsForOrder,
     updateOrderStatus,
     updateOrderItemStatus,
+    confirmOrder,
+    markOrderItemsUnavailable,
     forwardCustomerRequestToCashier,
     rejectCustomerRequestKitchen,
     toggleMenuItemStock,
     loading,
   } = usePOS();
-
-  const { logout } = useAuth();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
   const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
 
   const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -267,6 +322,7 @@ function Kitchen() {
   const [showStockDrawer, setShowStockDrawer] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [unavailableTarget, setUnavailableTarget] = useState(null);
+  const [unavailableOrderTarget, setUnavailableOrderTarget] = useState(null);
   const [processingIds, setProcessingIds] = useState(new Set());
   // Blink state for tabs when new items arrive
   const [pendingTabBlink, setPendingTabBlink] = useState(false);
@@ -335,7 +391,16 @@ function Kitchen() {
     });
   }, [orders, getItemsForOrder]);
 
-  const visibleTickets = useMemo(() => tickets.filter((t) => t.status === 'ACTIVE'), [tickets]);
+  const visibleTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      if (t.status !== 'ACTIVE') return false;
+      // Exclude orders that only have PENDING items (they belong in verification tab)
+      const items = getItemsForOrder(t.id);
+      const nonCancelledItems = items.filter(item => item.status !== 'CANCELLED');
+      const allPending = nonCancelledItems.length > 0 && nonCancelledItems.every(item => item.status === 'PENDING');
+      return !allPending;
+    });
+  }, [tickets, getItemsForOrder]);
 
   // ── Pending verification requests (from customers, not yet forwarded) ─
   const pendingRequests = useMemo(() =>
@@ -343,16 +408,37 @@ function Kitchen() {
     [customerRequests]
   );
 
+  // ── Orders from cashier that need kitchen verification (items with PENDING status) ─
+  const pendingCashierOrders = useMemo(() => {
+    return orders
+      .filter((order) => {
+        // Get items for this order
+        const items = getItemsForOrder(order.id);
+        // Check if any items are PENDING
+        const hasPendingItems = items.some((item) => item.status === 'PENDING');
+        return hasPendingItems && order.server_name === 'Cashier';
+      })
+      .map((order) => {
+        const items = getItemsForOrder(order.id);
+        const pendingItems = items.filter((item) => item.status === 'PENDING');
+        return {
+          ...order,
+          items: pendingItems,
+        };
+      });
+  }, [orders, getItemsForOrder]);
+
   // ── Blink tabs when their count increases ──
   useEffect(() => {
     const prev = prevPendingRef.current;
-    prevPendingRef.current = pendingRequests.length;
-    if (pendingRequests.length > prev && activeTab !== 'pending-verification') {
+    const totalPending = pendingRequests.length + pendingCashierOrders.length;
+    prevPendingRef.current = totalPending;
+    if (totalPending > prev && activeTab !== 'pending-verification') {
       setPendingTabBlink(true);
       const t = setTimeout(() => setPendingTabBlink(false), 2000);
       return () => clearTimeout(t);
     }
-  }, [pendingRequests.length, activeTab]);
+  }, [pendingRequests.length, pendingCashierOrders.length, activeTab]);
 
   useEffect(() => {
     const prev = prevOrdersRef.current;
@@ -403,18 +489,8 @@ function Kitchen() {
     await updateOrderStatus(target.id, 'CANCELLED');
   }, [cancelTarget, updateOrderStatus]);
 
-  const handleConfirmLogout = useCallback(async () => {
-    setShowLogoutModal(false);
-    try {
-      if (logout) await logout();
-    } catch (err) {
-      console.error('Error logging out:', err);
-    }
-    navigate('/login');
-  }, [logout, navigate]);
-
-  const handleSwitchInterface = useCallback(() => {
-    setShowLogoutModal(false);
+  const handleReturnToSelector = useCallback(() => {
+    setShowReturnModal(false);
     navigate('/');
   }, [navigate]);
 
@@ -430,6 +506,19 @@ function Kitchen() {
     await rejectCustomerRequestKitchen(unavailableTarget.id, unavailableItems, reason);
     setUnavailableTarget(null);
   }, [unavailableTarget, rejectCustomerRequestKitchen]);
+
+  const handleConfirmOrder = useCallback(async (orderId) => {
+    if (processingIds.has(orderId)) return;
+    setProcessingIds((prev) => new Set(prev).add(orderId));
+    await confirmOrder(orderId);
+    setProcessingIds((prev) => { const next = new Set(prev); next.delete(orderId); return next; });
+  }, [confirmOrder, processingIds]);
+
+  const handleOrderItemsUnavailable = useCallback(async (orderItemIds, reason) => {
+    if (!unavailableOrderTarget) return;
+    await markOrderItemsUnavailable(orderItemIds, reason);
+    setUnavailableOrderTarget(null);
+  }, [unavailableOrderTarget, markOrderItemsUnavailable]);
 
   if (loading) {
     return <div className="kitchen-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#fff', fontSize: '1.4rem' }}>Loading…</div>;
@@ -448,11 +537,10 @@ function Kitchen() {
       }}
     >
       {/* ── Modals ── */}
-      {showLogoutModal && (
-        <LogoutConfirmModal
-          onConfirmLogout={handleConfirmLogout}
-          onSwitchInterface={handleSwitchInterface}
-          onDismiss={() => setShowLogoutModal(false)}
+      {showReturnModal && (
+        <ReturnToInterfaceModal
+          onConfirm={handleReturnToSelector}
+          onDismiss={() => setShowReturnModal(false)}
         />
       )}
       {cancelTarget && (
@@ -467,6 +555,13 @@ function Kitchen() {
           request={unavailableTarget}
           onConfirm={handleUnavailableConfirm}
           onDismiss={() => setUnavailableTarget(null)}
+        />
+      )}
+      {unavailableOrderTarget && (
+        <UnavailableOrderItemModal
+          order={unavailableOrderTarget}
+          onConfirm={handleOrderItemsUnavailable}
+          onDismiss={() => setUnavailableOrderTarget(null)}
         />
       )}
       {showStockDrawer && (
@@ -507,7 +602,7 @@ function Kitchen() {
           onClick={() => { setActiveTab('pending-verification'); setPendingTabBlink(false); }}
         >
           PENDING VERIFICATION
-          {pendingRequests.length > 0 && <span className="pending-badge">{pendingRequests.length}</span>}
+          {(pendingRequests.length + pendingCashierOrders.length) > 0 && <span className="pending-badge">{pendingRequests.length + pendingCashierOrders.length}</span>}
         </button>
         <button
           className={[
@@ -526,14 +621,15 @@ function Kitchen() {
 
           {/* ── Pending Verification Tab ── */}
           {activeTab === 'pending-verification' && (
-            pendingRequests.length === 0 ? (
+            (pendingRequests.length === 0 && pendingCashierOrders.length === 0) ? (
               <div className="kitchen-empty">
                 <div>✓</div>
                 <h2>No pending verifications</h2>
-                <p>All customer requests have been reviewed.</p>
+                <p>All customer requests and cashier orders have been reviewed.</p>
               </div>
             ) : (
               <section className="pending-request-grid">
+                {/* Customer Requests */}
                 {pendingRequests.map((request) => {
                   const items = Array.isArray(request.items) ? request.items : [];
                   const isProcessing = processingIds.has(request.id);
@@ -542,7 +638,7 @@ function Kitchen() {
                       <header className="pending-request-header">
                         <div>
                           <strong>Table #{String(request.table_number).padStart(2, '0')}</strong>
-                          <span className="pending-request-badge">Pending Stock Check</span>
+                          <span className="pending-request-badge">Customer Request</span>
                         </div>
                         <time>{new Date(request.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</time>
                       </header>
@@ -572,6 +668,50 @@ function Kitchen() {
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
                           {isProcessing ? 'Forwarding…' : 'Confirm & Forward'}
+                        </button>
+                      </footer>
+                    </article>
+                  );
+                })}
+                
+                {/* Cashier Orders */}
+                {pendingCashierOrders.map((order) => {
+                  const isProcessing = processingIds.has(order.id);
+                  return (
+                    <article key={order.id} className="pending-request-card">
+                      <header className="pending-request-header">
+                        <div>
+                          <strong>Table #{String(order.table_number).padStart(2, '0')}</strong>
+                          <span className="pending-request-badge" style={{background: '#3b82f6'}}>Cashier Order</span>
+                        </div>
+                        <time>{new Date(order.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</time>
+                      </header>
+                      <div className="pending-request-items">
+                        {order.items.map((item, idx) => (
+                          <div key={`${order.id}-${idx}`} className="pending-request-item-row">
+                            <span>{item.item_name}</span>
+                            <span>×{item.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <footer className="pending-request-actions">
+                        <button
+                          type="button"
+                          className="pending-btn unavailable"
+                          onClick={() => setUnavailableOrderTarget(order)}
+                          disabled={isProcessing}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m8 8 8 8M16 8l-8 8" /><circle cx="12" cy="12" r="9" /></svg>
+                          Item Unavailable
+                        </button>
+                        <button
+                          type="button"
+                          className="pending-btn confirm"
+                          onClick={() => handleConfirmOrder(order.id)}
+                          disabled={isProcessing}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 12 4 4L19 6" /></svg>
+                          {isProcessing ? 'Confirming…' : 'Confirm Order'}
                         </button>
                       </footer>
                     </article>
