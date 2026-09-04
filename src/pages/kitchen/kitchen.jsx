@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
+import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
 import './kitchen.css';
 
 function useFixedInterfaceCanvas() {
@@ -575,7 +576,7 @@ function Kitchen() {
       <header className="kitchen-topbar">
         <div className="kitchen-brand">
           <span className="kitchen-brand-logo" aria-hidden="true">
-            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
+            <img src={Logo} alt="SERVIO Logo" />
           </span>
           <div className="kitchen-brand-text">
             <span className="kitchen-brand-title">Kitchen Interface</span>
