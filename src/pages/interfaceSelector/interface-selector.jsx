@@ -5,6 +5,7 @@ import { usePOS } from "../../context/POSContext";
 import { useAuth } from "../../context/AuthContext";
 import ScaleSelector, { useUIScale } from "../../components/ScaleSelector";
 import "./interface-selector.css";
+import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
 
 const INTERFACE_GROUPS = {
   "FRONT OPS": [
@@ -192,8 +193,8 @@ export default function InterfaceSelector() {
     >
       <header className="interface-selector-header">
         <div className="interface-selector-brand">
-          <div className="interface-selector-brand-mark">
-            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
+          <div className="interface-selector-brand-mark"> 
+            <img src={Logo} alt="SERVIO Logo" />
           </div>
           <span>Servio POS</span>
         </div>

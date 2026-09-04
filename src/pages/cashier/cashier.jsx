@@ -4,6 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
 import ScaleSelector, { useUIScale } from '../../components/ScaleSelector';
 import './cashier.css';
+import Logo from "../../../public/Servio-Logo-B-Icon-Transparent.png"
 
 const unquoteQueryValue = (value) => (value ?? '').replace(/^"|"$/g, '');
 
@@ -1087,7 +1088,7 @@ function Cashier() {
       <div className="topbar">
         <div className="brand">
           <div className="brand-logo" aria-hidden="true">
-            <img src="/src/assets/Servio-Logo-B-Icon-Transparent.png" alt="SERVIO Logo" />
+            <img src={Logo} alt="SERVIO Logo" />
           </div>
           <div className="brand-text">Cashier Interface</div>
         </div>
