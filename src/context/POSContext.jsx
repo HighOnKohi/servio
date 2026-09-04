@@ -391,6 +391,10 @@ export function POSProvider({ children }) {
       .on("broadcast", { event: "requests-changed" }, () => {
         refetchCustomerRequests();
       })
+      .on("broadcast", { event: "customer-request-created" }, () => {
+        refetchCustomerRequests();
+        refetchTables();
+      })
       .on("broadcast", { event: "menu-changed" }, ({ payload }) => {
         if (payload?.itemId && payload?.status) {
           setMenuItems((prev) =>
@@ -741,6 +745,7 @@ export function POSProvider({ children }) {
 
   const createCustomerRequest = useCallback(
     async (tableNumber, items) => {
+      console.log('Creating customer request for table:', tableNumber, 'Items:', items);
       const normalizedItems = items.map((item) => ({
         id: item.id || item.menu_item_id || null,
         name: item.name || item.item_name,
@@ -760,9 +765,12 @@ export function POSProvider({ children }) {
           status: "PENDING_KITCHEN",
           subtotal,
           items: normalizedItems,
+          server_name: "Cashier",
         })
         .select()
         .single();
+
+      console.log('Customer request created:', data, 'Error:', error);
 
       if (!error) {
         await supabase
@@ -773,6 +781,15 @@ export function POSProvider({ children }) {
             reserved_since: null,
           })
           .eq("table_number", tableNumber);
+
+        // Broadcast to kitchen that a new request is pending
+        console.log('Broadcasting customer-request-created event for request ID:', data?.id);
+        const channel = supabase.channel("servio-pos-realtime");
+        channel.send({
+          type: "broadcast",
+          event: "customer-request-created",
+          payload: { requestId: data?.id },
+        });
 
         await Promise.all([refetchCustomerRequests(), refetchTables()]);
       }
@@ -1530,6 +1547,74 @@ export function POSProvider({ children }) {
     [refetchOrderItems],
   );
 
+  /** 
+   * Kitchen confirms an order after verification, marking all PENDING items as ACTIVE.
+   * This is used when the kitchen verifies stock availability for cashier orders.
+   */
+  const confirmOrder = useCallback(
+    async (orderId) => {
+      // Update all PENDING items in this order to ACTIVE
+      const { error } = await supabase
+        .from("order_items")
+        .update({ status: "ACTIVE" })
+        .eq("order_id", orderId)
+        .eq("status", "PENDING");
+
+      if (error) {
+        console.error("Failed to confirm order:", error);
+        return { error };
+      }
+
+      // Broadcast the change
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "order-confirmed",
+          payload: { orderId },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
+      await refetchOrderItems();
+      return { error: null };
+    },
+    [refetchOrderItems],
+  );
+
+  /** 
+   * Kitchen marks specific items in an order as unavailable/cancelled.
+   * Used during the verification process for cashier orders.
+   */
+  const markOrderItemsUnavailable = useCallback(
+    async (orderItemIds, reason = "Out of stock") => {
+      // Update items to CANCELLED status
+      const { error } = await supabase
+        .from("order_items")
+        .update({ 
+          status: "CANCELLED",
+          notes: reason 
+        })
+        .in("id", orderItemIds);
+
+      if (error) {
+        console.error("Failed to mark items unavailable:", error);
+        return { error };
+      }
+
+      // Broadcast the change
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "order-items-unavailable",
+          payload: { orderItemIds },
+        }).catch((err) => console.warn("Realtime broadcast error:", err));
+      }
+
+      await refetchOrderItems();
+      return { error: null };
+    },
+    [refetchOrderItems],
+  );
+
   /**
  * Finalizes a table's session when they pay their bill.
  * Deletes all active orders on that table and resets the table status to EMPTY.
@@ -1969,6 +2054,8 @@ export function POSProvider({ children }) {
         removeOrderItem,
         updateOrderStatus,
         updateOrderItemStatus,
+        confirmOrder,
+        markOrderItemsUnavailable,
         billOutTable,
         splitOrderItemUnit,
         applyTableDiscount,

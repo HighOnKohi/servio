@@ -1312,13 +1312,72 @@
   border-bottom: 0;
 }
 
+/* Card-style separation for all item groups */
+.cashier-app .item-group {
+  margin: 8px 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.15s ease;
+}
+
+.cashier-app .item-group:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.cashier-app .item-group:first-child {
+  margin-top: 12px;
+}
+
+.cashier-app .item-group:last-child {
+  margin-bottom: 12px;
+}
+
 .cashier-app .item-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #eef2f7;
+  gap: 16px;
+  padding: 12px 48px;
+  border: none;
+}
+
+.cashier-app .item-row .item-name {
+  display: block;
+  font-size: var(--sidebar-item-name-size, 14px);
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cashier-app .item-row .item-price {
+  font-size: var(--sidebar-item-price-size, 14px);
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.cashier-app .item-row .item-remove {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.cashier-app .item-row .item-remove:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #ef4444;
 }
 
 .cashier-app .item-row.pending {
@@ -1450,8 +1509,8 @@
 }
 
 .cashier-app .item-unit-row {
-  padding-left: 40px;
-  padding-right: 16px;
+  padding-left: 72px;
+  padding-right: 48px;
   padding-top: 8px;
   padding-bottom: 8px;
   display: grid;
@@ -1459,24 +1518,11 @@
   align-items: center;
   column-gap: 8px;
   row-gap: 4px;
+  margin: 0;
 }
 
-/* Individual unit items inherit parent status color */
-.cashier-app .item-status-new .item-unit-row {
-  background: #fef08a;
-  border-bottom: 1px solid #facc15;
-}
-
-.cashier-app .item-status-pending .item-unit-row {
-  background: #fed7aa;
-  border-bottom: 1px solid #fb923c;
-}
-
-.cashier-app .item-status-in_progress .item-unit-row,
-.cashier-app .item-status-in_kitchen .item-unit-row,
-.cashier-app .item-status-active .item-unit-row {
-  background: #bfdbfe;
-  border-bottom: 1px solid #60a5fa;
+.cashier-app .item-unit-row:last-child::after {
+  display: none;
 }
 
 .cashier-app .item-unit-main {
@@ -2869,50 +2915,64 @@
   padding-inline: 0;
 }
 
-.cashier-app .item-status-new {
-  background: #fef08a !important;
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 12px 16px !important;
-  margin: 0 !important;
-  border-bottom: 1px solid #facc15 !important;
-}
-
-.cashier-app .item-status-new .item-row {
-  background: #fef08a !important;
-  border-bottom: 1px solid #facc15 !important;
-}
-
-.cashier-app .item-status-pending {
-  background: #fed7aa !important;
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 12px 16px !important;
-  margin: 0 !important;
-  border-bottom: 1px solid #fb923c !important;
-}
-
-.cashier-app .item-status-pending .item-row {
-  background: #fed7aa !important;
-  border-bottom: 1px solid #fb923c !important;
-}
-
+/* Item group status colors - for grouped items with expand/collapse */
+.cashier-app .item-status-new,
+.cashier-app .item-status-pending,
 .cashier-app .item-status-in_progress,
 .cashier-app .item-status-in_kitchen,
 .cashier-app .item-status-active {
-  background: #bfdbfe !important;
+  margin: 0 !important;
+  padding: 0 !important;
   border: none !important;
   border-radius: 0 !important;
-  padding: 12px 16px !important;
-  margin: 0 !important;
-  border-bottom: 1px solid #60a5fa !important;
 }
 
+/* Yellow background for new items */
+.cashier-app .item-status-new .item-row,
+.cashier-app .item-row.item-status-new {
+  background: #fef08a !important;
+  border: none !important;
+  padding: 12px 48px;
+  margin: 0;
+}
+
+.cashier-app .item-status-new .item-unit-row {
+  background: #facc15;
+  border: none;
+}
+
+/* Orange background for pending items */
+.cashier-app .item-status-pending .item-row,
+.cashier-app .item-row.item-status-pending {
+  background: #fed7aa !important;
+  border: none !important;
+  padding: 12px 48px;
+  margin: 0;
+}
+
+.cashier-app .item-status-pending .item-unit-row {
+  background: #fb923c;
+  border: none;
+}
+
+/* Blue background for active/in_progress/in_kitchen items */
 .cashier-app .item-status-in_progress .item-row,
 .cashier-app .item-status-in_kitchen .item-row,
-.cashier-app .item-status-active .item-row {
+.cashier-app .item-status-active .item-row,
+.cashier-app .item-row.item-status-in_progress,
+.cashier-app .item-row.item-status-in_kitchen,
+.cashier-app .item-row.item-status-active {
   background: #bfdbfe !important;
-  border-bottom: 1px solid #60a5fa !important;
+  border: none !important;
+  padding: 12px 48px;
+  margin: 0;
+}
+
+.cashier-app .item-status-in_progress .item-unit-row,
+.cashier-app .item-status-in_kitchen .item-unit-row,
+.cashier-app .item-status-active .item-unit-row {
+  background: #60a5fa;
+  border: none;
 }
 
 .cashier-app .item-right {

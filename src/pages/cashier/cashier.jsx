@@ -78,6 +78,8 @@ function Cashier() {
     getOrdersForTable,
     getItemsForOrder,
     createCustomerRequest,
+    createOrder,
+    addItemsToOrder,
     billOutTable,
     removeOrderItem,
     updateOrderStatus,
@@ -602,13 +604,30 @@ function Cashier() {
     if (availableCart.length === 0) return;
     setPunchingOrder(true);
     try {
-      await createCustomerRequest(selected.table_number, availableCart.map((item) => ({
-        id: item.id,
-        menu_item_id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.qty,
-      })));
+      // Check if there's an existing active order for this table
+      const activeOrder = existingOrders.find(
+        (order) => order.status !== 'COMPLETED' && order.status !== 'CANCELLED'
+      );
+
+      if (activeOrder) {
+        // Add items to existing order
+        await addItemsToOrder(activeOrder.id, availableCart.map((item) => ({
+          id: item.id,
+          menu_item_id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.qty,
+        })));
+      } else {
+        // Create a new order directly (not a request)
+        await createOrder(selected.table_number, 'Cashier', availableCart.map((item) => ({
+          id: item.id,
+          menu_item_id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.qty,
+        })), 'DINE-IN');
+      }
 
       // Clear the cart after successful punch
       setCarts((prev) => ({ ...prev, [selectedId]: [] }));
@@ -1368,6 +1387,7 @@ function Cashier() {
 
               <div className="items-list">
                 {groupedExistingItems.map((item) => {
+                  console.log('Item status:', item.status, 'Item:', item.item_name);
                   const calculateItemTotal = (entry) => {
                     const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
                     const entryDiscount = (entry.pwd_discount ? entrySubtotal * 0.2 : 0)
@@ -1470,19 +1490,25 @@ function Cashier() {
                   <div className="empty-items">No items yet. Add from below.</div>
                 ) : (
                   cart.map((item) => (
-                    <div key={item.id} className="item-row pending item-status-new">
-                      <div>
-                        <div className="item-name">{item.name} × {item.qty}</div>
-                      </div>
-                      <div className="item-right">
-                        <span>{formatPrice(item.price * item.qty)}</span>
-                        <button
-                          className="item-remove"
-                          onClick={() => removeItem(item.id)}
-                          title="Decrease quantity"
-                        >
-                          −
-                        </button>
+                    <div key={item.id} className="item-group item-status-new">
+                      <div className="item-row">
+                        <div className="item-content">
+                          <div className="item-name">
+                            <span className="item-name-text">{item.name} × {item.qty}</span>
+                          </div>
+                        </div>
+                        <div className="item-right">
+                          <div className="item-right-main">
+                            <span>{formatPrice(item.price * item.qty)}</span>
+                            <button
+                              className="item-remove"
+                              onClick={() => removeItem(item.id)}
+                              title="Remove item"
+                            >
+                              −
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
