@@ -1,6 +1,6 @@
 /* ==========================================================================
    SERVIO POS - WELCOME & MAIN PAGES SELECTOR DASHBOARD (/)
-   Light Mode Default with Dynamic Dark Mode Support
+   MonolithOS Design with Category Navigation
    ========================================================================== */
 
 /* ── Base Container (Light Mode Default) ── */
@@ -9,10 +9,7 @@
   min-height: 100vh;
   height: 100vh;
   max-height: 100vh;
-  background: #f8fafc;
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(8, 127, 99, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(56, 189, 248, 0.06), transparent);
+  background: #fafbfc;
   color: #0f172a;
   display: flex;
   flex-direction: column;
@@ -28,305 +25,244 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 36px 32px 48px;
-  max-width: 1400px;
+  padding: 32px 40px 60px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  gap: 32px;
 }
 
-/* ── Hero Welcome Section ── */
-.servio-welcome-hero {
-  text-align: center;
-  max-width: 720px;
-  margin-bottom: 38px;
+/* ── Category Navigation (Below Header) ── */
+.servio-category-nav {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
-.servio-welcome-kicker-row {
+.servio-category-container {
+  display: inline-flex;
+  gap: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.servio-category-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.servio-welcome-kicker {
-  font-size: 11.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #087f63;
-}
-
-.servio-role-tag {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 4px 10px;
-  border-radius: 999px;
-  line-height: 1;
-}
-
-.servio-role-tag.admin {
-  background: rgba(168, 85, 247, 0.12);
-  color: #7e22ce;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-.servio-role-tag.employee {
-  background: rgba(8, 127, 99, 0.12);
-  color: #087f63;
-  border: 1px solid rgba(8, 127, 99, 0.28);
-}
-
-.servio-welcome-title {
-  margin: 0;
-  font-size: clamp(1.8rem, 3.2vw, 2.5rem);
-  font-weight: 850;
-  letter-spacing: -0.02em;
-  color: #0f172a;
-  line-height: 1.2;
-}
-
-.servio-welcome-name {
-  background: linear-gradient(135deg, #087f63 0%, #0284c7 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.servio-welcome-desc {
-  margin: 0;
-  font-size: clamp(0.92rem, 1.2vw, 1.05rem);
+  justify-content: center;
+  padding: 12px 32px;
+  border: none;
+  background: transparent;
   color: #64748b;
-  line-height: 1.55;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+}
+
+.servio-category-btn:hover {
+  color: #0f172a;
+}
+
+.servio-category-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.servio-category-label {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* ── Main Selector Cards Grid ── */
 .servio-welcome-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   width: 100%;
   max-width: 1360px;
+  animation: slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.servio-welcome-grid.cols-4 {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.servio-welcome-grid.cols-3 {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  max-width: 1140px;
-}
-
-/* ── Card Styling (Light Mode) ── */
+/* ── Card Styling (Green/Blue Design) ── */
 .servio-main-card {
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 28px 24px 22px;
+  background: #e8f5f1;
+  border: none;
+  border-radius: 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   text-align: left;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   outline: none;
+  min-height: 280px;
+  animation: cardFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: var(--animation-delay, 0s);
+  opacity: 0;
 }
 
-.servio-main-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--card-accent, #087f63);
-  opacity: 0;
-  transition: opacity 0.22s ease;
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .servio-main-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--card-accent, #087f63);
-  box-shadow: 0 16px 36px -4px rgba(8, 127, 99, 0.15), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
-  background: #ffffff;
-}
-
-.servio-main-card:hover::before {
-  opacity: 1;
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
 .servio-main-card:active {
-  transform: translateY(-1px) scale(0.99);
+  transform: translateY(-4px) scale(0.98);
 }
 
-.servio-main-card-top {
+.servio-main-card-icon-area {
+  background: #d1ede5;
+  padding: 50px 28px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px 16px 0 0;
 }
 
 .servio-main-card-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 14px;
-  background: rgba(8, 127, 99, 0.07);
-  border: 1px solid rgba(8, 127, 99, 0.14);
-  color: var(--card-accent, #087f63);
+  width: 80px;
+  height: 80px;
   display: grid;
   place-items: center;
-  transition: transform 0.22s ease, background-color 0.22s ease, color 0.22s ease;
+  color: #10b981;
+  transition: all 0.3s ease;
 }
 
 .servio-main-card:hover .servio-main-card-icon {
-  transform: scale(1.08);
-  background: var(--card-accent, #087f63);
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(8, 127, 99, 0.3);
+  transform: scale(1.1);
+  color: #059669;
 }
 
 .servio-main-card-icon svg {
-  width: 28px;
-  height: 28px;
+  width: 60px;
+  height: 60px;
+  stroke-width: 1.5;
 }
 
-.servio-main-card-badge {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-}
-
-.servio-main-card-body {
-  flex: 1 1 auto;
+.servio-main-card-content {
+  background: #ffffff;
+  padding: 24px 28px 28px;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: 10px;
+  border-radius: 0 0 16px 16px;
 }
 
 .servio-main-card-title {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 850;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: #0f172a;
   letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 
 .servio-main-card-desc {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: #64748b;
-  line-height: 1.5;
-}
-
-.servio-main-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
-  font-size: 13px;
-  font-weight: 750;
-  color: var(--card-accent, #087f63);
-  transition: color 0.15s ease;
-}
-
-.servio-main-card:hover .servio-main-card-footer svg {
-  transform: translateX(4px);
-}
-
-.servio-main-card-footer svg {
-  transition: transform 0.2s ease;
+  line-height: 1.55;
 }
 
 /* ==========================================================================
    DARK MODE OVERRIDES FOR WELCOME SCREEN
-   Triggered via [data-theme="dark"] or .servio-welcome-page--dark
    ========================================================================== */
 
 [data-theme="dark"] .servio-welcome-page,
 .servio-welcome-page--dark {
-  background: #0b1324;
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(8, 127, 99, 0.25), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(56, 189, 248, 0.1), transparent);
+  background: #0f1419;
   color: #f8fafc;
 }
 
-[data-theme="dark"] .servio-welcome-kicker,
-.servio-welcome-page--dark .servio-welcome-kicker {
-  color: #38bdf8;
+[data-theme="dark"] .servio-category-container,
+.servio-welcome-page--dark .servio-category-container {
+  background: #1a1d24;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .servio-role-tag.admin,
-.servio-welcome-page--dark .servio-role-tag.admin {
-  background: rgba(168, 85, 247, 0.18);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.4);
-}
-
-[data-theme="dark"] .servio-role-tag.employee,
-.servio-welcome-page--dark .servio-role-tag.employee {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-}
-
-[data-theme="dark"] .servio-welcome-title,
-.servio-welcome-page--dark .servio-welcome-title {
-  color: #f8fafc;
-}
-
-[data-theme="dark"] .servio-welcome-name,
-.servio-welcome-page--dark .servio-welcome-name {
-  background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-[data-theme="dark"] .servio-welcome-desc,
-.servio-welcome-page--dark .servio-welcome-desc {
+[data-theme="dark"] .servio-category-btn,
+.servio-welcome-page--dark .servio-category-btn {
   color: #94a3b8;
+}
+
+[data-theme="dark"] .servio-category-btn:hover,
+.servio-welcome-page--dark .servio-category-btn:hover {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .servio-category-btn.active,
+.servio-welcome-page--dark .servio-category-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
 }
 
 [data-theme="dark"] .servio-main-card,
 .servio-welcome-page--dark .servio-main-card {
-  background: #1e293b;
-  border-color: #334155;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background: #1e3a32;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .servio-main-card:hover,
 .servio-welcome-page--dark .servio-main-card:hover {
-  background: #233247;
-  border-color: var(--card-accent, #10b981);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 20px rgba(8, 127, 99, 0.15);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .servio-main-card-icon-area,
+.servio-welcome-page--dark .servio-main-card-icon-area {
+  background: #152822;
 }
 
 [data-theme="dark"] .servio-main-card-icon,
 .servio-welcome-page--dark .servio-main-card-icon {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #34d399;
 }
 
-[data-theme="dark"] .servio-main-card-badge,
-.servio-welcome-page--dark .servio-main-card-badge {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
+[data-theme="dark"] .servio-main-card:hover .servio-main-card-icon,
+.servio-welcome-page--dark .servio-main-card:hover .servio-main-card-icon {
+  color: #6ee7b7;
+}
+
+[data-theme="dark"] .servio-main-card-content,
+.servio-welcome-page--dark .servio-main-card-content {
+  background: #1e293b;
 }
 
 [data-theme="dark"] .servio-main-card-title,
@@ -337,9 +273,4 @@
 [data-theme="dark"] .servio-main-card-desc,
 .servio-welcome-page--dark .servio-main-card-desc {
   color: #94a3b8;
-}
-
-[data-theme="dark"] .servio-main-card-footer,
-.servio-welcome-page--dark .servio-main-card-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }

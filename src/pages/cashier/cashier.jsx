@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +18,23 @@ function MenuImagePlaceholder() {
     </svg>
   );
 }
+
+// Isolated timer component — owns its own 1s tick so the parent never re-renders
+const TableElapsedTimer = memo(function TableElapsedTimer({ occupiedSince, reservedSince, occupied, reserved }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!occupied && !reserved) return null;
+  const startedAt = occupied ? occupiedSince : reservedSince;
+  if (!startedAt) return null;
+  const elapsedMs = Date.now() - new Date(startedAt).getTime();
+  if (elapsedMs < 0) return null;
+  const minutes = Math.floor(elapsedMs / 60000);
+  const seconds = Math.floor((elapsedMs % 60000) / 1000);
+  return <span className="table-card-timer">{minutes}m {String(seconds).padStart(2, '0')}s</span>;
+});
 
 function useFixedInterfaceCanvas() {
   return { scale: 1, width: '100%', height: '100vh' };
@@ -186,7 +203,6 @@ function Cashier() {
   const [receipt, setReceipt] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [reservedTables, setReservedTables] = useState([]);
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [punchingOrder, setPunchingOrder] = useState(false);
   const [pwdDiscount, setPwdDiscount] = useState(false);
   const [seniorDiscount, setSeniorDiscount] = useState(false);
@@ -194,6 +210,7 @@ function Cashier() {
   const [floatDiscountValue, setFloatDiscountValue] = useState('');
   const [carts, setCarts] = useState({});
   const [showRequestsDrawer, setShowRequestsDrawer] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const requestsDrawerRef = useRef(null);
   const toggleButtonRef = useRef(null);
 
@@ -1197,25 +1214,33 @@ function Cashier() {
       <div className={`main ${isMenuOrdering ? 'menu-ordering-main' : ''}`}>
         {isMenuOrdering ? (
           <section className="menu-ordering-workspace">
-            <aside className="menu-category-sidebar">
-              <p className="menu-category-label">Categories</p>
-              {menuCategories.map((category) => (
-                <button
-                  key={category.id}
-                  className={`menu-category-button ${category.isBestSeller ? 'menu-category-button--best-seller' : ''} ${activeMenuCategory === category.id ? 'active' : ''}`}
-                  onClick={() => selectCategory(category.id)}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </aside>
-            <div className="menu-catalog">
-              <div className="menu-search-row">
+            {/* ── Top bar: category pills + search ── */}
+            <div className="menu-topbar">
+              <div className="menu-topbar-left">
+                {menuCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    className={`menu-pill ${category.isBestSeller ? 'menu-pill--best-seller' : ''} ${activeMenuCategory === category.id ? 'active' : ''}`}
+                    onClick={() => selectCategory(category.id)}
+                  >
+                    {category.name}
+                    <span className="menu-pill-count">
+                      {category.isBestSeller
+                        ? visibleMenuItems.length
+                        : menuItems.filter((i) => i.category === category.id).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="menu-topbar-right">
                 <div className="menu-search-field">
+                  <svg className="menu-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                  </svg>
                   <input
                     className="menu-search-input"
                     type="search"
-                    placeholder="Search menu items..."
+                    placeholder="Search Menu"
                     aria-label="Search menu items"
                     value={menuSearch}
                     onFocus={() => setIsMenuSearchOpen(true)}
@@ -1248,35 +1273,57 @@ function Cashier() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* ── Menu grid (4 columns, photo cards) ── */}
+            <div className="menu-catalog">
               <div className="menu-item-grid">
-                {pagedMenuItems.map((item, idx) => (
-                  <button
-                    key={item.id}
-                    className={`menu-item-card ${item.status === 'SOLD OUT' ? 'is-sold-out' : ''}`}
-                    onClick={() => addMenuItem(item)}
-                    disabled={item.status === 'SOLD OUT'}
-                  >
-                    <span className="menu-item-image">
-                      {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="menu-item-photo" />
-                      ) : (
-                        <MenuImagePlaceholder />
-                      )}
-                    </span>
-                    <span className="menu-item-name">{item.name}</span>
-                    <span className="menu-item-bottom">
-                      <span className="menu-item-price">{formatPrice(item.price)}</span>
-                      {item.isTopBestSeller && item.soldCount > 0 && (
-                        <span className="menu-item-bestseller-badge">Best Seller</span>
-                      )}
-                    </span>
-                  </button>
-                ))}
+                {pagedMenuItems.map((item) => {
+                  const inCart = cart.find((ci) => ci.id === item.id);
+                  const isSoldOut = item.status === 'SOLD OUT';
+                  return (
+                    <div key={item.id} className={`menu-item-card ${isSoldOut ? 'is-sold-out' : ''}`}>
+                      <div className="menu-item-image-wrap">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="menu-item-photo" />
+                        ) : (
+                          <div className="menu-item-photo-placeholder"><MenuImagePlaceholder /></div>
+                        )}
+                        <span className={`menu-item-availability ${isSoldOut ? 'unavailable' : 'available'}`}>
+                          <span className="availability-dot" />
+                          {isSoldOut ? 'Not Available' : 'Available'}
+                        </span>
+                        {item.isTopBestSeller && item.soldCount > 0 && (
+                          <span className="menu-item-bestseller-badge">Best Seller</span>
+                        )}
+                      </div>
+                      <div className="menu-item-footer">
+                        <div className="menu-item-info">
+                          <span className="menu-item-name">{item.name}</span>
+                          <span className="menu-item-price">{formatPrice(item.price)}</span>
+                        </div>
+                        {isSoldOut ? (
+                          <button className="menu-item-btn menu-item-btn--unavailable" disabled>
+                            <span>✕</span> Not Available
+                          </button>
+                        ) : inCart ? (
+                          <button className="menu-item-btn menu-item-btn--more" onClick={() => addMenuItem(item)}>
+                            Add More ({inCart.qty})
+                          </button>
+                        ) : (
+                          <button className="menu-item-btn menu-item-btn--add" onClick={() => addMenuItem(item)}>
+                            <span>+</span> Add to Cart
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
                 {visibleMenuItems.length === 0 && (
-                  <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#64748b', padding: '48px 20px', background: '#fff', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+                  <div className="menu-empty-state">
                     <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🔥</div>
-                    <h3 style={{ margin: '0 0 6px', color: '#0f172a', fontSize: '1.1rem' }}>No Best Sellers Recorded Yet</h3>
-                    <p style={{ margin: 0, fontSize: '0.85rem' }}>Items will automatically appear here ranked by sales as orders are placed.</p>
+                    <h3>No Best Sellers Recorded Yet</h3>
+                    <p>Items will appear here ranked by sales as orders are placed.</p>
                   </div>
                 )}
               </div>
@@ -1394,59 +1441,11 @@ function Cashier() {
         )}
 
         <aside className="sidebar">
+          <div className="sidebar-title">Order Summary</div>
           {selected && (
             <>
-              <div className="sidebar-header">
-                <div>
-                  <div className="bill-title">
-                    Table {String(selected.label).padStart(2, '0')}
-                    <span className="sidebar-table-pax" title={`Seating Capacity: ${selected.capacity} PAX`}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                      {selected.capacity} PAX
-                    </span>
-                  </div>
-                </div>
-                <div className="status-legend">
-                  <div className="legend-item">
-                    <span className="legend-dot legend-dot--yellow"></span>
-                    <span>New</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-dot legend-dot--orange"></span>
-                    <span>Pending</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-dot legend-dot--blue"></span>
-                    <span>Active</span>
-                  </div>
-                </div>
-              </div>
-
-              {selected.isAssistanceRequested && (
-                <div className="cashier-assistance-callout">
-                  <div className="cashier-assistance-callout-header">
-                    <span className="cashier-assistance-callout-icon">🛎️</span>
-                    <div className="cashier-assistance-callout-info">
-                      <strong>Assistance Requested</strong>
-                      <span className="cashier-assistance-type">{selected.assistanceDetails?.type || 'Assistance Needed'}</span>
-                      {selected.assistanceDetails?.note && (
-                        <p className="cashier-assistance-note">"{selected.assistanceDetails.note}"</p>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="cashier-assistance-resolve-btn"
-                    onClick={() => resolveTableAssistance(selected.table_number)}
-                  >
-                    ✓ Acknowledge &amp; Clear Assistance
-                  </button>
-                </div>
-              )}
-
-              <div className="items-list">
+              <div className="order-summary-items">
                 {groupedExistingItems.map((item) => {
-                  console.log('Item status:', item.status, 'Item:', item.item_name);
                   const calculateItemTotal = (entry) => {
                     const entrySubtotal = (Number(entry.price) || 0) * (Number(entry.quantity) || 0);
                     const entryDiscount = (entry.pwd_discount ? entrySubtotal * 0.2 : 0)
@@ -1455,186 +1454,100 @@ function Cashier() {
                     const afterPercent = Math.max(0, entrySubtotal - entryDiscount);
                     return Math.max(0, afterPercent - Math.min(afterPercent, Number(entry.float_discount) || 0));
                   };
-                  const itemSubtotal = item.rows.reduce((sum, entry) => sum + (Number(entry.price) || 0) * (Number(entry.quantity) || 0), 0);
                   const itemTotal = item.rows.reduce((sum, entry) => sum + calculateItemTotal(entry), 0);
-                  const isExpanded = expandedItemIds[item.id] || false;
-                  const unitCount = Math.max(1, Number(item.quantity) || 1);
-                  const itemUnits = item.rows.flatMap((entry) => Array.from({ length: Math.max(1, Number(entry.quantity) || 1) }, (_, index) => ({ entry, index })));
+                  const menuItem = menuItems.find((m) => m.id === item.menu_item_id);
                   return (
-                    <div key={item.id} className={`item-group item-status-${String(item.status || 'PENDING').toLowerCase()}`}>
-                      <div className="item-row">
-                        <div className="item-content">
-                          <div className="item-name">
-                            {unitCount > 1 && (
-                              <button className="item-expand-button" onClick={() => toggleItemExpansion(item.id)} title="Show individual items">
-                                {isExpanded ? '▾' : '▸'}
-                              </button>
-                            )}
-                            <span className="item-name-text">{item.item_name} × {item.quantity}</span>
-                          </div>
-                        </div>
-                        <div className="item-right">
-                          <div className="item-right-main">
-                            <span>{formatPrice(itemTotal)}</span>
-                            <button className="item-discount-button" onClick={() => openItemDiscountModal(item)} title="Apply item discount">%</button>
-                            <button
-                              className="item-remove"
-                              onClick={() => requestItemDecrease(item)}
-                              title="Decrease quantity"
-                            >
-                              −
-                            </button>
-                          </div>
-                        </div>
+                    <div key={item.id} className="order-summary-item">
+                      <div className="order-summary-item-img">
+                        {menuItem?.image_url ? (
+                          <img src={menuItem.image_url} alt={item.item_name} />
+                        ) : (
+                          <div className="order-summary-item-img-placeholder"><MenuImagePlaceholder /></div>
+                        )}
                       </div>
-                      {isExpanded && unitCount > 1 && itemUnits.map(({ entry, index }, unitIndex) => (
-                        <div key={`${entry.id}-unit-${index}`} className="item-row item-unit-row">
-                          {(() => {
-                            const unitEntry = { ...entry, quantity: 1 };
-                            const unitTotal = calculateItemTotal(unitEntry);
-                            const unitSubtotal = Number(entry.price) || 0;
-                            const discountLines = [
-                              entry.pwd_discount && { label: 'PWD discount', value: unitSubtotal * 0.2 },
-                              entry.senior_discount && { label: 'Senior discount', value: unitSubtotal * 0.15 },
-                              Number(entry.percent_discount) > 0 && { label: `${entry.percent_discount}% discount`, value: unitSubtotal * (Number(entry.percent_discount) / 100) },
-                              Number(entry.float_discount) > 0 && { label: 'Fixed discount', value: Number(entry.float_discount) },
-                            ].filter(Boolean);
-                            return (
-                              <>
-                                <div className="item-unit-main">
-                                  <div className="item-content">
-                                    <div className="item-name">
-                                      <span className="item-name-text">{item.item_name}</span>
-                                    </div>
-                                  </div>
-                                  <div className="item-unit-price">{formatPrice(unitTotal)}</div>
-                                  <button className="item-discount-button" onClick={() => openItemDiscountModal(entry, unitIndex)} title="Apply discount to this item">%</button>
-                                  <button className="item-remove" onClick={() => requestItemDecrease(entry)} title="Remove this item">−</button>
-                                </div>
-                                {discountLines.length > 0 && (
-                                  <div className="item-unit-discount-row">
-                                    <div className="item-discount-labels">
-                                      {discountLines.map((discount) => (
-                                        <div key={discount.label} className="item-discount-info">{discount.label}</div>
-                                      ))}
-                                    </div>
-                                    <div className="item-discount-values">
-                                      {discountLines.map((discount) => (
-                                        <div key={discount.label} className="item-discount-info">-{formatPrice(discount.value)}</div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      ))}
+                      <div className="order-summary-item-info">
+                        <span className="order-summary-item-name">{item.item_name} <span className="order-summary-item-qty">({item.quantity})</span></span>
+                        {(item.notes || item.modifiers) && (
+                          <span className="order-summary-item-notes">{[item.notes, item.modifiers].filter(Boolean).join(' · ')}</span>
+                        )}
+                        <span className="order-summary-item-price">{formatPrice(itemTotal)}</span>
+                      </div>
+                      <div className="order-summary-item-actions">
+                        <button className="order-summary-icon-btn" onClick={() => openItemDiscountModal(item)} title="Discount">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m7 17 10-10M9 7h.01M15 17h.01"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg>
+                        </button>
+                        <button className="order-summary-icon-btn order-summary-icon-btn--delete" onClick={() => requestItemDecrease(item)} title="Remove">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
-                {/* Pending kitchen items — merged by item to avoid duplicates */}
-                {mergedPendingItems.map((item, index) => (
-                  <div key={`pending-${item.menu_item_id || item.id || item.name || index}`} className="item-row pending item-status-pending">
-                    <div>
-                      <div className="item-name">{item.name || item.item_name} × {item.quantity}</div>
+                {cart.map((item) => (
+                  <div key={`cart-${item.id}`} className="order-summary-item order-summary-item--cart">
+                    <div className="order-summary-item-img">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} />
+                      ) : (
+                        <div className="order-summary-item-img-placeholder"><MenuImagePlaceholder /></div>
+                      )}
                     </div>
-                    <div className="item-right">
-                      <span>{formatPrice((Number(item.price) || 0) * item.quantity)}</span>
+                    <div className="order-summary-item-info">
+                      <span className="order-summary-item-name">{item.name} <span className="order-summary-item-qty">({item.qty})</span></span>
+                      <span className="order-summary-item-price">{formatPrice(item.price * item.qty)}</span>
+                    </div>
+                    <div className="order-summary-item-actions">
+                      <button className="order-summary-icon-btn order-summary-icon-btn--delete" onClick={() => removeItem(item.id)} title="Remove">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                      </button>
                     </div>
                   </div>
                 ))}
-                {/* Cart items — not yet punched */}
-                {cart.length === 0 && existingItems.length === 0 && selectedPendingKitchenRequests.length === 0 ? (
-                  <div className="empty-items">No items yet. Add from below.</div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.id} className="item-group item-status-new">
-                      <div className="item-row">
-                        <div className="item-content">
-                          <div className="item-name">
-                            <span className="item-name-text">{item.name} × {item.qty}</span>
-                          </div>
-                        </div>
-                        <div className="item-right">
-                          <div className="item-right-main">
-                            <span>{formatPrice(item.price * item.qty)}</span>
-                            <button
-                              className="item-remove"
-                              onClick={() => removeItem(item.id)}
-                              title="Remove item"
-                            >
-                              −
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                {!hasItems && (
+                  <div className="order-summary-empty">No items added yet.</div>
                 )}
               </div>
 
-              <div className="summary">
-                <div className="summary-row">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+              <div className="order-summary-totals">
+                <div className="summary-row"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
+                <div className="summary-row"><span>Taxes</span><span>{formatPrice(subtotal * 0.1)}</span></div>
+                {discount > 0 && (
+                  <div className="summary-row summary-row--discount"><span>Discount</span><span>-{formatPrice(discount)}</span></div>
+                )}
+                <div className="summary-row summary-row--total"><span>Total Payment</span><span>{formatPrice(total)}</span></div>
+              </div>
+
+              <div className="order-summary-meta">
+                <div className="order-meta-row">
+                  <span>Order Type</span>
+                  <span className="order-meta-value">Dine-in <span className="order-meta-chevron">▾</span></span>
                 </div>
-                {individualDiscount > 0 && (
-                  <div className="summary-row">
-                    <span>Individual Discounts</span>
-                    <span>-{formatPrice(individualDiscount)}</span>
-                  </div>
-                )}
-                {selectedDiscounts.map((item) => (
-                  <div className="summary-row" key={item.label}>
-                    <span>{item.label}</span>
-                    <span>-{formatPrice(item.amount)}</span>
-                  </div>
-                ))}
-                {selected?.billOutPaymentMethod && (
-                  <div className="summary-row summary-payment-method">
-                    <span>Requested Payment</span>
-                    <span className="summary-payment-badge">
-                      {selected.billOutPaymentMethod === 'qr' && '📱 InstaPay QR'}
-                      {selected.billOutPaymentMethod === 'credit' && '💳 Credit Card'}
-                      {selected.billOutPaymentMethod === 'cash' && '💵 Cash'}
-                    </span>
-                  </div>
-                )}
-                <div className="summary-total">
-                  <span>Total</span>
-                  <span>{formatPrice(total)}</span>
+                <div className="order-meta-row">
+                  <span>Select Table</span>
+                  <span className="order-meta-value">
+                    {selected ? `Table ${String(selected.label).padStart(2, '0')}` : '—'}
+                    <span className="order-meta-chevron">▾</span>
+                  </span>
                 </div>
               </div>
+
+              {discount > 0 && (
+                <div className="order-discount-hint">
+                  <span className="order-discount-dot" />
+                  <span>{Math.round((discount / subtotal) * 100)}% Discount applied</span>
+                </div>
+              )}
 
               <div className="sidebar-actions">
-                {isMenuOrdering ? <>
-                  <button className="clear-button" onClick={requestClearOrder} disabled={cart.length === 0}>
-                    <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 16 9-9 3 3-9 9H7v-3Zm10.7-10.7 1.1-1.1a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4L19.7 7l-2-1.7Z"/></svg></span>
-                    Clear
-                  </button>
-                  <button className="punch-order-button" onClick={requestPunchOrder} disabled={cart.length === 0 || punchingOrder}>
-                    <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 2v5h10V5H7Zm0 9v5h10v-5H7Z"/></svg></span>
+                {isMenuOrdering ? (
+                  <button className="confirm-payment-btn" onClick={requestPunchOrder} disabled={cart.length === 0 || punchingOrder}>
                     {punchingOrder ? 'Punching...' : 'Punch Order'}
                   </button>
-                  <button className="cancel-order-button" onClick={requestCancelOrder} disabled={!(selected?.occupied && hasPunchedItems)}>
-                    <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4L17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19 12 13.4l5.6 5.6 1.4-1.4-5.6-5.6L19 6.4Z"/></svg></span>
-                    Cancel Order
+                ) : (
+                  <button className="confirm-payment-btn" onClick={openPaymentModal} disabled={!hasItems}>
+                    Confirm Payment
                   </button>
-                </> : <>
-                  <button className="discount-button" onClick={openTableDiscountModal}>
-                    <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M856-390 570-104q-12 12-27 18t-30 6q-15 0-30-6t-27-18L103-457q-11-11-17-25.5T80-513v-287q0-33 23.5-56.5T160-880h287q16 0 31 6.5t26 17.5l352 353q12 12 17.5 27t5.5 30q0 15-5.5 29.5T856-390ZM513-160l286-286-353-354H160v286l353 354ZM260-640q25 0 42.5-17.5T320-700q0-25-17.5-42.5T260-760q-25 0-42.5 17.5T200-700q0 25 17.5 42.5T260-640Zm220 160Z"/></svg></span>
-                    Discount
-                  </button>
-                  <button className="reserve-button" onClick={toggleReservation} disabled={selected?.occupied}>
-                    <span className="button-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H5V5h10v5z"/></svg></span>
-                    {selected?.reserved ? 'Unreserve' : 'Reserve'}
-                  </button>
-                  <button className="bill-button" onClick={openPaymentModal} disabled={!hasItems}>
-                    <span className="button-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M560-440q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM280-320q-33 0-56.5-23.5T200-400v-320q0-33 23.5-56.5T280-800h560q33 0 56.5 23.5T920-720v320q0 33-23.5 56.5T840-320H280Zm80-80h400q0-33 23.5-56.5T840-480v-160q-33 0-56.5-23.5T760-720H360q0 33-23.5 56.5T280-640v160q33 0 56.5 23.5T360-400Zm440 240H120q-33 0-56.5-23.5T40-240v-440h80v440h680v80ZM280-400v-320 320Z"/></svg></span>
-                    Bill Out
-                  </button>
-                </>}
+                )}
               </div>
             </>
           )}

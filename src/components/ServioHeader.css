@@ -5,10 +5,10 @@
 
 :root,
 [data-theme="light"] {
-  --servio-topbar-bg: #ffffff;
-  --servio-topbar-border: #e2e8f0;
-  --servio-topbar-text: #0f172a;
-  --servio-topbar-muted: #64748b;
+  --servio-topbar-bg: #1e293b;
+  --servio-topbar-border: #334155;
+  --servio-topbar-text: #f8fafc;
+  --servio-topbar-muted: #94a3b8;
   --servio-topbar-height: 84px;
   --servio-accent: #087f63;
   --servio-accent-hover: #066b54;

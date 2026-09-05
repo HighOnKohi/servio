@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,78 +11,121 @@ export default function InterfaceSelector() {
   const { user, profile, isAdmin } = useAuth();
   const { theme, isDark } = useTheme();
   const { scale: uiScale, changeScale: handleScaleChange, fontScale, elementScale } = useUIScale();
+  const [activeCategory, setActiveCategory] = useState('front-ops');
 
   const staffName = profile?.full_name || user?.email?.split('@')[0] || 'Staff User';
   const staffRole = isAdmin ? 'System Administrator' : (profile?.role || 'Staff Employee');
 
-  // Main operational pages
-  const mainCards = useMemo(() => {
-    const cards = [
+  // Categories
+  const categories = [
+    { id: 'front-ops', label: 'FRONT OPS' },
+    { id: 'management', label: 'MANAGEMENT' },
+    { id: 'admin', label: 'ADMIN' },
+  ];
+
+  // All interface cards organized by category
+  const allCards = useMemo(() => ({
+    'front-ops': [
       {
         id: 'kitchen',
         title: 'Kitchen Interface',
-        badge: 'Food Ops',
-        desc: 'Live incoming orders, kitchen ticket queue, food preparation & ready notifications.',
+        desc: 'High-density ticket display, timing orchestration, and station routing.',
         route: '/kitchen/active-orders',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="3" width="16" height="5" rx="1" />
-            <path d="M6 8v3m4-3v3m4-3v3" />
-            <path d="M4 14h16v5H4z" />
+            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
           </svg>
         ),
         color: '#10b981',
       },
       {
-        id: 'table-manager',
-        title: 'Table Management',
-        badge: 'Floor Ops',
-        desc: 'Restaurant floor plan, table status tracking, customer capacity & QR code generation.',
-        route: '/table-manager',
-        icon: (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 8h16v5H4z" />
-            <path d="M6 13v6m12-6v6M8 8V5h8v3" />
-          </svg>
-        ),
-        color: '#38bdf8',
-      },
-      {
         id: 'cashier',
         title: 'Cashier Interface',
-        badge: 'POS Terminal',
-        desc: 'Order billing, PWD/Senior discounts, table checkout, receipt printing & cash drawer.',
+        desc: 'Rapid transaction processing, split-tender handling, and receipt printing.',
         route: '/cashier/overview',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <path d="M7 9h10M7 13h2m3 0h2m3 0h0M7 16h10" />
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <path d="M7 15h0M12 15h0M17 15h0M7 11h10M7 8h10"/>
           </svg>
         ),
-        color: '#f59e0b',
+        color: '#10b981',
       },
-    ];
-
-    // Admin accounts only: reveal the 4th main card (Admin Dashboard)
-    if (isAdmin) {
-      cards.push({
+      {
+        id: 'customer',
+        title: 'Customer Interface',
+        desc: 'Self-service kiosk mode, digital menus, and patron loyalty access.',
+        route: '/customer',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        ),
+        color: '#10b981',
+      },
+    ],
+    'management': [
+      {
+        id: 'table-manager',
+        title: 'Table Management',
+        desc: 'Restaurant floor plan, table status tracking, and QR generation.',
+        route: '/table-manager',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="8" width="18" height="12" rx="2"/>
+            <path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 20v2M17 20v2"/>
+          </svg>
+        ),
+        color: '#0284c7',
+      },
+      {
+        id: 'inventory',
+        title: 'Inventory Management',
+        desc: 'Stock tracking, supplier orders, waste logging, and ingredient costing.',
+        route: '/inventory',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+          </svg>
+        ),
+        color: '#0284c7',
+      },
+      {
+        id: 'reports',
+        title: 'Reports & Analytics',
+        desc: 'Sales trends, peak hours analysis, and revenue forecasting.',
+        route: '/reports',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="20" x2="12" y2="10" />
+            <line x1="18" y1="20" x2="18" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="16" />
+          </svg>
+        ),
+        color: '#0284c7',
+      },
+    ],
+    'admin': isAdmin ? [
+      {
         id: 'admin',
         title: 'Admin Dashboard',
-        badge: 'Admin Only',
-        desc: 'Staff account management, revenue reporting, order history audit logs & protocols.',
+        desc: 'Staff management, revenue reporting, and order history audit logs.',
         route: '/admin',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="7" r="3" />
-            <path d="M5 21a7 7 0 0 1 14 0M19 8v5m-2.5-2.5h5" />
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
         ),
-        color: '#a855f7',
-      });
-    }
+        color: '#0284c7',
+      },
+    ] : [],
+  }), [isAdmin]);
 
-    return cards;
-  }, [isAdmin]);
+  const currentCards = allCards[activeCategory] || [];
 
   return (
     <div
@@ -93,30 +136,32 @@ export default function InterfaceSelector() {
       }}
     >
       <ServioHeader
-        title="SERVIO POS"
+        title="Servio"
         group="SYSTEM PORTAL"
         uiScale={uiScale}
         onScaleChange={handleScaleChange}
       />
 
       <main className="servio-welcome-main">
-        <div className="servio-welcome-hero">
-          <div className="servio-welcome-kicker-row">
-            <span className="servio-welcome-kicker">Operational Suite</span>
-            <span className={`servio-role-tag ${isAdmin ? 'admin' : 'employee'}`}>
-              {isAdmin ? '👑 Administrator' : '👤 Staff Employee'}
-            </span>
+        {/* Category Navigation */}
+        <div className="servio-category-nav">
+          <div className="servio-category-container">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={`servio-category-btn ${activeCategory === category.id ? 'active' : ''}`}
+                onClick={() => setActiveCategory(category.id)}
+              >
+                <span className="servio-category-label">{category.label}</span>
+              </button>
+            ))}
           </div>
-          <h1 className="servio-welcome-title">
-            Welcome back, <span className="servio-welcome-name">{staffName}</span>
-          </h1>
-          <p className="servio-welcome-desc">
-            Select one of the {mainCards.length} operational interfaces below to begin your shift, or toggle the logo burger menu at any time.
-          </p>
         </div>
 
-        <div className={`servio-welcome-grid ${isAdmin ? 'cols-4' : 'cols-3'}`}>
-          {mainCards.map((card) => (
+        {/* Cards Grid with Animation */}
+        <div className="servio-welcome-grid" key={activeCategory}>
+          {currentCards.map((card, index) => (
             <button
               key={card.id}
               type="button"
@@ -127,21 +172,17 @@ export default function InterfaceSelector() {
                 } catch {}
                 navigate(card.route);
               }}
-              style={{ '--card-accent': card.color }}
+              style={{ 
+                '--card-accent': card.color,
+                '--animation-delay': `${index * 0.1}s`
+              }}
             >
-              <div className="servio-main-card-top">
+              <div className="servio-main-card-icon-area">
                 <div className="servio-main-card-icon">{card.icon}</div>
-                <span className="servio-main-card-badge">{card.badge}</span>
               </div>
-              <div className="servio-main-card-body">
+              <div className="servio-main-card-content">
                 <h2 className="servio-main-card-title">{card.title}</h2>
                 <p className="servio-main-card-desc">{card.desc}</p>
-              </div>
-              <div className="servio-main-card-footer">
-                <span>Launch Interface</span>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
               </div>
             </button>
           ))}
